@@ -20,5 +20,5 @@ Requisitos: Java 21. Nada más — la base es embebida.
 
 ## Estructura
 
-    backend/   Spring Boot 3.5 + Java 21 + Gradle
+    backend/   Spring Boot 4.1.1 + Java 21 + Gradle
     frontend/  React + Vite (entrega 2)
