@@ -8,6 +8,26 @@
 
 **Input**: User description: "El sistema permite que cualquier persona se registre como usuario para poder operar en el mercado de jugadores. Registro con nombre de usuario, correo y contrasena; entrega de una clave de API de un solo uso; inicio de sesion con token de 24 horas; proteccion de los recursos con cualquiera de las dos credenciales; y gestion de las propias credenciales (perfil, cambio de contrasena, regeneracion de la clave de API)."
 
+## Clarifications
+
+### Session 2026-09-18
+
+Enmiendas surgidas de la planificacion (ver `plan.md`, seccion "Divergencias con el spec"):
+
+- Q: Si una peticion trae a la vez un token de sesion y una clave de API, y el token es
+  invalido pero la clave es valida, se atiende? -> A: No. El token de sesion tiene
+  precedencia: se evalua solo el token y la clave se ignora. Reemplaza al supuesto anterior,
+  que decia que alcanzaba con que una de las dos fuera valida.
+- Q: El perfil y la respuesta del registro incluyen el identificador del usuario? -> A: Si.
+  Ademas del nombre de usuario, el correo, el rol y el saldo, se devuelve el identificador.
+- Q: La contrasena tiene un largo maximo? -> A: Si, 72 bytes, que es el limite del mecanismo
+  de resguardo no reversible. Con caracteres simples equivale a 72 caracteres.
+- Q: El correo tiene un largo maximo? -> A: Si, 254 caracteres.
+- Q: La garantia de unicidad ante registros simultaneos cubre valores que solo difieren en
+  mayusculas? -> A: No. Cubre registros simultaneos con el mismo valor exacto. Fuera de la
+  simultaneidad, la diferencia solo en mayusculas se rechaza siempre. Es un riesgo aceptado
+  por el volumen del sistema.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Registro de usuario (Priority: P1)
@@ -30,7 +50,8 @@ con una credencial utilizable.
 1. **Given** que no existe ningun usuario con el nombre "lionel10" ni con el correo
    "lionel@mail.com", **When** una persona se registra con esos datos y una contrasena de
    al menos 8 caracteres, **Then** el sistema crea la cuenta, le asigna rol de usuario
-   comun y el saldo inicial de creditos, y devuelve la clave de API en la respuesta.
+   comun y el saldo inicial de creditos, y devuelve en la respuesta los datos de la cuenta
+   creada (identificador, nombre de usuario, correo, rol y saldo) junto con la clave de API.
 2. **Given** un registro exitoso, **When** se revisa la respuesta, **Then** no aparece la
    contrasena en ningun campo.
 3. **Given** que ya existe un usuario con el nombre "lionel10", **When** otra persona
@@ -106,23 +127,30 @@ que los recursos declarados publicos responden sin credencial.
 6. **Given** una peticion sin credencial a un recurso de consulta del catalogo de
    jugadores, **When** se envia, **Then** el sistema la atiende normalmente por la
    excepcion transitoria vigente.
+7. **Given** una peticion a un recurso protegido que trae un token de sesion invalido o
+   vencido y ademas una clave de API valida, **When** se envia, **Then** el sistema la
+   rechaza: el token tiene precedencia y la clave se ignora.
+8. **Given** una peticion a un recurso protegido que trae un token de sesion valido y ademas
+   una clave de API invalida, **When** se envia, **Then** el sistema la atiende como el
+   usuario del token.
 
 ---
 
 ### User Story 4 - Consulta del perfil propio (Priority: P4)
 
-Un usuario autenticado consulta sus propios datos: nombre de usuario, correo, rol y saldo.
+Un usuario autenticado consulta sus propios datos: identificador, nombre de usuario, correo,
+rol y saldo.
 
 **Why this priority**: Es la primera funcion que consume la autenticacion y le permite al
 usuario verificar su saldo antes de operar en el mercado.
 
 **Independent Test**: Se prueba autenticandose con cada una de las dos credenciales y
-verificando que la respuesta trae los cuatro datos y ninguno mas.
+verificando que la respuesta trae esos cinco datos y ninguno mas.
 
 **Acceptance Scenarios**:
 
 1. **Given** un usuario autenticado, **When** consulta su perfil, **Then** el sistema
-   devuelve su nombre de usuario, su correo, su rol y su saldo de creditos.
+   devuelve su identificador, su nombre de usuario, su correo, su rol y su saldo de creditos.
 2. **Given** un usuario autenticado, **When** consulta su perfil, **Then** la respuesta no
    contiene ni su contrasena ni su clave de API.
 3. **Given** dos usuarios distintos, **When** cada uno consulta su perfil, **Then** cada
@@ -231,13 +259,19 @@ seguidas para verificar que la segunda no toca nada.
 - El nombre de usuario o el correo llegan con espacios al principio o al final: se recortan
   antes de validar y de comparar.
 - Valores exactamente en el limite: nombre de usuario de 3 y de 30 caracteres, contrasena
-  de 8 caracteres. Los tres son validos.
+  de 8 y de 72 caracteres simples, correo de 254 caracteres. Todos son validos; un caracter
+  mas sobre cualquiera de los maximos se rechaza.
+- La contrasena tiene 72 caracteres o menos pero, por incluir acentos o simbolos, supera los
+  72 bytes: se rechaza por largo.
 - El nombre de usuario trae caracteres no admitidos (espacios, guiones medios, acentos,
   simbolos): se rechaza.
-- Dos registros con el mismo nombre de usuario llegan casi simultaneamente: solo uno crea
-  la cuenta; el otro recibe el rechazo por conflicto.
-- La peticion trae a la vez la clave de API y un token de sesion: alcanza con que una de
-  las dos sea valida.
+- Dos registros con exactamente el mismo nombre de usuario, o exactamente el mismo correo,
+  llegan casi simultaneamente: solo uno crea la cuenta; el otro recibe el rechazo por
+  conflicto. Si llegan a la vez y solo difieren en mayusculas, esta garantia no aplica (ver
+  Assumptions).
+- La peticion trae a la vez la clave de API y un token de sesion: se evalua unicamente el
+  token y la clave se ignora. Con un token valido se atiende aunque la clave sea invalida;
+  con un token invalido o vencido se rechaza aunque la clave sea valida.
 - La credencial esta bien formada pero el usuario al que apunta ya no existe: se rechaza
   como credencial invalida, sin distinguirla de cualquier otra invalida.
 - El token de sesion se presenta apenas pasado su vencimiento: se rechaza por vencido.
@@ -265,8 +299,10 @@ seguidas para verificar que la segunda no toca nada.
   de usuario, correo electronico y contrasena.
 - **FR-002**: El sistema MUST aceptar unicamente nombres de usuario de entre 3 y 30
   caracteres compuestos por letras, numeros y guiones bajos.
-- **FR-003**: El sistema MUST aceptar unicamente correos electronicos con formato valido.
-- **FR-004**: El sistema MUST aceptar unicamente contrasenas de al menos 8 caracteres.
+- **FR-003**: El sistema MUST aceptar unicamente correos electronicos con formato valido y
+  de a lo sumo 254 caracteres.
+- **FR-004**: El sistema MUST aceptar unicamente contrasenas de al menos 8 caracteres y de a
+  lo sumo 72 bytes.
 - **FR-005**: El sistema MUST garantizar que el nombre de usuario sea unico en todo el
   sistema.
 - **FR-006**: El sistema MUST garantizar que el correo electronico sea unico en todo el
@@ -309,6 +345,9 @@ seguidas para verificar que la segunda no toca nada.
 - **FR-019**: El sistema MUST exigir una credencial valida (clave de API o token de sesion)
   para atender cualquier recurso que no este declarado publico; ambas credenciales MUST ser
   igualmente validas y MUST resolver la misma identidad de usuario.
+- **FR-019a**: Si la peticion trae ambas credenciales, el sistema MUST evaluar unicamente el
+  token de sesion e ignorar la clave de API: la peticion se atiende o se rechaza segun el
+  token.
 - **FR-020**: El sistema MUST rechazar la peticion indicando el motivo cuando no trae
   credencial, cuando la credencial es invalida, cuando esta vencida o cuando corresponde a
   un usuario inexistente.
@@ -324,7 +363,7 @@ seguidas para verificar que la segunda no toca nada.
 #### Perfil propio
 
 - **FR-024**: Los usuarios autenticados MUST poder consultar sus propios datos de perfil:
-  nombre de usuario, correo, rol y saldo de creditos.
+  identificador, nombre de usuario, correo, rol y saldo de creditos.
 - **FR-025**: El perfil MUST NOT incluir la contrasena ni la clave de API.
 - **FR-026**: El sistema MUST devolver unicamente los datos del usuario que presenta la
   credencial.
@@ -378,9 +417,9 @@ seguidas para verificar que la segunda no toca nada.
 
 ### Key Entities
 
-- **Usuario**: la persona registrada en el sistema. Atributos: nombre de usuario (unico),
-  correo electronico (unico), contrasena guardada de forma no reversible, rol y saldo de
-  creditos. Es el titular de las dos credenciales.
+- **Usuario**: la persona registrada en el sistema. Atributos: identificador, nombre de
+  usuario (unico), correo electronico (unico), contrasena guardada de forma no reversible,
+  rol y saldo de creditos. Es el titular de las dos credenciales.
 - **Rol**: la categoria que determina que puede hacer un usuario. Dos valores: usuario
   comun, el unico que otorga el registro publico, y administrador, reservado para la gestion
   del mercado. El administrador existe por una sola via, el alta de arranque de FR-036, y su
@@ -434,7 +473,19 @@ seguidas para verificar que la segunda no toca nada.
 - El registro no emite un token de sesion. Para obtenerlo, el usuario inicia sesion.
 - La clave de API se guarda de forma no reversible, igual que la contrasena. Es la razon
   por la que no se puede volver a mostrar.
-- Si una peticion presenta las dos credenciales a la vez, alcanza con que una sea valida.
+- Si una peticion presenta las dos credenciales a la vez, el token de sesion tiene
+  precedencia: se evalua solo el token y la clave de API se ignora. Se prefiere un resultado
+  deterministico a probar una credencial tras otra.
+- El largo maximo de la contrasena es de 72 bytes, el limite del mecanismo de resguardo no
+  reversible: los bytes que pasaran ese limite no se tendrian en cuenta al verificarla. Con
+  caracteres simples equivale a 72 caracteres; con acentos o simbolos el limite se alcanza
+  antes.
+- El largo maximo del correo es de 254 caracteres, el maximo practico que admite el estandar
+  de correo electronico.
+- La unicidad sin distinguir mayusculas se garantiza siempre entre registros sucesivos. Ante
+  registros simultaneos, la garantia cubre valores identicos: dos registros simultaneos que
+  solo difieran en mayusculas podrian crearse ambos. Es un riesgo aceptado por el volumen del
+  sistema.
 - Los recursos declarados publicos responden aunque la peticion traiga una credencial
   invalida: una credencial invalida no bloquea un recurso publico.
 - El saldo inicial es igual para todos los usuarios que se registran bajo una misma

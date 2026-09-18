@@ -71,8 +71,27 @@ Ajustes de consistencia derivados:
 - Se sumaron SC-011 a SC-013, cuatro casos borde del alta y la dependencia con la
   funcionalidad de mercado.
 
+### Iteracion 3 - 2026-09-18
+
+Enmiendas surgidas de `/speckit-plan`, registradas en la seccion Clarifications del spec:
+
+1. **Dos credenciales a la vez**: el token de sesion tiene precedencia y la clave de API se
+   ignora. Cambian el caso borde y el supuesto; se agregan FR-019a y los escenarios 7 y 8 de
+   la User Story 3. Lo decidio el equipo el 2026-09-18 y reemplaza la regla por defecto de la
+   iteracion 1, "alcanza con que una sea valida".
+2. **Identificador en el perfil y en el registro**: FR-024, la User Story 4, el escenario 1 de
+   la User Story 1 y la entidad Usuario pasan a incluir el identificador.
+3. **Largo maximo de la contrasena**: FR-004 agrega un tope de 72 bytes, que es el limite del
+   mecanismo de resguardo no reversible. Se suman un supuesto y dos casos borde.
+4. **Largo maximo del correo**: FR-003 agrega un tope de 254 caracteres y un supuesto.
+5. **Unicidad ante registros simultaneos**: el caso borde se acota a valores identicos, y un
+   supuesto documenta el riesgo aceptado cuando solo difieren en mayusculas.
+
+Tambien sigue vigente la User Story 7 (alta del administrador), confirmada por el equipo el
+2026-09-18.
+
 ### Resultado
 
-16 de 16 items en verde. Estado final: 7 historias de usuario, 42 requisitos funcionales,
-13 criterios de exito, 0 marcadores [NEEDS CLARIFICATION]. El spec esta listo para
-`/speckit-plan`.
+16 de 16 items en verde. Estado final, despues de la iteracion 3: 7 historias de usuario, 43
+requisitos funcionales (42 mas FR-019a), 13 criterios de exito y 0 marcadores
+[NEEDS CLARIFICATION]. El spec y el plan estan alineados y listos para `/speckit-tasks`.
