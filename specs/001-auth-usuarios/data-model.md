@@ -2,10 +2,10 @@
 
 **Rama**: `001-auth-usuarios` | **Fecha**: 2026-09-18 | **Plan**: [plan.md](./plan.md)
 
-Todos los tipos del modelo viven en `auth/modelo/` y son Java puro: no llevan anotaciones de
-JPA ni importan `jakarta.persistence`, `org.springframework` ni nada del paquete
-`controller`. Lo que necesita infraestructura se resuelve con puertos, que son interfaces del
-modelo implementadas en `security/`.
+Todos los tipos del modelo viven en `auth/modelo/` y sus subpaquetes, y son Java puro: no
+llevan anotaciones de JPA ni importan `jakarta.persistence`, `org.springframework` ni nada del
+paquete `controller`. Lo que necesita infraestructura se resuelve con puertos, que son
+interfaces del modelo implementadas en `security/`.
 
 ```text
                    auth/modelo (Java puro)
@@ -138,7 +138,7 @@ configurada (24 horas por defecto, FR-016).
 
 ### Excepciones de dominio
 
-Viven en `auth/modelo/`. Hasta la integración con `shared/` extienden `RuntimeException`;
+Viven en `auth/modelo/exception/`. Hasta la integración con `shared/` extienden `RuntimeException`;
 después, la clase base de `shared/` (ver [contracts/shared-integration.md](./contracts/shared-integration.md)).
 Los mensajes están en español.
 

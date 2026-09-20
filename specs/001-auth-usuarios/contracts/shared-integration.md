@@ -29,7 +29,7 @@ advice no los ve (ver punto 5).
 
 ## 2. Clase base de excepciones: requisito
 
-Las excepciones de dominio de auth viven en `auth/modelo/`, y la constitución (principio I)
+Las excepciones de dominio de auth viven en `auth/modelo/exception/`, y la constitución (principio I)
 prohíbe que el modelo importe `org.springframework`. Por eso **la clase base de `shared/`
 tiene que poder extenderse sin tipos de Spring** en sus constructores o métodos abstractos.
 Por ejemplo, no puede exigir un `HttpStatus`. Sirve cualquiera de estas dos formas, y la elige
@@ -46,7 +46,7 @@ cambia una línea por clase.
 
 ## 3. Mapeo que auth necesita del advice
 
-| Excepción (`auth/modelo/`) | Status | `message` |
+| Excepción (`auth/modelo/exception/`) | Status | `message` |
 |---|---|---|
 | `DuplicateUsernameException` | 409 | El de la excepción |
 | `DuplicateEmailException` | 409 | El de la excepción |
@@ -94,7 +94,7 @@ auth.
 ## 7. Pasos de integración, cuando catálogo esté en `develop`
 
 1. Rebasear `001-auth-usuarios` sobre `develop`.
-2. Hacer que las excepciones de `auth/modelo/` extiendan la base, o las bases por categoría, de
+2. Hacer que las excepciones de `auth/modelo/exception/` extiendan la base, o las bases por categoría, de
    `shared/`.
 3. Hacer que `security/ApiErrorResponseWriter` use el `ApiError` de `shared/`, si es público.
    Si no, mantener el record propio con la misma forma y avisar.
