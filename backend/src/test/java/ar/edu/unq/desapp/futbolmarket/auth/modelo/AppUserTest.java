@@ -1,0 +1,157 @@
+package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.math.BigDecimal;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidUserDataException;
+
+class AppUserTest {
+
+    private static final String USERNAME = "lionel10";
+    private static final String EMAIL = "lionel@correo.com";
+    private static final String PASSWORD = "campeon2022";
+    private static final BigDecimal INITIAL_BALANCE = new BigDecimal("1000.00");
+    private static final int BALANCE_SCALE = 2;
+    private static final String EMAIL_DOMAIN = "@correo.com";
+
+    private final PasswordHasher hasher = new FakePasswordHasher();
+
+    @Test
+    void elRegistroCreaUnUsuarioComunConElSaldoInicial() {
+        AppUser user = register(USERNAME, EMAIL, PASSWORD).user();
+
+        assertThat(user.getRole()).isEqualTo(Role.USER);
+        assertThat(user.getBalance()).isEqualByComparingTo(INITIAL_BALANCE);
+        assertThat(user.getBalance().scale()).isEqualTo(BALANCE_SCALE);
+    }
+
+    @Test
+    void elRegistroNormalizaElSaldoAEscalaDos() {
+        AppUser user = AppUser.register(USERNAME, EMAIL, PASSWORD, new BigDecimal("1000"), hasher).user();
+
+        assertThat(user.getBalance().scale()).isEqualTo(BALANCE_SCALE);
+    }
+
+    @Test
+    void elRegistroGuardaElHashYNoLaContrasenaEnClaro() {
+        AppUser user = register(USERNAME, EMAIL, PASSWORD).user();
+
+        assertThat(user.getPasswordHash())
+                .isNotEqualTo(PASSWORD)
+                .isEqualTo(hasher.hash(PASSWORD));
+    }
+
+    @Test
+    void elRegistroEmiteUnaClaveDeApiCuyoHashQueda() {
+        RegisteredUser registered = register(USERNAME, EMAIL, PASSWORD);
+
+        assertThat(registered.user().getApiKeyHash())
+                .isEqualTo(ApiKey.hashOf(registered.apiKey().value()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abc", "lionel10", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
+    void aceptaLosNombresDeUsuarioValidos(String username) {
+        assertThatCode(() -> register(username, EMAIL, PASSWORD)).doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ab", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "lionel 10", "lionel-10", "lionél10"})
+    void rechazaLosNombresDeUsuarioInvalidos(String username) {
+        assertThatThrownBy(() -> register(username, EMAIL, PASSWORD))
+                .isInstanceOf(InvalidUserDataException.class);
+    }
+
+    @Test
+    void aceptaUnCorreoDeDoscientosCincuentaYCuatroCaracteres() {
+        String email = localPartOfLength(254 - EMAIL_DOMAIN.length()) + EMAIL_DOMAIN;
+
+        assertThat(email).hasSize(254);
+        assertThatCode(() -> register(USERNAME, email, PASSWORD)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rechazaUnCorreoDeDoscientosCincuentaYCincoCaracteres() {
+        String email = localPartOfLength(255 - EMAIL_DOMAIN.length()) + EMAIL_DOMAIN;
+
+        assertThatThrownBy(() -> register(USERNAME, email, PASSWORD))
+                .isInstanceOf(InvalidUserDataException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"sin-arroba", "dos@@arrobas.com", "sin@dominio", "con espacio@correo.com"})
+    void rechazaLosCorreosMalFormados(String email) {
+        assertThatThrownBy(() -> register(USERNAME, email, PASSWORD))
+                .isInstanceOf(InvalidUserDataException.class);
+    }
+
+    @Test
+    void aceptaLasContrasenasDeOchoYDeSetentaYDosCaracteresSimples() {
+        assertThatCode(() -> register(USERNAME, EMAIL, "clave123")).doesNotThrowAnyException();
+        assertThatCode(() -> register(USERNAME, EMAIL, "a".repeat(72))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rechazaUnaContrasenaDeSieteCaracteres() {
+        assertThatThrownBy(() -> register(USERNAME, EMAIL, "clave12"))
+                .isInstanceOf(InvalidUserDataException.class);
+    }
+
+    @Test
+    void rechazaUnaContrasenaQueSuperaLosSetentaYDosBytesAunqueTengaMenosCaracteres() {
+        String password = "ñ".repeat(40);
+
+        assertThat(password).hasSizeLessThan(72);
+        assertThatThrownBy(() -> register(USERNAME, EMAIL, password))
+                .isInstanceOf(InvalidUserDataException.class);
+    }
+
+    @Test
+    void elMensajeDeErrorNoRepiteElValorRecibido() {
+        assertThatThrownBy(() -> register("Qx", EMAIL, PASSWORD))
+                .isInstanceOf(InvalidUserDataException.class)
+                .hasMessageNotContaining("Qx");
+
+        assertThatThrownBy(() -> register(USERNAME, EMAIL, "Zq7w"))
+                .isInstanceOf(InvalidUserDataException.class)
+                .hasMessageNotContaining("Zq7w");
+    }
+
+    @Test
+    void emitirUnaClaveNuevaInvalidaLaAnterior() {
+        RegisteredUser registered = register(USERNAME, EMAIL, PASSWORD);
+        AppUser user = registered.user();
+        String previousHash = user.getApiKeyHash();
+
+        ApiKey renewed = user.issueApiKey();
+
+        assertThat(user.getApiKeyHash())
+                .isEqualTo(renewed.hash())
+                .isNotEqualTo(previousHash);
+        assertThat(ApiKey.hashOf(registered.apiKey().value())).isNotEqualTo(user.getApiKeyHash());
+    }
+
+    @Test
+    void elToStringNoMuestraNingunoDeLosDosHashes() {
+        AppUser user = register(USERNAME, EMAIL, PASSWORD).user();
+
+        assertThat(user.toString())
+                .doesNotContain(user.getPasswordHash())
+                .doesNotContain(user.getApiKeyHash());
+    }
+
+    private RegisteredUser register(String username, String email, String password) {
+        return AppUser.register(username, email, password, INITIAL_BALANCE, hasher);
+    }
+
+    private String localPartOfLength(int length) {
+        return "a".repeat(length);
+    }
+}
