@@ -15,6 +15,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 public class AuthTestHelper {
 
+    private static final String REGISTER_PATH = "/auth/register";
+    private static final String LOGIN_PATH = "/auth/login";
     private static final String USERNAME_PREFIX = "user";
     private static final int SUFFIX_LENGTH = 8;
     private static final String PASSWORD = "campeon2022";
@@ -31,7 +33,7 @@ public class AuthTestHelper {
         String username = USERNAME_PREFIX + randomSuffix();
         String email = username + EMAIL_DOMAIN;
 
-        MvcTestResult result = mvc.post().uri("/auth/register")
+        MvcTestResult result = mvc.post().uri(REGISTER_PATH)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registerBody(username, email, PASSWORD))
                 .exchange();
@@ -39,6 +41,16 @@ public class AuthTestHelper {
         JsonNode body = jsonMapper.readTree(result.getResponse().getContentAsString());
         return new TestUser(body.get("id").asLong(), username, email, PASSWORD,
                 body.get("apiKey").asString());
+    }
+
+    /** Inicia sesión con las credenciales del usuario y devuelve el token de sesión. */
+    public String login(TestUser user) throws Exception {
+        MvcTestResult result = mvc.post().uri(LOGIN_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(loginBody(user.username(), user.password()))
+                .exchange();
+
+        return jsonMapper.readTree(result.getResponse().getContentAsString()).get("token").asString();
     }
 
     /** El sufijo es hexadecimal, así que respeta el patrón y el máximo de 30 del username. */
@@ -50,6 +62,12 @@ public class AuthTestHelper {
         return """
                 {"username": "%s", "email": "%s", "password": "%s"}
                 """.formatted(username, email, password);
+    }
+
+    private String loginBody(String username, String password) {
+        return """
+                {"username": "%s", "password": "%s"}
+                """.formatted(username, password);
     }
 
     public record TestUser(Long id, String username, String email, String password, String apiKey) {

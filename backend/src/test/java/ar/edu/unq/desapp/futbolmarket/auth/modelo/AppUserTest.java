@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidCredentialsException;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidUserDataException;
 
 class AppUserTest {
@@ -145,6 +146,22 @@ class AppUserTest {
         assertThat(user.toString())
                 .doesNotContain(user.getPasswordHash())
                 .doesNotContain(user.getApiKeyHash());
+    }
+
+    @Test
+    void verifyPasswordAceptaLaContrasenaCorrecta() {
+        AppUser user = register(USERNAME, EMAIL, PASSWORD).user();
+
+        assertThatCode(() -> user.verifyPassword(PASSWORD, hasher)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void verifyPasswordLanzaInvalidCredentialsConUnaContrasenaIncorrecta() {
+        AppUser user = register(USERNAME, EMAIL, PASSWORD).user();
+
+        assertThatThrownBy(() -> user.verifyPassword("otraClave123", hasher))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("Credenciales inválidas.");
     }
 
     private RegisteredUser register(String username, String email, String password) {

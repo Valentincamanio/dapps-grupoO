@@ -3,6 +3,7 @@ package ar.edu.unq.desapp.futbolmarket.auth.modelo;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
+import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidCredentialsException;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidUserDataException;
 import lombok.Getter;
 
@@ -65,6 +66,17 @@ public class AppUser {
         ApiKey apiKey = ApiKey.generate();
         this.apiKeyHash = apiKey.hash();
         return apiKey;
+    }
+
+    /**
+     * Verifica la contraseña contra el hash guardado. El mensaje de la excepción es el mismo que
+     * usa el servicio para un usuario inexistente, así el rechazo no revela cuál de los dos falló
+     * (FR-017 y SC-007).
+     */
+    public void verifyPassword(String rawPassword, PasswordHasher hasher) {
+        if (!hasher.matches(rawPassword, passwordHash)) {
+            throw new InvalidCredentialsException();
+        }
     }
 
     /** No incluye ninguno de los dos hashes. */
