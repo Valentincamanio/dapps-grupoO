@@ -13,9 +13,11 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import ar.edu.unq.desapp.futbolmarket.auth.modelo.ApiKey;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.FakePasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.PasswordHasher;
@@ -78,6 +80,21 @@ class AccountServiceTest {
         assertThatThrownBy(() -> accountService.changePassword(USER_ID, "otraClave123", NEW_PASSWORD))
                 .isInstanceOf(InvalidPasswordChangeException.class);
         verify(appUserRepository, never()).save(any(AppUser.class));
+    }
+
+    @Test
+    void regenerarLaClaveGuardaElHashDeLaClaveNuevaEnLugarDelAnterior() {
+        AppUser user = registeredUser();
+        String previousHash = user.getApiKeyHash();
+        when(appUserRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+        ApiKey regenerated = accountService.regenerateApiKey(USER_ID);
+
+        ArgumentCaptor<AppUser> saved = ArgumentCaptor.forClass(AppUser.class);
+        verify(appUserRepository).save(saved.capture());
+        assertThat(saved.getValue().getApiKeyHash())
+                .isEqualTo(ApiKey.hashOf(regenerated.value()))
+                .isNotEqualTo(previousHash);
     }
 
     private AppUser registeredUser() {

@@ -25,6 +25,9 @@ class AccountControllerIT {
 
     private static final String PROFILE_PATH = "/auth/me";
     private static final String PASSWORD_PATH = "/auth/me/password";
+    private static final String API_KEY_PATH = "/auth/me/api-key";
+    private static final String INVALID_CREDENTIAL_MESSAGE = "La credencial es inválida.";
+    private static final int API_KEY_LENGTH = 43;
     private static final String LOGIN_PATH = "/auth/login";
     private static final String NEW_PASSWORD = "tricampeon2022";
     private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -135,6 +138,72 @@ class AccountControllerIT {
 
         assertThat(profileWithToken(tokenBeforeChange).getResponse().getStatus())
                 .isEqualTo(HttpStatus.OK.value());
+    }
+
+    @Test
+    void laRegeneracionDevuelveUnaClaveNuevaDistintaDeLaOriginal() throws Exception {
+        TestUser user = helper.registerUser();
+
+        MvcTestResult result = regenerateApiKey(user.apiKey());
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(body(result).get("apiKey").asString())
+                .hasSize(API_KEY_LENGTH)
+                .isNotEqualTo(user.apiKey());
+    }
+
+    @Test
+    void despuesDeRegenerarLaClaveAnteriorEsInvalida() throws Exception {
+        TestUser user = helper.registerUser();
+
+        regenerateApiKey(user.apiKey());
+        MvcTestResult withOldKey = profileWithApiKey(user.apiKey());
+
+        assertThat(withOldKey.getResponse().getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+        assertThat(body(withOldKey).get("message").asString()).isEqualTo(INVALID_CREDENTIAL_MESSAGE);
+    }
+
+    @Test
+    void laClaveNuevaResuelveAlMismoUsuario() throws Exception {
+        TestUser user = helper.registerUser();
+
+        String newKey = regeneratedKey(regenerateApiKey(user.apiKey()));
+        MvcTestResult withNewKey = profileWithApiKey(newKey);
+
+        assertThat(withNewKey.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(body(withNewKey).get("id").asLong()).isEqualTo(user.id());
+    }
+
+    /** Siempre hay a lo sumo una clave vigente: cada emisión invalida la anterior. */
+    @Test
+    void trasRegenerarDosVecesLaPenultimaClaveDejaDeValer() throws Exception {
+        TestUser user = helper.registerUser();
+
+        String penultimate = regeneratedKey(regenerateApiKey(user.apiKey()));
+        regenerateApiKey(penultimate);
+
+        assertThat(profileWithApiKey(penultimate).getResponse().getStatus())
+                .isEqualTo(HttpStatus.UNAUTHORIZED.value());
+    }
+
+    /** Los tokens no dependen de la clave de API: valen hasta su vencimiento (FR-035). */
+    @Test
+    void elTokenEmitidoAntesDeRegenerarSigueValiendo() throws Exception {
+        TestUser user = helper.registerUser();
+        String tokenBeforeRegeneration = helper.login(user);
+
+        regenerateApiKey(user.apiKey());
+
+        assertThat(profileWithToken(tokenBeforeRegeneration).getResponse().getStatus())
+                .isEqualTo(HttpStatus.OK.value());
+    }
+
+    private MvcTestResult regenerateApiKey(String apiKey) {
+        return mvc.post().uri(API_KEY_PATH).header(API_KEY_HEADER, apiKey).exchange();
+    }
+
+    private String regeneratedKey(MvcTestResult result) throws Exception {
+        return body(result).get("apiKey").asString();
     }
 
     private MvcTestResult changePassword(String apiKey, String currentPassword, String newPassword) {

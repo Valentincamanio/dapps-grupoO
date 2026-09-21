@@ -3,12 +3,14 @@ package ar.edu.unq.desapp.futbolmarket.auth.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ApiKeyResponse;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ChangePasswordRequest;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ProfileResponse;
 import ar.edu.unq.desapp.futbolmarket.auth.service.AccountService;
@@ -72,5 +74,17 @@ public class AccountController {
     public void changePassword(@AuthenticationPrincipal @Parameter(hidden = true) Long userId,
                                @Valid @RequestBody ChangePasswordRequest request) {
         accountService.changePassword(userId, request.currentPassword(), request.newPassword());
+    }
+
+    @Operation(
+            summary = "Regenera la clave de API",
+            description = "Emite una clave nueva y la devuelve por única vez. La clave anterior deja de "
+                    + "ser válida en ese mismo momento: siempre hay a lo sumo una vigente. Los tokens de "
+                    + "sesión ya emitidos siguen siendo válidos hasta su vencimiento. No lleva cuerpo.")
+    @ApiResponse(responseCode = "200", description = "Clave nueva. No se vuelve a mostrar.")
+    @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION, content = @Content)
+    @PostMapping("/api-key")
+    public ApiKeyResponse regenerateApiKey(@AuthenticationPrincipal @Parameter(hidden = true) Long userId) {
+        return ApiKeyResponse.from(accountService.regenerateApiKey(userId));
     }
 }

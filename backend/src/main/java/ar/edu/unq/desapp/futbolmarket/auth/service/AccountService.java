@@ -2,6 +2,7 @@ package ar.edu.unq.desapp.futbolmarket.auth.service;
 
 import org.springframework.stereotype.Service;
 
+import ar.edu.unq.desapp.futbolmarket.auth.modelo.ApiKey;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.PasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidCredentialsException;
@@ -28,6 +29,17 @@ public class AccountService {
         AppUser user = authenticatedUser(userId);
         user.changePassword(currentPassword, newPassword, passwordHasher);
         appUserRepository.save(user);
+    }
+
+    /**
+     * Emite una clave nueva y la devuelve en claro, por única vez. Al guardarse el hash nuevo, la
+     * clave anterior deja de valer en el acto (FR-032 a FR-034).
+     */
+    public ApiKey regenerateApiKey(Long userId) {
+        AppUser user = authenticatedUser(userId);
+        ApiKey apiKey = user.issueApiKey();
+        appUserRepository.save(user);
+        return apiKey;
     }
 
     /**

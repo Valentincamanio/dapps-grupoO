@@ -276,14 +276,14 @@ con el mismo `id` en `GET /auth/me` (quickstart 3.7).
 
 ### Implementación de la Historia 6
 
-- [ ] T075 [US6] Agregar `ApiKey regenerateApiKey(Long userId)` a `AccountService` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/auth/service/AccountService.java: carga el usuario, llama a `user.issueApiKey()`, lo guarda y devuelve la clave
-- [ ] T076 [P] [US6] Crear el record `ApiKeyResponse(String apiKey)` con `static ApiKeyResponse from(ApiKey)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/auth/controller/dto/ApiKeyResponse.java
-- [ ] T077 [US6] Agregar `POST /api-key` (sin cuerpo) a `AccountController` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/auth/controller/AccountController.java, que responde 200 con `ApiKeyResponse`; `@Operation` en español y `@ApiResponse` para 200 y 401 (depende de T075 y T076)
+- [X] T075 [US6] Agregar `ApiKey regenerateApiKey(Long userId)` a `AccountService` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/auth/service/AccountService.java: carga el usuario, llama a `user.issueApiKey()`, lo guarda y devuelve la clave
+- [X] T076 [P] [US6] Crear el record `ApiKeyResponse(String apiKey)` con `static ApiKeyResponse from(ApiKey)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/auth/controller/dto/ApiKeyResponse.java
+- [X] T077 [US6] Agregar `POST /api-key` (sin cuerpo) a `AccountController` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/auth/controller/AccountController.java, que responde 200 con `ApiKeyResponse`; `@Operation` en español y `@ApiResponse` para 200 y 401 (depende de T075 y T076)
 
 ### Tests de la Historia 6
 
-- [ ] T078 [P] [US6] Agregar a `AccountServiceTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/auth/service/AccountServiceTest.java los casos de regeneración: el usuario guardado tiene como `apiKeyHash` el hash de la clave devuelta, distinto del anterior
-- [ ] T079 [US6] Agregar a `AccountControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/AccountControllerIT.java los casos de regeneración: responde 200 con un `apiKey` distinto del original; la clave anterior responde 401 `"La credencial es inválida."`; la nueva responde 200 con el mismo `id`; tras regenerar dos veces, la penúltima responde 401; un token emitido antes de regenerar sigue respondiendo 200
+- [X] T078 [P] [US6] Agregar a `AccountServiceTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/auth/service/AccountServiceTest.java los casos de regeneración: el usuario guardado tiene como `apiKeyHash` el hash de la clave devuelta, distinto del anterior
+- [X] T079 [US6] Agregar a `AccountControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/AccountControllerIT.java los casos de regeneración: responde 200 con un `apiKey` distinto del original; la clave anterior responde 401 `"La credencial es inválida."`; la nueva responde 200 con el mismo `id`; tras regenerar dos veces, la penúltima responde 401; un token emitido antes de regenerar sigue respondiendo 200
 
 **Checkpoint**: las HU1 a HU6 funcionan.
 
