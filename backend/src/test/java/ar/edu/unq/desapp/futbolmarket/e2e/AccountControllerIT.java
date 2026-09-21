@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
@@ -23,6 +24,9 @@ import tools.jackson.databind.json.JsonMapper;
 class AccountControllerIT {
 
     private static final String PROFILE_PATH = "/auth/me";
+    private static final String PASSWORD_PATH = "/auth/me/password";
+    private static final String LOGIN_PATH = "/auth/login";
+    private static final String NEW_PASSWORD = "tricampeon2022";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String API_KEY_HEADER = "X-API-Key";
     private static final String BEARER_PREFIX = "Bearer ";
@@ -99,6 +103,57 @@ class AccountControllerIT {
         assertThat(secondProfile.get("id").asLong()).isEqualTo(second.id());
         assertThat(secondProfile.get("username").asString()).isEqualTo(second.username());
         assertThat(firstProfile.get("id").asLong()).isNotEqualTo(secondProfile.get("id").asLong());
+    }
+
+    @Test
+    void elCambioDeContrasenaRespondeNoContentSinCuerpo() throws Exception {
+        TestUser user = helper.registerUser();
+
+        MvcTestResult result = changePassword(user.apiKey(), user.password(), NEW_PASSWORD);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.NO_CONTENT.value());
+        assertThat(result.getResponse().getContentAsString()).isEmpty();
+    }
+
+    @Test
+    void despuesDelCambioElLoginFuncionaConLaContrasenaNueva() throws Exception {
+        TestUser user = helper.registerUser();
+
+        changePassword(user.apiKey(), user.password(), NEW_PASSWORD);
+
+        assertThat(login(user.username(), NEW_PASSWORD).getResponse().getStatus())
+                .isEqualTo(HttpStatus.OK.value());
+    }
+
+    /** Los tokens no dependen de la contraseña: valen hasta su vencimiento (FR-035). */
+    @Test
+    void elTokenEmitidoAntesDelCambioSigueValiendo() throws Exception {
+        TestUser user = helper.registerUser();
+        String tokenBeforeChange = helper.login(user);
+
+        changePassword(user.apiKey(), user.password(), NEW_PASSWORD);
+
+        assertThat(profileWithToken(tokenBeforeChange).getResponse().getStatus())
+                .isEqualTo(HttpStatus.OK.value());
+    }
+
+    private MvcTestResult changePassword(String apiKey, String currentPassword, String newPassword) {
+        return mvc.put().uri(PASSWORD_PATH)
+                .header(API_KEY_HEADER, apiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"currentPassword": "%s", "newPassword": "%s"}
+                        """.formatted(currentPassword, newPassword))
+                .exchange();
+    }
+
+    private MvcTestResult login(String username, String password) {
+        return mvc.post().uri(LOGIN_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"username": "%s", "password": "%s"}
+                        """.formatted(username, password))
+                .exchange();
     }
 
     private MvcTestResult profileWithApiKey(String apiKey) {

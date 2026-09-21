@@ -11,6 +11,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidCredentialsException;
+import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidPasswordChangeException;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidUserDataException;
 
 class AppUserTest {
@@ -21,6 +22,10 @@ class AppUserTest {
     private static final BigDecimal INITIAL_BALANCE = new BigDecimal("1000.00");
     private static final int BALANCE_SCALE = 2;
     private static final String EMAIL_DOMAIN = "@correo.com";
+    private static final String NEW_PASSWORD = "tricampeon2022";
+    private static final String WRONG_CURRENT_PASSWORD_MESSAGE = "La contraseña actual es incorrecta.";
+    private static final String SAME_PASSWORD_MESSAGE = "La nueva contraseña debe ser distinta de la actual.";
+    private static final String INVALID_NEW_PASSWORD_MESSAGE = "La nueva contraseña no cumple las reglas de formato.";
 
     private final PasswordHasher hasher = new FakePasswordHasher();
 
@@ -162,6 +167,54 @@ class AppUserTest {
         assertThatThrownBy(() -> user.verifyPassword("otraClave123", hasher))
                 .isInstanceOf(InvalidCredentialsException.class)
                 .hasMessage("Credenciales inválidas.");
+    }
+
+    @Test
+    void unCambioValidoHaceQueVerifiqueLaNuevaYNoLaAnterior() {
+        AppUser user = register(USERNAME, EMAIL, PASSWORD).user();
+
+        user.changePassword(PASSWORD, NEW_PASSWORD, hasher);
+
+        assertThatCode(() -> user.verifyPassword(NEW_PASSWORD, hasher)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> user.verifyPassword(PASSWORD, hasher))
+                .isInstanceOf(InvalidCredentialsException.class);
+    }
+
+    @Test
+    void elCambioSeRechazaSinTocarNadaSiLaActualEsIncorrecta() {
+        assertPasswordChangeRejected("otraClave123", NEW_PASSWORD, WRONG_CURRENT_PASSWORD_MESSAGE);
+    }
+
+    @Test
+    void elCambioSeRechazaSinTocarNadaSiLaNuevaEsIgualALaActual() {
+        assertPasswordChangeRejected(PASSWORD, PASSWORD, SAME_PASSWORD_MESSAGE);
+    }
+
+    @Test
+    void elCambioSeRechazaSinTocarNadaSiLaNuevaTieneSieteCaracteres() {
+        assertPasswordChangeRejected(PASSWORD, "clave12", INVALID_NEW_PASSWORD_MESSAGE);
+    }
+
+    @Test
+    void elCambioSeRechazaSinTocarNadaSiLaNuevaSuperaLosSetentaYDosBytes() {
+        assertPasswordChangeRejected(PASSWORD, "ñ".repeat(40), INVALID_NEW_PASSWORD_MESSAGE);
+    }
+
+    /** El orden de los controles decide qué se informa cuando fallan dos a la vez. */
+    @Test
+    void conLaActualIncorrectaYLaNuevaInvalidaSeInformaLaActualIncorrecta() {
+        assertPasswordChangeRejected("otraClave123", "corta", WRONG_CURRENT_PASSWORD_MESSAGE);
+    }
+
+    private void assertPasswordChangeRejected(String currentPassword, String newPassword,
+                                              String expectedMessage) {
+        AppUser user = register(USERNAME, EMAIL, PASSWORD).user();
+        String previousHash = user.getPasswordHash();
+
+        assertThatThrownBy(() -> user.changePassword(currentPassword, newPassword, hasher))
+                .isInstanceOf(InvalidPasswordChangeException.class)
+                .hasMessage(expectedMessage);
+        assertThat(user.getPasswordHash()).isEqualTo(previousHash);
     }
 
     private RegisteredUser register(String username, String email, String password) {

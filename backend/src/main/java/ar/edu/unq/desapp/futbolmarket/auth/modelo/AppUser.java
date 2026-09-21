@@ -2,8 +2,10 @@ package ar.edu.unq.desapp.futbolmarket.auth.modelo;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Objects;
 
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidCredentialsException;
+import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidPasswordChangeException;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidUserDataException;
 import lombok.Getter;
 
@@ -16,6 +18,10 @@ import lombok.Getter;
  */
 @Getter
 public class AppUser {
+
+    private static final String WRONG_CURRENT_PASSWORD_MESSAGE = "La contraseña actual es incorrecta.";
+    private static final String SAME_PASSWORD_MESSAGE = "La nueva contraseña debe ser distinta de la actual.";
+    private static final String INVALID_NEW_PASSWORD_MESSAGE = "La nueva contraseña no cumple las reglas de formato.";
 
     private final Long id;
     private final String username;
@@ -77,6 +83,27 @@ public class AppUser {
         if (!hasher.matches(rawPassword, passwordHash)) {
             throw new InvalidCredentialsException();
         }
+    }
+
+    /**
+     * Cambia la contraseña después de tres controles, en este orden: que la actual coincida, que
+     * la nueva sea distinta y que la nueva cumpla el formato. El orden importa: si la actual es
+     * incorrecta, eso es lo que se informa aunque la nueva también sea inválida. Si algún control
+     * falla, el hash no se toca (FR-027 a FR-031).
+     *
+     * <p>Los tokens ya emitidos siguen valiendo: el token no depende de la contraseña (FR-035).</p>
+     */
+    public void changePassword(String currentPassword, String newPassword, PasswordHasher hasher) {
+        if (!hasher.matches(currentPassword, passwordHash)) {
+            throw new InvalidPasswordChangeException(WRONG_CURRENT_PASSWORD_MESSAGE);
+        }
+        if (Objects.equals(newPassword, currentPassword)) {
+            throw new InvalidPasswordChangeException(SAME_PASSWORD_MESSAGE);
+        }
+        if (!CredentialPolicy.isValidPassword(newPassword)) {
+            throw new InvalidPasswordChangeException(INVALID_NEW_PASSWORD_MESSAGE);
+        }
+        this.passwordHash = hasher.hash(newPassword);
     }
 
     /** No incluye ninguno de los dos hashes. */
