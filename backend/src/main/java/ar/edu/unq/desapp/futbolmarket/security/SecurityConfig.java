@@ -16,9 +16,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
+import ar.edu.unq.desapp.futbolmarket.auth.service.AuthService;
 import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 
@@ -63,7 +65,11 @@ public class SecurityConfig {
      * sigue exigiendo credencial, porque no es una ruta pública.
      */
     @Bean
-    public SecurityFilterChain apiFilterChain(HttpSecurity http, RequestMatcher publicEndpoints) throws Exception {
+    public SecurityFilterChain apiFilterChain(HttpSecurity http, RequestMatcher publicEndpoints,
+                                              JwtService jwtService, AuthService authService) throws Exception {
+        CredentialAuthenticationFilter credentialAuthenticationFilter = new CredentialAuthenticationFilter(
+                jwtService, authService, jsonAuthenticationEntryPoint, publicEndpoints);
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -76,7 +82,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(jsonAuthenticationEntryPoint)
-                        .accessDeniedHandler(jsonAccessDeniedHandler));
+                        .accessDeniedHandler(jsonAccessDeniedHandler))
+                .addFilterBefore(credentialAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

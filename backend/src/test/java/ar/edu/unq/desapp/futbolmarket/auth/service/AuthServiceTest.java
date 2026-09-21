@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import ar.edu.unq.desapp.futbolmarket.auth.modelo.ApiKey;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.FakePasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.PasswordHasher;
@@ -42,6 +43,7 @@ class AuthServiceTest {
     private static final String INVALID_CREDENTIALS_MESSAGE = "Credenciales inválidas.";
     private static final BigDecimal INITIAL_BALANCE = new BigDecimal("1000.00");
     private static final int API_KEY_LENGTH = 43;
+    private static final long UNKNOWN_USER_ID = 999L;
 
     @Mock
     private AppUserRepository appUserRepository;
@@ -147,6 +149,29 @@ class AuthServiceTest {
         assertThatThrownBy(() -> serviceWithMockedHasher.login(USERNAME, PASSWORD))
                 .isInstanceOf(InvalidCredentialsException.class);
         verify(mockedPasswordHasher).matches(eq(PASSWORD), any());
+    }
+
+    @Test
+    void findByApiKeyBuscaPorElHashDeLaClaveEnClaro() {
+        ApiKey apiKey = ApiKey.generate();
+        AppUser user = existingUser();
+        when(appUserRepository.findByApiKeyHash(apiKey.hash())).thenReturn(Optional.of(user));
+
+        assertThat(authService.findByApiKey(apiKey.value())).contains(user);
+    }
+
+    @Test
+    void findByApiKeyNoEncuentraNadaConUnaClaveDesconocida() {
+        when(appUserRepository.findByApiKeyHash(any())).thenReturn(Optional.empty());
+
+        assertThat(authService.findByApiKey(ApiKey.generate().value())).isEmpty();
+    }
+
+    @Test
+    void findByIdNoEncuentraNadaConUnIdInexistente() {
+        when(appUserRepository.findById(UNKNOWN_USER_ID)).thenReturn(Optional.empty());
+
+        assertThat(authService.findById(UNKNOWN_USER_ID)).isEmpty();
     }
 
     private void givenAvailability(boolean usernameTaken, boolean emailTaken) {

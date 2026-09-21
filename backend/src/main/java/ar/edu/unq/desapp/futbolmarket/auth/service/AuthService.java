@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
+import ar.edu.unq.desapp.futbolmarket.auth.modelo.ApiKey;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.PasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.RegisteredUser;
@@ -72,5 +73,18 @@ public class AuthService {
         AppUser user = found.get();
         user.verifyPassword(rawPassword, passwordHasher);
         return sessionTokenIssuer.issueFor(user);
+    }
+
+    /** Resuelve al dueño de un token de sesión. La usa el filtro de autenticación. */
+    public Optional<AppUser> findById(Long userId) {
+        return appUserRepository.findById(userId);
+    }
+
+    /**
+     * Resuelve al dueño de una clave de API. La clave en claro nunca se guarda: se busca por su
+     * hash, que es determinístico y por eso permite la búsqueda por igualdad (research D4).
+     */
+    public Optional<AppUser> findByApiKey(String rawApiKey) {
+        return appUserRepository.findByApiKeyHash(ApiKey.hashOf(rawApiKey));
     }
 }

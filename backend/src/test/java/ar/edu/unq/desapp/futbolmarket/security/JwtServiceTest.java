@@ -15,6 +15,8 @@ import java.util.Date;
 import javax.crypto.SecretKey;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.CredentialsExpiredException;
 
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
@@ -78,6 +80,68 @@ class JwtServiceTest {
 
         assertThatThrownBy(() -> new JwtService(weakProperties, clock))
                 .isInstanceOf(WeakKeyException.class);
+    }
+
+    @Test
+    void unTokenVigenteDevuelveElIdDelUsuario() {
+        SessionToken sessionToken = jwtService.issueFor(user());
+
+        assertThat(jwtService.parseUserId(sessionToken.value())).isEqualTo(USER_ID);
+    }
+
+    @Test
+    void unSegundoAntesDelVencimientoElTokenSigueValiendo() {
+        String token = jwtService.issueFor(user()).value();
+        JwtService atExpiration = serviceAt(NOW.plus(EXPIRATION).minusSeconds(1));
+
+        assertThat(atExpiration.parseUserId(token)).isEqualTo(USER_ID);
+    }
+
+    @Test
+    void unSegundoDespuesDelVencimientoElTokenSeRechazaComoVencido() {
+        String token = jwtService.issueFor(user()).value();
+        JwtService afterExpiration = serviceAt(NOW.plus(EXPIRATION).plusSeconds(1));
+
+        assertThatThrownBy(() -> afterExpiration.parseUserId(token))
+                .isInstanceOf(CredentialsExpiredException.class);
+    }
+
+    @Test
+    void unTokenConLaFirmaAlteradaSeRechazaComoInvalido() {
+        String token = jwtService.issueFor(user()).value();
+
+        assertThatThrownBy(() -> jwtService.parseUserId(tamperSignature(token)))
+                .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void unTokenFirmadoConOtraClaveSeRechazaComoInvalido() {
+        JwtService otherService = new JwtService(
+                new JwtProperties(randomSecret(STRONG_SECRET_BYTES), EXPIRATION), clock);
+        String foreignToken = otherService.issueFor(user()).value();
+
+        assertThatThrownBy(() -> jwtService.parseUserId(foreignToken))
+                .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void unaCadenaQueNoEsUnTokenSeRechazaComoInvalida() {
+        assertThatThrownBy(() -> jwtService.parseUserId("abc"))
+                .isInstanceOf(BadCredentialsException.class);
+        assertThatThrownBy(() -> jwtService.parseUserId(""))
+                .isInstanceOf(BadCredentialsException.class);
+    }
+
+    private JwtService serviceAt(Instant instant) {
+        return new JwtService(new JwtProperties(secret, EXPIRATION),
+                Clock.fixed(instant, ZoneOffset.UTC));
+    }
+
+    /** Cambia el último carácter de la firma, dejando intactos el header y el payload. */
+    private String tamperSignature(String token) {
+        char last = token.charAt(token.length() - 1);
+        char replacement = last == 'A' ? 'B' : 'A';
+        return token.substring(0, token.length() - 1) + replacement;
     }
 
     private Jws<Claims> parse(String token) {

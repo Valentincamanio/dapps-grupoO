@@ -8,12 +8,17 @@ import java.util.Date;
 
 import javax.crypto.SecretKey;
 
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.stereotype.Component;
 
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.SessionToken;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.SessionTokenIssuer;
 import ar.edu.unq.desapp.futbolmarket.config.JwtProperties;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -33,6 +38,9 @@ import io.jsonwebtoken.security.Keys;
  */
 @Component
 public class JwtService implements SessionTokenIssuer {
+
+    private static final String EXPIRED_TOKEN_MESSAGE = "El token de sesión está vencido.";
+    private static final String INVALID_TOKEN_MESSAGE = "El token de sesión es inválido.";
 
     private final SecretKey secretKey;
     private final Duration expiration;
@@ -57,5 +65,29 @@ public class JwtService implements SessionTokenIssuer {
                 .compact();
 
         return new SessionToken(value, expiresAt);
+    }
+
+    /**
+     * Valida la firma y el vencimiento, y devuelve el id que viaja en {@code sub}.
+     *
+     * <p>El margen de reloj es cero porque el token tiene que dejar de valer apenas pasado su
+     * vencimiento. Se distinguen solo dos casos, que son los dos mensajes que ve el cliente: el
+     * token vencido y todo lo demás, incluido un {@code sub} que no sea un id.</p>
+     */
+    public Long parseUserId(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(secretKey)
+                    .clock(() -> Date.from(clock.instant()))
+                    .clockSkewSeconds(0)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return Long.valueOf(claims.getSubject());
+        } catch (ExpiredJwtException e) {
+            throw new CredentialsExpiredException(EXPIRED_TOKEN_MESSAGE, e);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new BadCredentialsException(INVALID_TOKEN_MESSAGE, e);
+        }
     }
 }
