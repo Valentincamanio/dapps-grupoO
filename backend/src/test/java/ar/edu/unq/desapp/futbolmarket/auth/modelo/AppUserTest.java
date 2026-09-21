@@ -206,6 +206,37 @@ class AppUserTest {
         assertPasswordChangeRejected("otraClave123", "corta", WRONG_CURRENT_PASSWORD_MESSAGE);
     }
 
+    @Test
+    void createAdminCreaUnAdministradorConSaldoCeroYSinClave() {
+        AppUser admin = AppUser.createAdmin(USERNAME, EMAIL, PASSWORD, hasher);
+
+        assertThat(admin.getRole()).isEqualTo(Role.ADMIN);
+        assertThat(admin.getBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(admin.getBalance().scale()).isEqualTo(BALANCE_SCALE);
+        assertThat(admin.getApiKeyHash()).isNull();
+        assertThat(admin.getPasswordHash())
+                .isNotEqualTo(PASSWORD)
+                .isEqualTo(hasher.hash(PASSWORD));
+    }
+
+    @Test
+    void createAdminRechazaUnNombreDeUsuarioConGuionMedio() {
+        assertThatThrownBy(() -> AppUser.createAdmin("admin-01", EMAIL, PASSWORD, hasher))
+                .isInstanceOf(InvalidUserDataException.class);
+    }
+
+    @Test
+    void createAdminRechazaUnCorreoMalFormado() {
+        assertThatThrownBy(() -> AppUser.createAdmin(USERNAME, "sin-arroba", PASSWORD, hasher))
+                .isInstanceOf(InvalidUserDataException.class);
+    }
+
+    @Test
+    void createAdminRechazaUnaContrasenaDeSieteCaracteres() {
+        assertThatThrownBy(() -> AppUser.createAdmin(USERNAME, EMAIL, "clave12", hasher))
+                .isInstanceOf(InvalidUserDataException.class);
+    }
+
     private void assertPasswordChangeRejected(String currentPassword, String newPassword,
                                               String expectedMessage) {
         AppUser user = register(USERNAME, EMAIL, PASSWORD).user();

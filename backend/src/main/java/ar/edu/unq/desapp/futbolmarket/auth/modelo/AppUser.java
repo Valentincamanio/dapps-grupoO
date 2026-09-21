@@ -48,11 +48,18 @@ public class AppUser {
      */
     public static RegisteredUser register(String username, String email, String rawPassword,
                                           BigDecimal initialBalance, PasswordHasher hasher) {
-        validateCredentials(username, email, rawPassword);
-        AppUser user = new AppUser(null, username, email, hasher.hash(rawPassword), null, Role.USER,
-                normalizedBalance(initialBalance));
+        AppUser user = newAccount(username, email, rawPassword, Role.USER, initialBalance, hasher);
         ApiKey apiKey = user.issueApiKey();
         return new RegisteredUser(user, apiKey);
+    }
+
+    /**
+     * Crea la cuenta del alta de arranque: rol {@code ADMIN}, saldo cero y sin clave de API. La
+     * clave la emite el propio administrador después, desde su cuenta (FR-040 a FR-042).
+     */
+    public static AppUser createAdmin(String username, String email, String rawPassword,
+                                      PasswordHasher hasher) {
+        return newAccount(username, email, rawPassword, Role.ADMIN, BigDecimal.ZERO, hasher);
     }
 
     /**
@@ -111,6 +118,17 @@ public class AppUser {
     public String toString() {
         return "AppUser{id=%s, username='%s', email='%s', role=%s, balance=%s}"
                 .formatted(id, username, email, role, balance);
+    }
+
+    /**
+     * Lo que comparten las dos fábricas de cuentas nuevas: validar las credenciales, hashear la
+     * contraseña y fijar la escala del saldo. Cada fábrica decide el rol, el saldo y la clave.
+     */
+    private static AppUser newAccount(String username, String email, String rawPassword, Role role,
+                                      BigDecimal balance, PasswordHasher hasher) {
+        validateCredentials(username, email, rawPassword);
+        return new AppUser(null, username, email, hasher.hash(rawPassword), null, role,
+                normalizedBalance(balance));
     }
 
     /**
