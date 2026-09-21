@@ -170,8 +170,18 @@ feature y no tiene relaciones JPA con otras entidades.
 | `email` | `VARCHAR(254)` | no | `@Column(nullable = false, length = 254)` |
 | `password_hash` | `VARCHAR(60)` | no | `@Column(name = "password_hash", nullable = false, length = 60)` |
 | `api_key_hash` | `VARCHAR(64)` | sí | `@Column(name = "api_key_hash", length = 64)` |
-| `role` | `VARCHAR(20)` | no | `@Enumerated(EnumType.STRING)`, nunca `ORDINAL` |
+| `role` | `VARCHAR(20)` | no | `@Column(nullable = false, length = 20)` sobre un `String`; el mapper traduce `Role` ↔ su nombre, nunca el ordinal |
 | `balance` | `DECIMAL(19,2)` | no | `@Column(nullable = false, precision = 19, scale = 2)` |
+
+**Por qué `role` no usa `@Enumerated`**. Con `@Enumerated(EnumType.STRING)`, Hibernate 7 crea en
+H2 una columna `ENUM` nativa e ignora el `length`. Esa columna no acompaña la evolución del enum:
+`ddl-auto: update` no modifica el tipo de una columna existente, así que un valor nuevo falla
+contra la base local hasta recrearla. Forzar `VARCHAR` con `@JdbcTypeCode(SqlTypes.VARCHAR)`
+tampoco sirve: Hibernate agrega `CHECK (role IN (...))` y H2 no puede evaluarlo una vez cerrada la
+conexión que creó la tabla, así que los inserts fallan. Con un `String` la columna es un
+`VARCHAR(20)` simple, sin `CHECK`, igual en H2 y en PostgreSQL. Los valores válidos los restringe
+el enum `Role` del modelo. `AppUserRepositoryIT` verifica el tipo de la columna en el esquema,
+porque H2 devuelve como texto también los valores de un `ENUM`.
 
 `@Table(name = "app_user")` es obligatorio porque `user` es palabra reservada en PostgreSQL.
 Los índices únicos se declaran explícitamente en `@Table(indexes = ...)`:
@@ -200,8 +210,9 @@ usa derived queries, sin `@Query` nativo:
 Está en `auth/persistence/mapper/`. Traduce campo a campo en las dos direcciones y no contiene
 lógica de negocio:
 
-- `toDomain(AppUserSQL)` llama a `AppUser.reconstitute(...)`.
-- `toSQL(AppUser)` copia los siete campos. Si el id es `null`, JPA inserta; si no, actualiza.
+- `toDomain(AppUserSQL)` llama a `AppUser.reconstitute(...)`. El rol se lee con `Role.valueOf`.
+- `toSQL(AppUser)` copia los siete campos; el rol se guarda con `role.name()`. Si el id es `null`,
+  JPA inserta; si no, actualiza.
 
 ### AppUserRepository
 

@@ -3,11 +3,8 @@ package ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.entity;
 import java.math.BigDecimal;
 
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.CredentialPolicy;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.EnumType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -57,9 +54,16 @@ public class AppUserSQL {
     @Column(name = "api_key_hash", length = API_KEY_HASH_LENGTH)
     private String apiKeyHash;
 
-    @Enumerated(EnumType.STRING)
+    /**
+     * Es texto y no el enum del modelo; la traducción la hace {@code AppUserMapper}. Con
+     * {@code @Enumerated}, Hibernate usa el tipo {@code ENUM} nativo de H2 e ignora el
+     * {@code length}; y si se fuerza {@code VARCHAR}, agrega un {@code CHECK (role IN (...))} que
+     * H2 no puede evaluar una vez cerrada la conexión que creó la tabla. Un {@code VARCHAR(20)}
+     * simple es lo que fija el modelo de datos y se comporta igual en H2 y en PostgreSQL
+     * (principio VI).
+     */
     @Column(nullable = false, length = ROLE_LENGTH)
-    private Role role;
+    private String role;
 
     @Column(nullable = false, precision = BALANCE_PRECISION, scale = CredentialPolicy.BALANCE_SCALE)
     private BigDecimal balance;

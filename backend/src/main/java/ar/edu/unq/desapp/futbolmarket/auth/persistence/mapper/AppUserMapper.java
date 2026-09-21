@@ -3,11 +3,12 @@ package ar.edu.unq.desapp.futbolmarket.auth.persistence.mapper;
 import org.springframework.stereotype.Component;
 
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
+import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.entity.AppUserSQL;
 
 /**
  * Traduce campo a campo entre {@link AppUser} y {@link AppUserSQL}, en las dos direcciones y sin
- * lógica de negocio.
+ * lógica de negocio. El rol viaja como su nombre, nunca como ordinal.
  */
 @Component
 public class AppUserMapper {
@@ -19,7 +20,7 @@ public class AppUserMapper {
                 entity.getEmail(),
                 entity.getPasswordHash(),
                 entity.getApiKeyHash(),
-                entity.getRole(),
+                Role.valueOf(entity.getRole()),
                 entity.getBalance());
     }
 
@@ -31,7 +32,7 @@ public class AppUserMapper {
         entity.setEmail(user.getEmail());
         entity.setPasswordHash(user.getPasswordHash());
         entity.setApiKeyHash(user.getApiKeyHash());
-        entity.setRole(user.getRole());
+        entity.setRole(user.getRole().name());
         entity.setBalance(user.getBalance());
         return entity;
     }

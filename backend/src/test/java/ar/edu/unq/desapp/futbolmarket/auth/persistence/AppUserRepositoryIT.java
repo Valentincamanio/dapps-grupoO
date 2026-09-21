@@ -29,6 +29,8 @@ class AppUserRepositoryIT {
     private static final String PASSWORD_HASH = "$2a$10$abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0";
     private static final BigDecimal INITIAL_BALANCE = new BigDecimal("1000.00");
     private static final int BALANCE_SCALE = 2;
+    private static final String VARCHAR_TYPE = "CHARACTER VARYING";
+    private static final int ROLE_LENGTH = 20;
 
     @Autowired
     private AppUserRepository repository;
@@ -67,6 +69,21 @@ class AppUserRepositoryIT {
                 .getSingleResult();
 
         assertThat(storedRole).isEqualTo(Role.USER.name());
+    }
+
+    /**
+     * El test anterior no alcanza para ver el tipo de la columna: H2 devuelve como texto también
+     * los valores de un {@code ENUM} nativo. Por eso se mira el esquema.
+     */
+    @Test
+    void laColumnaDelRolEsUnVarcharDeVeinteCaracteres() {
+        Object[] column = (Object[]) entityManager.getEntityManager()
+                .createNativeQuery("SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS "
+                        + "WHERE TABLE_NAME = 'APP_USER' AND COLUMN_NAME = 'ROLE'")
+                .getSingleResult();
+
+        assertThat(column[0]).isEqualTo(VARCHAR_TYPE);
+        assertThat(((Number) column[1]).intValue()).isEqualTo(ROLE_LENGTH);
     }
 
     @Test

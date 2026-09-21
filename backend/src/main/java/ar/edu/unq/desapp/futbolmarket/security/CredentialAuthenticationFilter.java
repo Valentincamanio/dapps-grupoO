@@ -80,12 +80,14 @@ public class CredentialAuthenticationFilter extends OncePerRequestFilter {
     private Optional<AppUser> resolveUser(HttpServletRequest request) {
         String token = bearerToken(request);
         if (token != null) {
-            return Optional.of(userOrReject(authService.findById(jwtService.parseUserId(token))));
+            return Optional.of(authService.findById(jwtService.parseUserId(token))
+                    .orElseThrow(CredentialAuthenticationFilter::unknownCredential));
         }
 
         String apiKey = request.getHeader(API_KEY_HEADER);
         if (apiKey != null && !apiKey.isBlank()) {
-            return Optional.of(userOrReject(authService.findByApiKey(apiKey)));
+            return Optional.of(authService.findByApiKey(apiKey)
+                    .orElseThrow(CredentialAuthenticationFilter::unknownCredential));
         }
 
         return Optional.empty();
@@ -95,8 +97,8 @@ public class CredentialAuthenticationFilter extends OncePerRequestFilter {
      * El mensaje no llega al cliente: el entry point responde siempre el texto fijo que
      * corresponde al tipo de excepción, así el rechazo no revela qué parte falló (FR-021).
      */
-    private AppUser userOrReject(Optional<AppUser> user) {
-        return user.orElseThrow(() -> new BadCredentialsException(UNKNOWN_CREDENTIAL_MESSAGE));
+    private static BadCredentialsException unknownCredential() {
+        return new BadCredentialsException(UNKNOWN_CREDENTIAL_MESSAGE);
     }
 
     private void authenticate(AppUser user) {

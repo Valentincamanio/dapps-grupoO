@@ -2,7 +2,9 @@ package ar.edu.unq.desapp.futbolmarket.e2e;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -52,8 +54,14 @@ class AccessControlIT {
     private static final String UNKNOWN_API_KEY = "claveInventadaQueNoCorrespondeANingunUsuario";
     private static final String NOT_A_TOKEN = "abc";
     private static final long UNKNOWN_USER_ID = 999999L;
-    private static final String OTHER_SECRET = "c2VjcmV0b0RlT3RyYVJhbWFRdWVOb0VzRWxEZUxhQXBsaWNhY2lvbjEyMzQ1Ng==";
     private static final long VALID_EXPIRATION_SECONDS = 3600;
+    private static final int SECRET_BYTES = 32;
+
+    /**
+     * Clave ajena a la aplicación, para firmar un token que tiene que rechazarse. Se genera en
+     * cada corrida: el único secreto JWT escrito en el repositorio es el de los perfiles (SC-013).
+     */
+    private static final String OTHER_SECRET = randomSecret();
 
     @Autowired
     private MockMvcTester mvc;
@@ -290,5 +298,11 @@ class AccessControlIT {
 
     private JsonNode body(MvcTestResult result) throws Exception {
         return jsonMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private static String randomSecret() {
+        byte[] material = new byte[SECRET_BYTES];
+        new SecureRandom().nextBytes(material);
+        return Base64.getEncoder().encodeToString(material);
     }
 }
