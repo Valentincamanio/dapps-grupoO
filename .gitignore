@@ -3,6 +3,7 @@ backend/build/
 backend/.gradle/
 backend/bin/
 backend/out/
+*.log
 !backend/gradle/wrapper/gradle-wrapper.jar
 
 # Base H2 local
@@ -26,5 +27,4 @@ frontend/.vite/
 Thumbs.db
 
 # Env
-.env
-.env.local
+.env*

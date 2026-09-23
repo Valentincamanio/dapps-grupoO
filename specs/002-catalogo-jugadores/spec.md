@@ -9,7 +9,7 @@
 
 ### Sesión 2026-09-16
 
-- P: ¿Cómo debe responder el catálogo si recibe un valor de filtro no admitido, por ejemplo una posición distinta de las cuatro permitidas? → R: Devolver una página vacía.
+- P: ¿Cómo debe responder el catálogo si recibe un valor de filtro no admitido, por ejemplo una posición distinta de las cuatro permitidas? → R: Devolver `400 Bad Request` con el formato `ApiError`.
 - P: ¿Con qué número debe comenzar la numeración de las páginas del catálogo? → R: La primera página es la 0.
 
 ## Escenarios de usuario y pruebas *(obligatorio)*
@@ -64,7 +64,7 @@ Como persona usuaria, quiero ver el detalle de un jugador identificado del catá
 - Una consulta sin filtros devuelve jugadores de todas las ligas disponibles, respetando la paginación.
 - La combinación de filtros se interpreta como una condición acumulativa: todo jugador devuelto satisface todos los filtros aplicados.
 - Una liga, equipo o posición válidos que no producen coincidencias devuelven una página vacía, no un error.
-- Un filtro con un valor no admitido devuelve una página vacía, sin informar un error.
+- Un filtro con un valor no admitido devuelve `400 Bad Request` con el formato `ApiError`.
 - Una solicitud de página fuera del rango de resultados devuelve una página vacía con metadatos de paginación consistentes.
 - La primera página del catálogo se identifica con el número 0.
 - No se admiten posiciones distintas de arquero, defensor, mediocampista y delantero en los datos del catálogo ni como valores de filtro.
@@ -92,7 +92,7 @@ Como persona usuaria, quiero ver el detalle de un jugador identificado del catá
 - **RF-014**: Si el jugador solicitado no existe, el sistema DEBE comunicar claramente que no fue encontrado, sin devolver datos de otro jugador ni un error genérico.
 - **RF-015**: En inicios posteriores de la aplicación, el sistema DEBE mantener datos iniciales consistentes y no duplicar jugadores ni equipos existentes.
 - **RF-016**: La funcionalidad NO DEBE incluir cotizaciones, estadísticas de rendimiento, historial de partidos, goles, asistencias, tarjetas, edad, nacionalidad, partidos, resultados, búsqueda por nombre, rankings, órdenes, compra o venta de tokens ni portfolio.
-- **RF-017**: Cuando una consulta incluye un filtro con un valor no admitido, el sistema DEBE devolver un resultado paginado vacío y no tratarlo como error.
+- **RF-017**: Cuando una consulta incluye un filtro con un valor no admitido, el sistema DEBE devolver `400 Bad Request` con el formato `ApiError`.
 
 ### Entidades clave
 
@@ -116,7 +116,7 @@ Como persona usuaria, quiero ver el detalle de un jugador identificado del catá
 ## Supuestos
 
 - La consulta del catálogo es pública y no requiere autenticación, ya que el alcance no define roles ni restricciones de acceso.
-- Los filtros se interpretan según los valores admitidos por el catálogo; cualquier valor no admitido produce un resultado paginado vacío.
+- Los filtros se interpretan según los valores admitidos por el catálogo; cualquier valor no admitido produce `400 Bad Request` con el formato `ApiError`.
 - Si no se especifican datos de paginación, se usa la página 0 con un tamaño predeterminado razonable; la interfaz de consulta permite elegir una página y tamaño de página válidos.
 - Los identificadores internos de los jugadores son estables entre reinicios y se usan para acceder al detalle; no forman parte de una capacidad de búsqueda por nombre.
 - La carga inicial incluye jugadores y equipos representativos, sin pretender ser una plantilla oficial, completa ni actualizada de las ligas.

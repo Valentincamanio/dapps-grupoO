@@ -17,9 +17,9 @@ description: "Tareas ejecutables para la entrega del catálogo de jugadores"
 
 **Purpose**: Confirmar el esqueleto Spring Boot y preparar los recursos de la feature sin cambiar el stack ni los perfiles ya definidos.
 
-- [ ] T001 Verificar el baseline y ejecutar la suite existente con `backend/build.gradle` y `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/FutbolMarketApplicationTests.java`
-- [ ] T002 Crear el árbol de paquetes de catálogo definido en el plan y retirar los `.gitkeep` reemplazados bajo `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/`
-- [ ] T003 Revisar que los perfiles local y test conservan H2, `open-in-view: false` y sus modos de DDL en `backend/src/main/resources/application-local.yml` y `backend/src/test/resources/application-test.yml`
+- [X] T001 Verificar el baseline y ejecutar la suite existente con `backend/build.gradle` y `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/FutbolMarketApplicationTests.java`
+- [X] T002 Crear el árbol de paquetes de catálogo definido en el plan y retirar los `.gitkeep` reemplazados bajo `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/`
+- [X] T003 Revisar que los perfiles local y test conservan H2, `open-in-view: false` y sus modos de DDL en `backend/src/main/resources/application-local.yml` y `backend/src/test/resources/application-test.yml`
 
 ---
 
@@ -29,11 +29,11 @@ description: "Tareas ejecutables para la entrega del catálogo de jugadores"
 
 **⚠️ CRITICAL**: No comenzar historias de usuario hasta completar esta fase.
 
-- [ ] T004 Corregir la regla contradictoria de filtros inválidos para que indique `400`, conforme a plan y contrato, en `specs/002-catalogo-jugadores/spec.md`
-- [ ] T005 [P] Crear el DTO de error HTTP uniforme `ApiError` en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared/ApiError.java`
-- [ ] T006 [P] Crear las excepciones de dominio `PlayerNotFoundException` e invariantes del catálogo en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/`
-- [ ] T007 Implementar el único `@RestControllerAdvice` que traduzca validación, argumentos inválidos y jugador inexistente a errores en español en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared/GlobalExceptionHandler.java`
-- [ ] T008 Crear pruebas HTTP del formato `ApiError` para respuestas 400 y 404 en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/shared/GlobalExceptionHandlerIT.java`
+- [X] T004 Corregir la regla contradictoria de filtros inválidos para que indique `400`, conforme a plan y contrato, en `specs/002-catalogo-jugadores/spec.md`
+- [X] T005 [P] Crear el DTO de error HTTP uniforme `ApiError` en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared/ApiError.java`
+- [X] T006 [P] Crear las excepciones de dominio `PlayerNotFoundException` e invariantes del catálogo en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/`
+- [X] T007 Implementar el único `@RestControllerAdvice` que traduzca validación, argumentos inválidos y jugador inexistente a errores en español en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared/GlobalExceptionHandler.java`
+- [X] T008 Crear pruebas HTTP del formato `ApiError` para respuestas 400 y 404 en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/shared/GlobalExceptionHandlerIT.java`
 
 **Checkpoint**: La base de errores es consistente y las historias pueden comenzar.
 
@@ -47,14 +47,14 @@ description: "Tareas ejecutables para la entrega del catálogo de jugadores"
 
 ### Implementation and tests for User Story 1
 
-- [ ] T009 [P] [US1] Crear los enums `League` y `Position` con los valores admitidos en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/League.java` y `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/Position.java`
-- [ ] T010 [P] [US1] Implementar el modelo rico `Team`, con nombre y liga obligatorios, en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/Team.java`
-- [ ] T011 [P] [US1] Implementar el modelo rico `Player`, sus invariantes y la liga derivada del equipo en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/Player.java`
-- [ ] T012 [P] [US1] Implementar el valor de página `PlayerPage` con metadatos de navegación base cero en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/PlayerPage.java`
-- [ ] T013 [P] [US1] Cubrir invariantes de `Team`, `Player` y metadatos de `PlayerPage` con pruebas unitarias AssertJ en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/PlayerTest.java`
-- [ ] T014 [P] [US1] Crear las entidades JPA `TeamSQL` y `PlayerSQL`, con tablas explícitas, enums como texto y asociación lazy, en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/sql/entity/TeamSQL.java` y `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/sql/entity/PlayerSQL.java`
-- [ ] T015 [P] [US1] Crear los DAOs Spring Data para equipos y jugadores en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/sql/interfaces/TeamSQLDAO.java` y `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/sql/interfaces/PlayerSQLDAO.java`
-- [ ] T016 [US1] Implementar los mappers bidireccionales sin lógica de negocio en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/mapper/TeamMapper.java` y `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/mapper/PlayerMapper.java`
+- [X] T009 [P] [US1] Crear los enums `League` y `Position` con los valores admitidos en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/League.java` y `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/Position.java`
+- [X] T010 [P] [US1] Implementar el modelo rico `Team`, con nombre y liga obligatorios, en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/Team.java`
+- [X] T011 [P] [US1] Implementar el modelo rico `Player`, sus invariantes y la liga derivada del equipo en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/Player.java`
+- [X] T012 [P] [US1] Implementar el valor de página `PlayerPage` con metadatos de navegación base cero en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/PlayerPage.java`
+- [X] T013 [P] [US1] Cubrir invariantes de `Team`, `Player` y metadatos de `PlayerPage` con pruebas unitarias AssertJ en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/PlayerTest.java`
+- [X] T014 [P] [US1] Crear las entidades JPA `TeamSQL` y `PlayerSQL`, con tablas explícitas, enums como texto y asociación lazy, en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/sql/entity/TeamSQL.java` y `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/sql/entity/PlayerSQL.java`
+- [X] T015 [P] [US1] Crear los DAOs Spring Data para equipos y jugadores en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/sql/interfaces/TeamSQLDAO.java` y `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/sql/interfaces/PlayerSQLDAO.java`
+- [X] T016 [US1] Implementar los mappers bidireccionales sin lógica de negocio en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/mapper/TeamMapper.java` y `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/mapper/PlayerMapper.java`
 - [ ] T017 [US1] Implementar los repositorios que encapsulan DAOs y mappers, incluida la página ordenada por id ascendente, en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/repository/TeamRepository.java` y `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/repository/PlayerRepository.java`
 - [ ] T018 [US1] Crear `PlayerCatalogService` para obtener páginas de modelos sin conocer DTOs ni JPA en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogService.java`
 - [ ] T019 [P] [US1] Crear los DTOs HTTP de respuesta del jugador y de la página en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/dto/PlayerResponse.java` y `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/dto/PlayerPageResponse.java`
