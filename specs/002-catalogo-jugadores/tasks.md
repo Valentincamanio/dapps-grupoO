@@ -61,9 +61,9 @@ description: "Tareas ejecutables para la entrega del catálogo de jugadores"
 - [X] T020 [US1] Implementar `GET /players` con valores por defecto, validación de página/tamaño y conversión modelo-a-DTO en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerController.java`
 - [X] T021 [P] [US1] Crear el dataset estático de 50–60 jugadores, 10–12 por liga y cuatro posiciones válidas en `backend/src/main/resources/data/players.json`
 - [X] T022 [US1] Implementar el seeder exclusivo del perfil local, idempotente por `externalId` y reutilizando equipos por nombre/liga, en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/PlayerCatalogDataSeeder.java`
-- [ ] T023 [P] [US1] Probar mapeo, repositorio paginado y seeder idempotente contra H2 test en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/PlayerRepositoryIT.java` y `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/PlayerCatalogDataSeederIT.java`
-- [ ] T024 [P] [US1] Probar el servicio con repositorio mockeado, incluyendo página fuera de rango vacía, en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogServiceTest.java`
-- [ ] T025 [US1] Probar con MockMvc la respuesta, navegación y validaciones 400 de `GET /players` en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerControllerIT.java`
+- [X] T023 [P] [US1] Probar mapeo, repositorio paginado y seeder idempotente contra H2 test en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/PlayerRepositoryIT.java` y `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/PlayerCatalogDataSeederIT.java`
+- [X] T024 [P] [US1] Probar el servicio con repositorio mockeado, incluyendo página fuera de rango vacía, en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogServiceTest.java`
+- [X] T025 [US1] Probar con MockMvc la respuesta, navegación y validaciones 400 de `GET /players` en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerControllerIT.java`
 
 **Checkpoint**: El listado paginado, el dataset persistente y la navegación son funcionales y verificables sin filtros.
 
