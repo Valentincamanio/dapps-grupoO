@@ -2,6 +2,7 @@ package ar.edu.unq.desapp.futbolmarket.catalog.persistence;
 
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.League;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Player;
+import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerFilter;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Position;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Team;
 import ar.edu.unq.desapp.futbolmarket.catalog.persistence.repository.PlayerRepository;
@@ -52,5 +53,35 @@ class PlayerRepositoryIT {
         assertThat(firstPage.totalPages()).isEqualTo(2);
         assertThat(firstPage.content().getFirst().team()).isEqualTo(team);
         assertThat(firstPage.content().getFirst().league()).isEqualTo(League.PREMIER);
+    }
+
+    @Test
+    void aplicaFiltrosIndividualesYCombinadosConOrdenEstable() {
+        Team arsenal = teamRepository.findOrCreate("Arsenal", League.PREMIER);
+        Team chelsea = teamRepository.findOrCreate("Chelsea", League.PREMIER);
+        Team bayern = teamRepository.findOrCreate("Bayern Munich", League.BUNDESLIGA);
+        Player arsenalForward = playerRepository.save(new Player("arsenal-01", "Bukayo Saka", Position.FORWARD, arsenal));
+        playerRepository.save(new Player("arsenal-02", "William Saliba", Position.DEFENDER, arsenal));
+        playerRepository.save(new Player("chelsea-01", "Cole Palmer", Position.FORWARD, chelsea));
+        playerRepository.save(new Player("bayern-01", "Jamal Musiala", Position.MIDFIELDER, bayern));
+
+        var leaguePage = playerRepository.findPage(0, 10, new PlayerFilter(League.PREMIER, null, null));
+        var teamPage = playerRepository.findPage(0, 10, new PlayerFilter(null, "  Arsenal  ", null));
+        var combinedPage = playerRepository.findPage(0, 10, new PlayerFilter(League.PREMIER, "Arsenal", Position.FORWARD));
+
+        assertThat(leaguePage.content()).allMatch(player -> player.league() == League.PREMIER);
+        assertThat(teamPage.content()).allMatch(player -> player.team().name().equals("Arsenal"));
+        assertThat(combinedPage.content()).containsExactly(arsenalForward);
+    }
+
+    @Test
+    void devuelvePaginaVaciaParaFiltrosValidosSinCoincidencias() {
+        Team arsenal = teamRepository.findOrCreate("Arsenal", League.PREMIER);
+        playerRepository.save(new Player("arsenal-01", "Bukayo Saka", Position.FORWARD, arsenal));
+
+        var page = playerRepository.findPage(0, 10, new PlayerFilter(League.PREMIER, "Arsenal", Position.GOALKEEPER));
+
+        assertThat(page.content()).isEmpty();
+        assertThat(page.totalElements()).isZero();
     }
 }

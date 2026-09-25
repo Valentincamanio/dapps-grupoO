@@ -2,6 +2,7 @@ package ar.edu.unq.desapp.futbolmarket.catalog.service;
 
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.League;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Player;
+import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerFilter;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerPage;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Position;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Team;
@@ -53,5 +54,17 @@ class PlayerCatalogServiceTest {
         assertThat(result.page()).isEqualTo(8);
         assertThat(result.totalPages()).isEqualTo(1);
         then(playerRepository).should().findPage(8, 10);
+    }
+
+    @Test
+    void delegaElCriterioDeFiltrosEnElRepositorio() {
+        var filter = new PlayerFilter(League.PREMIER, "Arsenal", Position.FORWARD);
+        var expectedPage = new PlayerPage(List.of(), 0, 10, 0);
+        given(playerRepository.findPage(0, 10, filter)).willReturn(expectedPage);
+
+        var result = playerCatalogService.getPlayers(0, 10, filter);
+
+        assertThat(result).isSameAs(expectedPage);
+        then(playerRepository).should().findPage(0, 10, filter);
     }
 }

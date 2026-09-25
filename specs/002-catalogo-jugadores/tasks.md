@@ -77,13 +77,13 @@ description: "Tareas ejecutables para la entrega del catálogo de jugadores"
 
 ### Implementation and tests for User Story 2
 
-- [ ] T026 [US2] Crear el criterio puro opcional `PlayerFilter` que represente liga, equipo normalizado y posición en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/PlayerFilter.java`
-- [ ] T027 [US2] Extender la consulta JPA del repositorio para aplicar con AND los filtros opcionales y conservar `id` ascendente antes de paginar en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/repository/PlayerRepository.java`
-- [ ] T028 [US2] Extender `PlayerCatalogService` para recibir `PlayerFilter` y delegar la consulta filtrada en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogService.java`
-- [ ] T029 [US2] Añadir parámetros `league`, `team` y `position`, normalización de espacios y validación HTTP al listado en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerController.java`
-- [ ] T030 [P] [US2] Probar filtros individuales, combinados y sin coincidencias contra H2 en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/PlayerRepositoryIT.java`
-- [ ] T031 [P] [US2] Probar la coordinación de filtros en el servicio con Mockito en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogServiceTest.java`
-- [ ] T032 [US2] Probar con MockMvc filtros válidos, combinación AND, parámetros enum inválidos y equipo vacío en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerControllerIT.java`
+- [X] T026 [US2] Crear el criterio puro opcional `PlayerFilter` que represente liga, equipo normalizado y posición en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/modelo/PlayerFilter.java`
+- [X] T027 [US2] Extender la consulta JPA del repositorio para aplicar con AND los filtros opcionales y conservar `id` ascendente antes de paginar en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/repository/PlayerRepository.java`
+- [X] T028 [US2] Extender `PlayerCatalogService` para recibir `PlayerFilter` y delegar la consulta filtrada en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogService.java`
+- [X] T029 [US2] Añadir parámetros `league`, `team` y `position`, normalización de espacios y validación HTTP al listado en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerController.java`
+- [X] T030 [P] [US2] Probar filtros individuales, combinados y sin coincidencias contra H2 en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/PlayerRepositoryIT.java`
+- [X] T031 [P] [US2] Probar la coordinación de filtros en el servicio con Mockito en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogServiceTest.java`
+- [X] T032 [US2] Probar con MockMvc filtros válidos, combinación AND, parámetros enum inválidos y equipo vacío en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerControllerIT.java`
 
 **Checkpoint**: Las consultas filtradas son independientes, deterministas y preservan la semántica de resultado vacío válido.
 
