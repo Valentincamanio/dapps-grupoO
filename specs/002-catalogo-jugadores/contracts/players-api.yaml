@@ -20,6 +20,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlayerPageResponse'
+              examples:
+                paginaConResultados:
+                  summary: Primera página del catálogo
+                  value:
+                    content:
+                      - id: 1
+                        name: Erling Haaland
+                        position: FORWARD
+                        team: Manchester City
+                        league: PREMIER
+                    page: 0
+                    size: 10
+                    totalElements: 50
+                    totalPages: 5
+                    hasPrevious: false
+                    hasNext: true
         '400':
           $ref: '#/components/responses/BadRequest'
   /players/{id}:
@@ -40,6 +56,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlayerResponse'
+              examples:
+                jugadorEncontrado:
+                  value:
+                    id: 1
+                    name: Erling Haaland
+                    position: FORWARD
+                    team: Manchester City
+                    league: PREMIER
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
@@ -48,6 +72,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+              examples:
+                jugadorInexistente:
+                  value:
+                    timestamp: '2026-09-25T18:21:51Z'
+                    status: 404
+                    error: No encontrado
+                    message: No existe un jugador con id 999999.
+                    path: /players/999999
+                    violations: []
 components:
   parameters:
     League:
@@ -96,6 +129,15 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
+          examples:
+            parametroInvalido:
+              value:
+                timestamp: '2026-09-25T18:21:51Z'
+                status: 400
+                error: Solicitud inválida
+                message: Los parámetros enviados no son válidos.
+                path: /players
+                violations: []
   schemas:
     League:
       type: string

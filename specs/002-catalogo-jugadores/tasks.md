@@ -111,10 +111,10 @@ description: "Tareas ejecutables para la entrega del catálogo de jugadores"
 
 **Purpose**: Validar el contrato completo, perfiles y definición de terminado.
 
-- [ ] T038 [P] Validar que el contrato y ejemplos documentan los comportamientos finales de 200, 400 y 404 en `specs/002-catalogo-jugadores/contracts/players-api.yaml` y `specs/002-catalogo-jugadores/quickstart.md`
-- [ ] T039 Ejecutar `test` y `build`, y registrar la verificación de perfiles en `specs/002-catalogo-jugadores/quickstart.md`
-- [ ] T040 Ejecutar tres reinicios con perfil local y documentar que no hay duplicados ni relaciones inconsistentes en `specs/002-catalogo-jugadores/quickstart.md`
-- [ ] T041 Revisar la separación controller→service→repository→DAO, DTOs, modelo puro, mensajes españoles y ausencia de dependencias nuevas en `specs/002-catalogo-jugadores/plan.md`
+- [X] T038 [P] Validar que el contrato y ejemplos documentan los comportamientos finales de 200, 400 y 404 en `specs/002-catalogo-jugadores/contracts/players-api.yaml` y `specs/002-catalogo-jugadores/quickstart.md`
+- [X] T039 Ejecutar `test` y `build`, y registrar la verificación de perfiles en `specs/002-catalogo-jugadores/quickstart.md`
+- [X] T040 Ejecutar tres reinicios con perfil local y documentar que no hay duplicados ni relaciones inconsistentes en `specs/002-catalogo-jugadores/quickstart.md`
+- [X] T041 Revisar la separación controller→service→repository→DAO, DTOs, modelo puro, mensajes españoles y ausencia de dependencias nuevas en `specs/002-catalogo-jugadores/plan.md`
 
 ---
 

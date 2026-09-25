@@ -96,3 +96,7 @@ backend/
 ## Seguimiento de complejidad
 
 No aplica: la verificación constitucional no tiene violaciones.
+
+## Revisión final de arquitectura
+
+Revisado el 2026-09-25: la ruta de dependencias se mantiene como controller → service → repository → DAO. Los DTOs permanecen en `catalog/controller/dto`, el modelo en `catalog/modelo` no usa anotaciones JPA y los mappers aíslan las entidades `*SQL` dentro de persistencia. `GlobalExceptionHandler` centraliza los mensajes HTTP en español. No se agregaron dependencias al `build.gradle` para esta entrega.
