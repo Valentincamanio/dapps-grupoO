@@ -4,6 +4,7 @@ import ar.edu.unq.desapp.futbolmarket.catalog.modelo.League;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Player;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerFilter;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerPage;
+import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerNotFoundException;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Position;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Team;
 import ar.edu.unq.desapp.futbolmarket.catalog.service.PlayerCatalogService;
@@ -114,5 +115,44 @@ class PlayerControllerIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.path").value("/players"));
+    }
+
+    @Test
+    void devuelveElDetalleDelJugadorExistente() throws Exception {
+        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "Arsenal", League.PREMIER));
+        given(playerCatalogService.getPlayer(7L)).willReturn(player);
+
+        mockMvc.perform(get("/players/7").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(7))
+                .andExpect(jsonPath("$.name").value("Bukayo Saka"))
+                .andExpect(jsonPath("$.position").value("FORWARD"))
+                .andExpect(jsonPath("$.team").value("Arsenal"))
+                .andExpect(jsonPath("$.league").value("PREMIER"));
+        verify(playerCatalogService).getPlayer(7L);
+    }
+
+    @Test
+    void rechazaUnIdInvalidoConApiError() throws Exception {
+        mockMvc.perform(get("/players/0").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Solicitud inválida"))
+                .andExpect(jsonPath("$.path").value("/players/0"));
+    }
+
+    @Test
+    void devuelveNotFoundSinDatosDeJugadorCuandoElIdNoExiste() throws Exception {
+        given(playerCatalogService.getPlayer(99L)).willThrow(new PlayerNotFoundException(99L));
+
+        mockMvc.perform(get("/players/99").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("No encontrado"))
+                .andExpect(jsonPath("$.message").value("No se encontró el jugador con id 99."))
+                .andExpect(jsonPath("$.path").value("/players/99"))
+                .andExpect(jsonPath("$.name").doesNotExist())
+                .andExpect(jsonPath("$.team").doesNotExist());
+        verify(playerCatalogService).getPlayer(99L);
     }
 }

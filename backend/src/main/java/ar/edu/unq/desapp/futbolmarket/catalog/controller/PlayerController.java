@@ -13,6 +13,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,6 +43,11 @@ public class PlayerController {
                 ? playerCatalogService.getPlayers(page, size, filter)
                 : playerCatalogService.getPlayers(page, size);
         return toResponse(playerPage);
+    }
+
+    @GetMapping("/{id}")
+    public PlayerResponse getPlayer(@PathVariable @Min(1) Long id) {
+        return toResponse(playerCatalogService.getPlayer(id));
     }
 
     private PlayerPageResponse toResponse(PlayerPage playerPage) {

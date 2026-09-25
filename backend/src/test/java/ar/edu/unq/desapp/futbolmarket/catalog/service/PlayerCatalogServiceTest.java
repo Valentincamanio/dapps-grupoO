@@ -4,6 +4,7 @@ import ar.edu.unq.desapp.futbolmarket.catalog.modelo.League;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Player;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerFilter;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerPage;
+import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerNotFoundException;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Position;
 import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Team;
 import ar.edu.unq.desapp.futbolmarket.catalog.persistence.repository.PlayerRepository;
@@ -14,8 +15,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
@@ -66,5 +69,26 @@ class PlayerCatalogServiceTest {
 
         assertThat(result).isSameAs(expectedPage);
         then(playerRepository).should().findPage(0, 10, filter);
+    }
+
+    @Test
+    void devuelveElJugadorCuandoElRepositorioLoEncuentra() {
+        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "Arsenal", League.PREMIER));
+        given(playerRepository.findById(7L)).willReturn(Optional.of(player));
+
+        var result = playerCatalogService.getPlayer(7L);
+
+        assertThat(result).isSameAs(player);
+        then(playerRepository).should().findById(7L);
+    }
+
+    @Test
+    void lanzaPlayerNotFoundExceptionCuandoElRepositorioNoEncuentraElJugador() {
+        given(playerRepository.findById(99L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> playerCatalogService.getPlayer(99L))
+                .isInstanceOf(PlayerNotFoundException.class)
+                .hasMessage("No se encontró el jugador con id 99.");
+        then(playerRepository).should().findById(99L);
     }
 }

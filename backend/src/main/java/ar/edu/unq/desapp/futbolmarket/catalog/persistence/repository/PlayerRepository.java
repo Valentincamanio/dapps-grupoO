@@ -61,4 +61,9 @@ public class PlayerRepository {
     public Optional<Player> findByExternalId(String externalId) {
         return playerDAO.findByExternalId(externalId).map(playerMapper::toDomain);
     }
+
+    @Transactional(readOnly = true)
+    public Optional<Player> findById(Long playerId) {
+        return playerDAO.findById(playerId).map(playerMapper::toDomain);
+    }
 }

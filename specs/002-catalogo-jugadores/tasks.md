@@ -97,11 +97,11 @@ description: "Tareas ejecutables para la entrega del catálogo de jugadores"
 
 ### Implementation and tests for User Story 3
 
-- [ ] T033 [US3] Añadir la búsqueda de jugador por id que devuelve modelo o ausencia en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/repository/PlayerRepository.java`
-- [ ] T034 [US3] Añadir la resolución de detalle y el lanzamiento de `PlayerNotFoundException` en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogService.java`
-- [ ] T035 [US3] Implementar `GET /players/{id}` y mapear el modelo a `PlayerResponse` en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerController.java`
-- [ ] T036 [P] [US3] Probar la resolución existente e inexistente del servicio con Mockito en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogServiceTest.java`
-- [ ] T037 [US3] Probar con MockMvc el detalle exitoso, id inválido y 404 sin filtrado de datos en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerControllerIT.java`
+- [X] T033 [US3] Añadir la búsqueda de jugador por id que devuelve modelo o ausencia en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/persistence/repository/PlayerRepository.java`
+- [X] T034 [US3] Añadir la resolución de detalle y el lanzamiento de `PlayerNotFoundException` en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogService.java`
+- [X] T035 [US3] Implementar `GET /players/{id}` y mapear el modelo a `PlayerResponse` en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerController.java`
+- [X] T036 [P] [US3] Probar la resolución existente e inexistente del servicio con Mockito en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/service/PlayerCatalogServiceTest.java`
+- [X] T037 [US3] Probar con MockMvc el detalle exitoso, id inválido y 404 sin filtrado de datos en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/catalog/controller/PlayerControllerIT.java`
 
 **Checkpoint**: El detalle y el error de no encontrado cumplen el contrato sin depender de los filtros.
 
