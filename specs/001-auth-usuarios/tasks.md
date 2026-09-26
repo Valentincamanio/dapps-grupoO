@@ -43,8 +43,11 @@ US7) para implementar y probar cada una por separado.
   que mantiene al servicio ignorante de JPA. No se lo describe como el único punto donde conviven
   el modelo y la persistencia.
 - Cuando un paquete deja de estar vacío, su `.gitkeep` se borra en el mismo commit.
-- No se tocan `catalog/` ni `shared/`, no se modifica `FutbolMarketApplicationTests` y no se crean
-  endpoints bajo `/users`.
+- **`catalog/` y `shared/` solo se tocan en la Fase 10**, que es la integración, y con el permiso
+  del equipo: ahí se completan las bases de excepción y el advice de `shared/`, y se ajusta lo
+  mínimo de `catalog/` para que siga comportándose igual (sus tests incluidos). Fuera de esa fase
+  no se tocan. No se modifica `FutbolMarketApplicationTests` y no se crean endpoints bajo
+  `/users`.
 - **Tests existentes**: varias historias agregan métodos `@Test` nuevos a una clase de test que
   creó una historia anterior (por ejemplo `AppUserTest`). Agregar métodos está permitido;
   modificar o borrar un método `@Test` ya escrito requiere el "sí" explícito del equipo
@@ -323,7 +326,7 @@ end to end de errores (plan, decisión 3; contracts/shared-integration.md, secci
 
 **⚠️ No empezar** hasta que la feature `002-catalogo-jugadores` esté mergeada en `develop`.
 
-- [ ] T086 Rebasear la rama `001-auth-usuarios` sobre `develop`; en backend/src/main/resources/application.yaml conservar las claves de las dos features (el bloque `futbolmarket` al final y la exclusión dentro de `spring`), y verificar que `./gradlew build` pase antes de seguir
+- [X] T086 Rebasear la rama `001-auth-usuarios` sobre `develop`; en backend/src/main/resources/application.yaml conservar las claves de las dos features (el bloque `futbolmarket` al final y la exclusión dentro de `spring`), y verificar que `./gradlew build` pase antes de seguir
 - [ ] T087 Leer la clase base de excepciones y el `ApiError` de backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared/ y confirmar que la base se puede extender sin tipos de Spring (contracts/shared-integration.md, sección 2). Si exige un `HttpStatus` u otro tipo de Spring, **detenerse y avisar al equipo** antes de tocar `auth/modelo/`
 - [ ] T088 [P] Hacer que las seis excepciones de backend/src/main/java/ar/edu/unq/desapp/futbolmarket/auth/modelo/exception/ (`DuplicateUsernameException`, `DuplicateEmailException`, `DuplicateUsernameAndEmailException`, `InvalidCredentialsException`, `InvalidPasswordChangeException` e `InvalidUserDataException`) extiendan la base, o la base por categoría, de `shared/` según el mapeo de la sección 3 del contrato (409, 401 y 400)
 - [ ] T089 [P] Hacer que backend/src/main/java/ar/edu/unq/desapp/futbolmarket/security/ApiErrorResponseWriter.java use el `ApiError` de `shared/` si es público y borrar el record privado; si no es público, mantener el record con la misma forma y avisar
@@ -342,7 +345,7 @@ end to end de errores (plan, decisión 3; contracts/shared-integration.md, secci
 Las tareas T094 a T101 se pueden correr mientras la Fase 10 está bloqueada, y se repiten T098 y
 T099 después de integrarla.
 
-- [X] T094 [P] Verificar el árbol: no existe backend/src/main/java/ar/edu/unq/desapp/futbolmarket/domain/; no queda `.gitkeep` en `auth/`, `security/` ni `config/`; `git diff --stat main -- backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared` no muestra cambios de esta feature; backend/src/test/java/ar/edu/unq/desapp/futbolmarket/FutbolMarketApplicationTests.java no cambió
+- [X] T094 [P] Verificar el árbol: no existe backend/src/main/java/ar/edu/unq/desapp/futbolmarket/domain/; no queda `.gitkeep` en `auth/`, `security/` ni `config/`; los únicos cambios de `git diff origin/develop -- backend/src/main/java/ar/edu/unq/desapp/futbolmarket/catalog backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared` son los de la integración de la Fase 10 (la base es `origin/develop`, no `main`: desde el rebase de T086 es la rama que ya tiene catálogo mergeado) (las bases de excepción y el advice de `shared/`, y en `catalog/` las excepciones que pasan a extenderlas); backend/src/test/java/ar/edu/unq/desapp/futbolmarket/FutbolMarketApplicationTests.java no cambió
 - [X] T095 [P] Verificar la pureza del modelo: ningún archivo de backend/src/main/java/ar/edu/unq/desapp/futbolmarket/auth/modelo/ y sus subpaquetes importa `org.springframework`, `jakarta.persistence` ni `...auth.controller`; ningún controller inyecta un repository, un DAO ni un mapper; ningún DTO llega al servicio (principio I)
 - [X] T096 [P] Verificar SC-013 y la ausencia de secretos: ningún archivo del repositorio define `futbolmarket.auth.admin.*` ni las variables `FUTBOLMARKET_AUTH_ADMIN_*` con valor, y el único secreto JWT está en backend/src/main/resources/application-local.yml y backend/src/test/resources/application-test.yml
 - [X] T097 [P] Revisión orientada a SonarCloud del código nuevo en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/auth/, `security/` y `config/`: sin imports ni parámetros sin usar, sin números mágicos, sin código duplicado (la validación de `register` y `createAdmin` es un solo método), sin `System.out`, sin `catch` genéricos, métodos cortos y comentarios que explican el porqué (principio V)
