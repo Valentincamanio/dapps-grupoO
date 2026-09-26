@@ -154,6 +154,40 @@ class AuthErrorsIT {
         assertThat(withoutTimestamp(unknownUser)).isEqualTo(withoutTimestamp(wrongPassword));
     }
 
+    /**
+     * Sin los campos obligatorios, el constructor compacto del DTO recibe null. La respuesta tiene
+     * que ser el 400 de validación con las violaciones, no un 500 por un null que se recorta.
+     */
+    @Test
+    void unRegistroSinLosCamposObligatoriosDevuelveBadRequestConLasViolaciones() throws Exception {
+        MvcTestResult result = mvc.post().uri(REGISTER_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"password": "%s"}
+                        """.formatted(PASSWORD))
+                .exchange();
+        String rawBody = result.getResponse().getContentAsString();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(violationFields(rawBody)).contains("username", "email");
+        assertThat(rawBody).doesNotContain(PASSWORD);
+    }
+
+    @Test
+    void unLoginSinNombreDeUsuarioDevuelveBadRequestConLaViolacion() throws Exception {
+        MvcTestResult result = mvc.post().uri(LOGIN_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"password": "%s"}
+                        """.formatted(PASSWORD))
+                .exchange();
+        String rawBody = result.getResponse().getContentAsString();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(violationFields(rawBody)).contains("username");
+        assertThat(rawBody).doesNotContain(PASSWORD);
+    }
+
     private void assertConflict(MvcTestResult result, String expectedMessage) throws Exception {
         assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         JsonNode body = jsonMapper.readTree(result.getResponse().getContentAsString());

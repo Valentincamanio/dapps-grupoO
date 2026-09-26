@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidCredentialsException;
@@ -235,6 +236,38 @@ class AppUserTest {
     void createAdminRechazaUnaContrasenaDeSieteCaracteres() {
         assertThatThrownBy(() -> AppUser.createAdmin(USERNAME, EMAIL, "clave12", hasher))
                 .isInstanceOf(InvalidUserDataException.class);
+    }
+
+    /**
+     * El DTO ataja los campos vacios con Bean Validation, pero la invariante vive en el modelo:
+     * `register` y `createAdmin` tambien se invocan desde el alta del administrador, con lo que
+     * venga de la configuracion.
+     */
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    void rechazaUnNombreDeUsuarioAusenteOEnBlanco(String username) {
+        assertThatThrownBy(() -> register(username, EMAIL, PASSWORD))
+                .isInstanceOf(InvalidUserDataException.class)
+                .hasMessage(CredentialPolicy.USERNAME_REQUIRED_MESSAGE);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    void rechazaUnCorreoAusenteOEnBlanco(String email) {
+        assertThatThrownBy(() -> register(USERNAME, email, PASSWORD))
+                .isInstanceOf(InvalidUserDataException.class)
+                .hasMessage(CredentialPolicy.EMAIL_REQUIRED_MESSAGE);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"        "})
+    void rechazaUnaContrasenaAusenteOEnBlanco(String password) {
+        assertThatThrownBy(() -> register(USERNAME, EMAIL, password))
+                .isInstanceOf(InvalidUserDataException.class)
+                .hasMessage(CredentialPolicy.PASSWORD_REQUIRED_MESSAGE);
     }
 
     private void assertPasswordChangeRejected(String currentPassword, String newPassword,
