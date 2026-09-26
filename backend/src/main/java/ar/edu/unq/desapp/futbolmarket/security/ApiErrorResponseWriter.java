@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
+import ar.edu.unq.desapp.futbolmarket.shared.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,9 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Serializa con el {@code JsonMapper} de Boot, el mismo que usa el advice, así el formato del
  * {@code timestamp} coincide con el del resto de los errores de la API.</p>
+ *
+ * <p>Usa el {@code ApiError} de {@code shared/}: estos rechazos no son errores de validación, así
+ * que {@code violations} viaja en {@code null} y no aparece en el cuerpo.</p>
  */
 @Component
 @RequiredArgsConstructor
@@ -31,18 +35,12 @@ public class ApiErrorResponseWriter {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        jsonMapper.writeValue(response.getWriter(), new ApiErrorBody(
+        jsonMapper.writeValue(response.getWriter(), new ApiError(
                 Instant.now(),
                 status.value(),
                 status.getReasonPhrase(),
                 message,
-                request.getRequestURI()));
-    }
-
-    /**
-     * Tiene la forma del {@code ApiError} del contrato común. Es privado hasta la integración con
-     * {@code shared/}, que aporta la clase compartida (contracts/shared-integration.md).
-     */
-    private record ApiErrorBody(Instant timestamp, int status, String error, String message, String path) {
+                request.getRequestURI(),
+                null));
     }
 }

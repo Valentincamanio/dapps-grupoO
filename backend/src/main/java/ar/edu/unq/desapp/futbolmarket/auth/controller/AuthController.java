@@ -12,8 +12,10 @@ import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.LoginResponse;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.RegisterRequest;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.RegisterResponse;
 import ar.edu.unq.desapp.futbolmarket.auth.service.AuthService;
+import ar.edu.unq.desapp.futbolmarket.shared.ApiError;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -37,10 +39,10 @@ public class AuthController {
     @ApiResponse(responseCode = "201",
             description = "Usuario creado. Incluye la clave de API, que no se vuelve a mostrar.")
     @ApiResponse(responseCode = "400", description = "Los datos enviados no cumplen las reglas de formato.",
-            content = @Content)
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "409",
             description = "El nombre de usuario, el correo o ambos ya están registrados.",
-            content = @Content)
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public RegisterResponse register(@Valid @RequestBody RegisterRequest request) {
@@ -56,9 +58,9 @@ public class AuthController {
     @ApiResponse(responseCode = "200",
             description = "Credenciales correctas. Devuelve el token de sesión y su vencimiento.")
     @ApiResponse(responseCode = "400", description = "Falta el nombre de usuario o la contraseña.",
-            content = @Content)
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "401", description = "Usuario inexistente o contraseña incorrecta.",
-            content = @Content)
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return LoginResponse.from(authService.login(request.username(), request.password()));

@@ -14,10 +14,12 @@ import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ApiKeyResponse;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ChangePasswordRequest;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ProfileResponse;
 import ar.edu.unq.desapp.futbolmarket.auth.service.AccountService;
+import ar.edu.unq.desapp.futbolmarket.shared.ApiError;
 import ar.edu.unq.desapp.futbolmarket.config.OpenApiConfig;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -50,7 +52,7 @@ public class AccountController {
             description = "Devuelve los datos del usuario dueño de la credencial. Nunca incluye la "
                     + "contraseña, su hash ni la clave de API.")
     @ApiResponse(responseCode = "200", description = "Perfil del usuario autenticado.")
-    @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION, content = @Content)
+    @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION, content = @Content(schema = @Schema(implementation = ApiError.class)))
     @GetMapping
     public ProfileResponse getProfile(@AuthenticationPrincipal @Parameter(hidden = true) Long userId) {
         return ProfileResponse.from(accountService.getProfile(userId));
@@ -67,8 +69,8 @@ public class AccountController {
     @ApiResponse(responseCode = "400",
             description = "La contraseña actual no coincide, o la nueva no cumple el formato o es igual "
                     + "a la actual. La contraseña vigente no cambia.",
-            content = @Content)
-    @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION, content = @Content)
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION, content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PutMapping("/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changePassword(@AuthenticationPrincipal @Parameter(hidden = true) Long userId,
@@ -82,7 +84,7 @@ public class AccountController {
                     + "ser válida en ese mismo momento: siempre hay a lo sumo una vigente. Los tokens de "
                     + "sesión ya emitidos siguen siendo válidos hasta su vencimiento. No lleva cuerpo.")
     @ApiResponse(responseCode = "200", description = "Clave nueva. No se vuelve a mostrar.")
-    @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION, content = @Content)
+    @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION, content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping("/api-key")
     public ApiKeyResponse regenerateApiKey(@AuthenticationPrincipal @Parameter(hidden = true) Long userId) {
         return ApiKeyResponse.from(accountService.regenerateApiKey(userId));
