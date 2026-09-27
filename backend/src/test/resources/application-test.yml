@@ -10,3 +10,8 @@ spring:
   h2:
     console:
       enabled: false
+
+futbolmarket:
+  security:
+    jwt:
+      secret: /tfNkTteCHEpxj9lzElDi/ss60bi7icliBx9uFkxD+u9HFSH7IF0WQjr+upsKbgJ

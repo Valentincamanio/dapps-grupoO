@@ -1,0 +1,445 @@
+openapi: 3.0.3
+info:
+  title: API de autenticación y credenciales
+  version: 1.0.0
+  description: |
+    Contrato de la feature `001-auth-usuarios` de Futbol Market. Todos los endpoints de esta
+    feature están bajo `/auth`.
+
+    Las rutas protegidas aceptan cualquiera de las dos credenciales:
+
+    - Token de sesión: header `Authorization: Bearer <token>`. Es un JWT HS256 con vigencia de
+      24 horas desde su emisión.
+    - Clave de API: header `X-API-Key: <clave>`.
+
+    Si un request trae las dos, se evalúa solo el token y la clave se ignora, aunque sea
+    válida. Una credencial inválida no bloquea una ruta pública: el filtro no corre sobre las
+    rutas públicas.
+
+    Los errores usan el formato común `ApiError`, el mismo del catálogo de jugadores
+    (`specs/002-catalogo-jugadores/contracts/players-api.yaml`). Los 401 y 403 de la cadena de
+    filtros los escriben el entry point y el access denied handler de `security/`. El resto de
+    los errores los escribe el `@RestControllerAdvice` de `shared/`.
+servers:
+  - url: http://localhost:8080
+    description: Perfil local (./gradlew bootRun)
+tags:
+  - name: Autenticación
+    description: Registro e inicio de sesión. No requieren credencial.
+  - name: Cuenta
+    description: Perfil y credenciales del usuario autenticado. Requieren token de sesión o clave de API.
+paths:
+  /auth/register:
+    post:
+      tags: [Autenticación]
+      operationId: register
+      summary: Registra un usuario
+      description: |
+        Crea una cuenta con rol `USER` y el saldo inicial configurado (1000.00 por defecto).
+        Devuelve la clave de API **por única vez**: no existe otra vía para volver a
+        consultarla. El nombre de usuario y el correo se recortan y se comparan sin distinguir
+        mayúsculas. Si el cliente declara un rol, se ignora. El registro no emite token de
+        sesión.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Usuario creado. Incluye la clave de API, que no se vuelve a mostrar.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/RegistrationConflict'
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      operationId: login
+      summary: Inicia sesión
+      description: |
+        Valida el nombre de usuario (sin distinguir mayúsculas) y la contraseña, y devuelve un
+        token de sesión con su vencimiento. Si el usuario no existe o la contraseña es
+        incorrecta, el rechazo es idéntico en los dos casos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Credenciales correctas. Devuelve el token de sesión y su vencimiento.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/InvalidLogin'
+  /auth/me:
+    get:
+      tags: [Cuenta]
+      operationId: getProfile
+      summary: Consulta el perfil propio
+      description: |
+        Devuelve los datos del usuario dueño de la credencial. Nunca incluye la contraseña, su
+        hash ni la clave de API.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: Perfil del usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/me/password:
+    put:
+      tags: [Cuenta]
+      operationId: changePassword
+      summary: Cambia la contraseña
+      description: |
+        Requiere la contraseña actual y una nueva que cumpla las reglas del registro y sea
+        distinta de la actual. Si el cambio se rechaza, nada se modifica. Los tokens de sesión
+        ya emitidos siguen siendo válidos hasta su vencimiento. Se responde 400 y no 401
+        cuando la contraseña actual no coincide, porque el usuario sí está autenticado: el
+        problema está en el cuerpo del request.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Contraseña cambiada. Sin cuerpo.
+        '400':
+          $ref: '#/components/responses/PasswordChangeRejected'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/me/api-key:
+    post:
+      tags: [Cuenta]
+      operationId: regenerateApiKey
+      summary: Regenera la clave de API
+      description: |
+        Emite una clave nueva y la devuelve **por única vez**. La clave anterior deja de ser
+        válida en ese mismo momento: siempre hay a lo sumo una vigente. Los tokens de sesión
+        ya emitidos siguen siendo válidos hasta su vencimiento. No lleva cuerpo.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: Clave nueva. No se vuelve a mostrar.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de sesión obtenido en POST /auth/login. Vigencia de 24 horas.
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clave de API entregada en el registro o en la regeneración.
+  schemas:
+    Role:
+      type: string
+      enum: [USER, ADMIN]
+      description: USER es el único rol que otorga el registro público. ADMIN solo existe por el alta de arranque.
+    RegisterRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: '^[A-Za-z0-9_]+$'
+          description: Letras, números y guiones bajos. Se recortan los espacios de los extremos antes de validar.
+          example: lionel10
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Se recortan los espacios de los extremos antes de validar.
+          example: lionel@mail.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          writeOnly: true
+          description: No se recorta. Máximo de 72 bytes en UTF-8, que es el límite de BCrypt.
+          example: campeon2022
+    RegisterResponse:
+      type: object
+      required: [id, username, email, role, balance, apiKey]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        username:
+          type: string
+          example: lionel10
+        email:
+          type: string
+          example: lionel@mail.com
+        role:
+          $ref: '#/components/schemas/Role'
+        balance:
+          type: number
+          description: Saldo de créditos, con dos decimales.
+          example: 1000.00
+        apiKey:
+          type: string
+          description: Clave de API en claro, 43 caracteres Base64URL. Se muestra solo en esta respuesta.
+          example: q8Xv2Lr0Tn5WkZ3pY7uH1bC9dF4gJ6mN0sR2tV8wXyA
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: lionel10
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          example: campeon2022
+    LoginResponse:
+      type: object
+      required: [token, tokenType, expiresAt]
+      properties:
+        token:
+          type: string
+          description: JWT firmado con HS256.
+          example: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzg5NzQwMDAwLCJleHAiOjE3ODk4MjY0MDB9.firma
+        tokenType:
+          type: string
+          enum: [Bearer]
+          example: Bearer
+        expiresAt:
+          type: string
+          format: date-time
+          description: Momento de vencimiento, 24 horas después de la emisión.
+          example: '2026-09-19T15:00:00Z'
+    ProfileResponse:
+      type: object
+      required: [id, username, email, role, balance]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        username:
+          type: string
+          example: lionel10
+        email:
+          type: string
+          example: lionel@mail.com
+        role:
+          $ref: '#/components/schemas/Role'
+        balance:
+          type: number
+          example: 1000.00
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          writeOnly: true
+          example: campeon2022
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          writeOnly: true
+          description: Mismas reglas que en el registro. Tiene que ser distinta de la actual.
+          example: tricampeon2022
+    ApiKeyResponse:
+      type: object
+      required: [apiKey]
+      properties:
+        apiKey:
+          type: string
+          description: Clave de API nueva en claro. Se muestra solo en esta respuesta.
+          example: Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWp
+    ApiError:
+      type: object
+      description: Formato de error común del backend, compartido con el catálogo.
+      required: [timestamp, status, error, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          format: int32
+        error:
+          type: string
+          description: Frase estándar del status HTTP (por ejemplo, Unauthorized).
+        message:
+          type: string
+          description: Mensaje claro en español, sin detalles internos.
+        path:
+          type: string
+        violations:
+          type: array
+          description: Solo en errores de validación. No incluye rejectedValue en los campos de contraseña.
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              rejectedValue:
+                type: string
+  responses:
+    ValidationError:
+      description: El cuerpo no cumple las reglas de formato. Se informa qué regla falló y no se crea ni modifica nada.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-09-18T15:00:00Z'
+            status: 400
+            error: Bad Request
+            message: El request tiene datos inválidos.
+            path: /auth/register
+            violations:
+              - field: username
+                message: El nombre de usuario debe tener entre 3 y 30 caracteres.
+                rejectedValue: li
+              - field: password
+                message: La contraseña debe tener entre 8 y 72 caracteres.
+    RegistrationConflict:
+      description: El nombre de usuario, el correo o ambos ya están registrados. Se informa cuál.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            username:
+              value:
+                timestamp: '2026-09-18T15:00:00Z'
+                status: 409
+                error: Conflict
+                message: El nombre de usuario ya está registrado.
+                path: /auth/register
+            email:
+              value:
+                timestamp: '2026-09-18T15:00:00Z'
+                status: 409
+                error: Conflict
+                message: El correo electrónico ya está registrado.
+                path: /auth/register
+            ambos:
+              value:
+                timestamp: '2026-09-18T15:00:00Z'
+                status: 409
+                error: Conflict
+                message: El nombre de usuario y el correo electrónico ya están registrados.
+                path: /auth/register
+    InvalidLogin:
+      description: Usuario inexistente o contraseña incorrecta. La respuesta es idéntica en los dos casos.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-09-18T15:00:00Z'
+            status: 401
+            error: Unauthorized
+            message: Credenciales inválidas.
+            path: /auth/login
+    PasswordChangeRejected:
+      description: La contraseña actual no coincide, la nueva no cumple el formato o es igual a la actual. La contraseña vigente no cambia.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            actualIncorrecta:
+              value:
+                timestamp: '2026-09-18T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: La contraseña actual es incorrecta.
+                path: /auth/me/password
+            igualALaActual:
+              value:
+                timestamp: '2026-09-18T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: La nueva contraseña debe ser distinta de la actual.
+                path: /auth/me/password
+            formatoInvalido:
+              value:
+                timestamp: '2026-09-18T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: El request tiene datos inválidos.
+                path: /auth/me/password
+                violations:
+                  - field: newPassword
+                    message: La contraseña debe tener entre 8 y 72 caracteres.
+    Unauthorized:
+      description: |
+        No hay credencial, o la credencial es inválida o está vencida. Lo responde la cadena de
+        filtros, antes de llegar al controller. Siempre es JSON, nunca la página HTML de Spring
+        Security. No revela datos de otros usuarios.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            faltaCredencial:
+              value:
+                timestamp: '2026-09-18T15:00:00Z'
+                status: 401
+                error: Unauthorized
+                message: 'Se requiere una credencial: un token de sesión (Authorization: Bearer) o una clave de API (X-API-Key).'
+                path: /auth/me
+            credencialInvalida:
+              value:
+                timestamp: '2026-09-18T15:00:00Z'
+                status: 401
+                error: Unauthorized
+                message: La credencial es inválida.
+                path: /auth/me
+            tokenVencido:
+              value:
+                timestamp: '2026-09-18T15:00:00Z'
+                status: 401
+                error: Unauthorized
+                message: El token de sesión está vencido.
+                path: /auth/me
