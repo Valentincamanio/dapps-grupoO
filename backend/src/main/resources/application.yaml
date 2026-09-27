@@ -5,6 +5,8 @@ spring:
     default: local
   jpa:
     open-in-view: false
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
 
 server:
   port: 8080
@@ -14,3 +16,10 @@ management:
     web:
       exposure:
         include: health,info
+
+futbolmarket:
+  auth:
+    initial-balance: 1000.00
+  security:
+    jwt:
+      expiration: 24h

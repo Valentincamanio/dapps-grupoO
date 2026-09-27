@@ -81,7 +81,7 @@ class PlayerControllerIT {
         mockMvc.perform(get("/players?page=-1&size=0").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.error").value("Solicitud inválida"))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
                 .andExpect(jsonPath("$.message").value("Los parámetros enviados no son válidos."))
                 .andExpect(jsonPath("$.path").value("/players"));
     }
@@ -137,7 +137,7 @@ class PlayerControllerIT {
         mockMvc.perform(get("/players/0").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.error").value("Solicitud inválida"))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
                 .andExpect(jsonPath("$.path").value("/players/0"));
     }
 
@@ -148,7 +148,7 @@ class PlayerControllerIT {
         mockMvc.perform(get("/players/99").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.error").value("No encontrado"))
+                .andExpect(jsonPath("$.error").value("Not Found"))
                 .andExpect(jsonPath("$.message").value("No se encontró el jugador con id 99."))
                 .andExpect(jsonPath("$.path").value("/players/99"))
                 .andExpect(jsonPath("$.name").doesNotExist())

@@ -12,3 +12,8 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+futbolmarket:
+  security:
+    jwt:
+      secret: aACiNrbMW3kXh/SFGHf/mMS7SujRmZV/Qxe3m5hQYJUKmKzCA3yLVvA7W1KLY6nV

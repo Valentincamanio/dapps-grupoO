@@ -25,7 +25,7 @@ class GlobalExceptionHandlerIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.timestamp").exists())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.error").value("Solicitud inválida"))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
                 .andExpect(jsonPath("$.message").value("Los parámetros enviados no son válidos."))
                 .andExpect(jsonPath("$.path").value("/error-probe/bad"));
     }
@@ -36,7 +36,7 @@ class GlobalExceptionHandlerIT {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.timestamp").exists())
                 .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.error").value("No encontrado"))
+                .andExpect(jsonPath("$.error").value("Not Found"))
                 .andExpect(jsonPath("$.message").value("No se encontró el jugador con id 99."))
                 .andExpect(jsonPath("$.path").value("/error-probe/missing"));
     }
