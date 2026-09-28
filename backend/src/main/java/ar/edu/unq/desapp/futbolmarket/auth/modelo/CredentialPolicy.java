@@ -19,7 +19,11 @@ public final class CredentialPolicy {
     public static final int USERNAME_MAX_LENGTH = 30;
     public static final String USERNAME_PATTERN = "^[A-Za-z0-9_]+$";
     public static final int EMAIL_MAX_LENGTH = 254;
-    public static final String EMAIL_PATTERN = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
+    /**
+     * La primera parte del dominio excluye el punto: así hay una sola forma de partir el texto y
+     * el motor de regex no hace backtracking cuadrático ante un dominio largo sin punto.
+     */
+    public static final String EMAIL_PATTERN = "^[^@\\s]+@[^@\\s.]+\\.[^@\\s]+$";
     public static final int PASSWORD_MIN_LENGTH = 8;
     public static final int PASSWORD_MAX_LENGTH = 72;
     public static final int PASSWORD_MAX_BYTES = 72;

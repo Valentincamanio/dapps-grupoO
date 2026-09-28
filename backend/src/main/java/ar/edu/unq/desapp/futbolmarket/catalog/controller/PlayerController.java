@@ -35,7 +35,7 @@ public class PlayerController {
             @RequestParam(defaultValue = "0") @Min(DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size,
             @RequestParam(required = false) League league,
-            @RequestParam(required = false) @Pattern(regexp = ".*\\S.*") String team,
+            @RequestParam(required = false) @Pattern(regexp = "\\s*\\S.*") String team,
             @RequestParam(required = false) Position position
     ) {
         var filter = new PlayerFilter(league, team, position);
