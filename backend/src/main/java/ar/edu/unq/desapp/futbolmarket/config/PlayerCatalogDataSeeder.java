@@ -36,7 +36,7 @@ public class PlayerCatalogDataSeeder implements ApplicationRunner {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = IOException.class)
     public void run(ApplicationArguments args) throws IOException {
         for (PlayerSeed playerSeed : readPlayers()) {
             if (!playerRepository.existsByExternalId(playerSeed.externalId())) {
