@@ -13,11 +13,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.ApiKey;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateEmailException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateUsernameException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.mapper.AppUserMapper;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
 

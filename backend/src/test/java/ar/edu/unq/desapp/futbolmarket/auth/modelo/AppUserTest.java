@@ -11,9 +11,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidCredentialsException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidPasswordChangeException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidUserDataException;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.RegisteredUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidPasswordChangeException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidUserDataException;
 
 class AppUserTest {
 

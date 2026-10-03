@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.league;
 
 public enum League {
     PREMIER,

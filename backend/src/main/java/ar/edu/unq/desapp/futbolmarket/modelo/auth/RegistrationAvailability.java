@@ -1,8 +1,8 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.auth;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateEmailException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateUsernameException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateUsernameAndEmailException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameAndEmailException;
 
 /**
  * Disponibilidad del nombre de usuario y del correo al registrarse.

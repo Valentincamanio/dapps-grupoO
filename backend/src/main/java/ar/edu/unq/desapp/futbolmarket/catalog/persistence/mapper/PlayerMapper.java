@@ -1,6 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.catalog.persistence.mapper;
 
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.entity.PlayerSQL;
 import org.springframework.stereotype.Component;
 

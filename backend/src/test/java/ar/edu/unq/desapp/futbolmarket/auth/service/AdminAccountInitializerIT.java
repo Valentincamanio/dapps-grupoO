@@ -15,9 +15,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.ApiKey;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.interfaces.AppUserSQLDAO;
 

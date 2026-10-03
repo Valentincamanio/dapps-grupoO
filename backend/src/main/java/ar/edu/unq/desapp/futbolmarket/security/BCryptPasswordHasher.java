@@ -3,7 +3,7 @@ package ar.edu.unq.desapp.futbolmarket.security;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.PasswordHasher;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
 import lombok.RequiredArgsConstructor;
 
 /**

@@ -2,7 +2,7 @@ package ar.edu.unq.desapp.futbolmarket.auth.controller.dto;
 
 import java.time.Instant;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.SessionToken;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.SessionToken;
 
 /**
  * Respuesta del inicio de sesión. No lleva la contraseña ni la clave de API.

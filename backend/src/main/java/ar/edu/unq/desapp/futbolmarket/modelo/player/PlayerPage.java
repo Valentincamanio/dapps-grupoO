@@ -1,6 +1,8 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.player;
 
 import java.util.List;
+
+import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.CatalogInvariantException;
 
 public record PlayerPage(
         List<Player> content,

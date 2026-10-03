@@ -17,13 +17,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.ApiKey;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.FakePasswordHasher;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.PasswordHasher;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidCredentialsException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidPasswordChangeException;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidPasswordChangeException;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
 
 @ExtendWith(MockitoExtension.class)

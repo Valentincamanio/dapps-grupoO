@@ -1,6 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.auth.controller.dto;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.ApiKey;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
 
 /**
  * Respuesta de la regeneración. Es el único momento en que la clave nueva viaja en claro: no hay

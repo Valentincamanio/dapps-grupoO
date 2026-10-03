@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.player.exception;
 
 import ar.edu.unq.desapp.futbolmarket.shared.NotFoundException;
 

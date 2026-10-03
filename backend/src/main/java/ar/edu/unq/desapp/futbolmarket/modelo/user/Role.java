@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.user;
 
 /**
  * Rol de una cuenta. Se persiste como texto y en Spring Security se traduce a las autoridades

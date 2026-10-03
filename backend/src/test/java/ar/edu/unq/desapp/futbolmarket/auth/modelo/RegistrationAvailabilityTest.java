@@ -5,9 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateEmailException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateUsernameAndEmailException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateUsernameException;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.RegistrationAvailability;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameAndEmailException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
 
 class RegistrationAvailabilityTest {
 

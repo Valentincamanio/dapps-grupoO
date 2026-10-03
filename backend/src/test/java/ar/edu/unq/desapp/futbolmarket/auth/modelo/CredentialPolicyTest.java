@@ -7,6 +7,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
+
 /**
  * Los predicados son la única fuente de las reglas de formato: los comparten el modelo y los DTO.
  * Se prueban acá de forma directa porque {@code AppUser} filtra los casos nulos y de longitud

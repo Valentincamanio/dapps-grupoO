@@ -7,9 +7,9 @@ import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateEmailException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateUsernameException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.mapper.AppUserMapper;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.interfaces.AppUserSQLDAO;
 import lombok.RequiredArgsConstructor;

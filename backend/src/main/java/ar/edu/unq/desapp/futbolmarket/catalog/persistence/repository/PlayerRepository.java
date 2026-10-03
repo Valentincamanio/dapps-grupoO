@@ -1,8 +1,8 @@
 package ar.edu.unq.desapp.futbolmarket.catalog.persistence.repository;
 
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Player;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerFilter;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerPage;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerFilter;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
 import ar.edu.unq.desapp.futbolmarket.catalog.persistence.mapper.PlayerMapper;
 import ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.entity.PlayerSQL;
 import ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.interfaces.PlayerSQLDAO;

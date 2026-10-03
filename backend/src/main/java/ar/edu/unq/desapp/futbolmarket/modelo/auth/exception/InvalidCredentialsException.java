@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo.exception;
+package ar.edu.unq.desapp.futbolmarket.modelo.auth.exception;
 
 import ar.edu.unq.desapp.futbolmarket.shared.UnauthorizedException;
 

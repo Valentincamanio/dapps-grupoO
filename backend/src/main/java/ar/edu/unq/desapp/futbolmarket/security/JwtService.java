@@ -12,9 +12,9 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.stereotype.Component;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.SessionToken;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.SessionTokenIssuer;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.SessionToken;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.SessionTokenIssuer;
 import ar.edu.unq.desapp.futbolmarket.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;

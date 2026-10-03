@@ -2,9 +2,9 @@ package ar.edu.unq.desapp.futbolmarket.auth.controller.dto;
 
 import java.math.BigDecimal;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.RegisteredUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.RegisteredUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 
 /**
  * Respuesta del registro. Es el único lugar donde viaja la clave de API en claro; no lleva la

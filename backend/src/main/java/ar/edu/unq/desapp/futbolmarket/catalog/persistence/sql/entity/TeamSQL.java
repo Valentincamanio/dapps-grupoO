@@ -1,6 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.entity;
 
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

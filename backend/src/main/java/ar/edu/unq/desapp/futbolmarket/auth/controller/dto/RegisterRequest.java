@@ -2,7 +2,7 @@ package ar.edu.unq.desapp.futbolmarket.auth.controller.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.CredentialPolicy;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

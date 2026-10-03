@@ -16,7 +16,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.e2e.AuthTestHelper.TestUser;
 import tools.jackson.databind.json.JsonMapper;
 

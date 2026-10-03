@@ -7,6 +7,13 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.CatalogInvariantException;
+import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
+
 class PlayerTest {
     private final Team river = new Team(1L, "River", League.LA_LIGA);
 

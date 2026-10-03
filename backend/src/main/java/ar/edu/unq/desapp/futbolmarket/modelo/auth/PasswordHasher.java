@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.auth;
 
 /**
  * Puerto del modelo para hashear y verificar contraseñas. Lo implementa

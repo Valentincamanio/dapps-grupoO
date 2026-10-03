@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.user;
 
 /**
  * Resultado del registro público: el usuario creado y la clave de API que se muestra una sola

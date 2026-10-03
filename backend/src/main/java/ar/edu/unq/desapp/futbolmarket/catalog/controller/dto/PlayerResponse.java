@@ -1,7 +1,7 @@
 package ar.edu.unq.desapp.futbolmarket.catalog.controller.dto;
 
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.League;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 
 public record PlayerResponse(Long id, String name, Position position, String team, League league) {
 }

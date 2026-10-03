@@ -19,12 +19,12 @@ import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.CredentialPolicy;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
 import ar.edu.unq.desapp.futbolmarket.auth.modelo.FakePasswordHasher;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.PasswordHasher;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateUsernameException;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.config.AuthProperties;
 

@@ -2,8 +2,8 @@ package ar.edu.unq.desapp.futbolmarket.auth.persistence.mapper;
 
 import org.springframework.stereotype.Component;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.entity.AppUserSQL;
 
 /**

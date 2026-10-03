@@ -6,11 +6,11 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.PasswordHasher;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateEmailException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.DuplicateUsernameException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidUserDataException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidUserDataException;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.config.AuthProperties;
 import lombok.RequiredArgsConstructor;

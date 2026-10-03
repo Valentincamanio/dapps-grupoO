@@ -1,4 +1,8 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.player;
+
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.CatalogInvariantException;
+import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 
 public record PlayerFilter(League league, String team, Position position) {
     public PlayerFilter {

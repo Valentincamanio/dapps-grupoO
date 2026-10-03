@@ -1,4 +1,6 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.auth;
+
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 
 /**
  * Puerto del modelo para emitir tokens de sesión. Lo implementa {@code security/JwtService}, así

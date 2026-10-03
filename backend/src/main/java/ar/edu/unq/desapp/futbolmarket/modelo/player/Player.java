@@ -1,4 +1,9 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.player;
+
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.CatalogInvariantException;
+import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
 
 public record Player(Long id, String externalId, String name, Position position, Team team) {
     public Player {

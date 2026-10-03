@@ -1,12 +1,14 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.user;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Objects;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidCredentialsException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidPasswordChangeException;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidUserDataException;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidPasswordChangeException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidUserDataException;
 import lombok.Getter;
 
 /**

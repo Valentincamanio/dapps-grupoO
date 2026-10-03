@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.auth;
 
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;

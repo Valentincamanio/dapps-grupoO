@@ -2,8 +2,8 @@ package ar.edu.unq.desapp.futbolmarket.auth.controller.dto;
 
 import java.math.BigDecimal;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.Role;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 
 /**
  * Perfil del usuario autenticado. No lleva la contraseña, ninguno de los dos hashes ni la clave

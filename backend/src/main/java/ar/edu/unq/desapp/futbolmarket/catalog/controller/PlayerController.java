@@ -2,11 +2,11 @@ package ar.edu.unq.desapp.futbolmarket.catalog.controller;
 
 import ar.edu.unq.desapp.futbolmarket.catalog.controller.dto.PlayerPageResponse;
 import ar.edu.unq.desapp.futbolmarket.catalog.controller.dto.PlayerResponse;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Player;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.League;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerFilter;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerPage;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerFilter;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
+import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.catalog.service.PlayerCatalogService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

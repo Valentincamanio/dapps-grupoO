@@ -1,9 +1,9 @@
 package ar.edu.unq.desapp.futbolmarket.config;
 
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.League;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Player;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Position;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Team;
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
 import ar.edu.unq.desapp.futbolmarket.catalog.persistence.repository.PlayerRepository;
 import ar.edu.unq.desapp.futbolmarket.catalog.persistence.repository.TeamRepository;
 import org.springframework.boot.ApplicationArguments;

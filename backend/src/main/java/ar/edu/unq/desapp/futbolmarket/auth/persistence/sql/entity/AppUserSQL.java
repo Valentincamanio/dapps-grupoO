@@ -2,7 +2,7 @@ package ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.entity;
 
 import java.math.BigDecimal;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.CredentialPolicy;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

@@ -2,10 +2,10 @@ package ar.edu.unq.desapp.futbolmarket.auth.service;
 
 import org.springframework.stereotype.Service;
 
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.ApiKey;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.PasswordHasher;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.exception.InvalidCredentialsException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
 import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
 import lombok.RequiredArgsConstructor;
 

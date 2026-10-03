@@ -1,9 +1,9 @@
 package ar.edu.unq.desapp.futbolmarket.catalog.service;
 
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerPage;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerFilter;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.Player;
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerNotFoundException;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerFilter;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.PlayerNotFoundException;
 import ar.edu.unq.desapp.futbolmarket.catalog.persistence.repository.PlayerRepository;
 import org.springframework.stereotype.Service;
 
