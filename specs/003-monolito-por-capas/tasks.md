@@ -162,9 +162,9 @@ description: "Tareas ejecutables para la reestructuración del backend en monoli
 
 **Independent Test**: `./gradlew clean build` en verde, `bootRun` con la base local existente responde `UP` y datos, y Swagger muestra las 7 operaciones bajo las mismas secciones.
 
-- [ ] T052 [US4] Correr `./gradlew clean build` en `backend/`. Esperado: `BUILD SUCCESSFUL` (SC-002)
-- [ ] T053 [US4] Sin borrar `backend/data/`, levantar `./gradlew bootRun` y comprobar `curl -s http://localhost:8080/actuator/health` (`{"status":"UP"}`) y `curl -s "http://localhost:8080/players?size=1"` (página con los datos ya cargados). Revisar que el log no tenga errores de Hibernate ni de creación de beans (SC-005, FR-004, research D9)
-- [ ] T054 [US4] Con la aplicación levantada, abrir `http://localhost:8080/swagger-ui.html` y confirmar las 7 operaciones de negocio bajo "Autenticación", "Cuenta" y la sección del catálogo de jugadores (SC-006, FR-003). Detener la aplicación
+- [X] T052 [US4] Correr `./gradlew clean build` en `backend/`. Esperado: `BUILD SUCCESSFUL` (SC-002)
+- [X] T053 [US4] Sin borrar `backend/data/`, levantar `./gradlew bootRun` y comprobar `curl -s http://localhost:8080/actuator/health` (`{"status":"UP"}`) y `curl -s "http://localhost:8080/players?size=1"` (página con los datos ya cargados). Revisar que el log no tenga errores de Hibernate ni de creación de beans (SC-005, FR-004, research D9)
+- [X] T054 [US4] Con la aplicación levantada, abrir `http://localhost:8080/swagger-ui.html` y confirmar las 7 operaciones de negocio bajo "Autenticación", "Cuenta" y la sección del catálogo de jugadores (SC-006, FR-003). Detener la aplicación
 
 **Checkpoint**: Definición de terminado cumplida en local. SC-007 se verifica después del merge (Phase 7).
 
