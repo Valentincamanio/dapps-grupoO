@@ -20,6 +20,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.user.AppUserSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.service.user.AdminAccountInitializer;
 
 /**
  * Alta del administrador contra la base real.

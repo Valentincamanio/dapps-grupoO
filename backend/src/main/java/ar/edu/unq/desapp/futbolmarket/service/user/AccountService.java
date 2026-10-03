@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.service;
+package ar.edu.unq.desapp.futbolmarket.service.user;
 
 import org.springframework.stereotype.Service;
 

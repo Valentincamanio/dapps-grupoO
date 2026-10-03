@@ -7,7 +7,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.PlayerNotFoundException;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
-import ar.edu.unq.desapp.futbolmarket.catalog.service.PlayerCatalogService;
+import ar.edu.unq.desapp.futbolmarket.service.player.PlayerCatalogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

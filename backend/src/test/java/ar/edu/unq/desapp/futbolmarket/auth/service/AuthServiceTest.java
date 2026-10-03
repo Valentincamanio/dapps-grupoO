@@ -32,6 +32,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameExc
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.config.AuthProperties;
+import ar.edu.unq.desapp.futbolmarket.service.auth.AuthService;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {

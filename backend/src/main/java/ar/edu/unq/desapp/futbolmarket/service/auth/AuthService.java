@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.service;
+package ar.edu.unq.desapp.futbolmarket.service.auth;
 
 import java.util.Optional;
 import java.util.UUID;

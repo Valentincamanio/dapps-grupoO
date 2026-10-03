@@ -7,7 +7,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerFilter;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
-import ar.edu.unq.desapp.futbolmarket.catalog.service.PlayerCatalogService;
+import ar.edu.unq.desapp.futbolmarket.service.player.PlayerCatalogService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;

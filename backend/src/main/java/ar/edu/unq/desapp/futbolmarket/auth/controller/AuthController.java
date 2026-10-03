@@ -11,7 +11,7 @@ import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.LoginRequest;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.LoginResponse;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.RegisterRequest;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.RegisterResponse;
-import ar.edu.unq.desapp.futbolmarket.auth.service.AuthService;
+import ar.edu.unq.desapp.futbolmarket.service.auth.AuthService;
 import ar.edu.unq.desapp.futbolmarket.shared.ApiError;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;

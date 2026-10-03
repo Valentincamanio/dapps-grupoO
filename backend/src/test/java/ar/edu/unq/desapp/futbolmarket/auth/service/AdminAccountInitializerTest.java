@@ -27,6 +27,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.config.AuthProperties;
+import ar.edu.unq.desapp.futbolmarket.service.user.AdminAccountInitializer;
 
 /**
  * Como el {@code FakePasswordHasher} arma el hash con la contraseña en claro adentro, verificar que

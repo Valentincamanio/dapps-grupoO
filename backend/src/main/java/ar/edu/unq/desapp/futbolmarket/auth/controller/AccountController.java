@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ApiKeyResponse;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ChangePasswordRequest;
 import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ProfileResponse;
-import ar.edu.unq.desapp.futbolmarket.auth.service.AccountService;
+import ar.edu.unq.desapp.futbolmarket.service.user.AccountService;
 import ar.edu.unq.desapp.futbolmarket.shared.ApiError;
 import ar.edu.unq.desapp.futbolmarket.config.OpenApiConfig;
 import io.swagger.v3.oas.annotations.Operation;

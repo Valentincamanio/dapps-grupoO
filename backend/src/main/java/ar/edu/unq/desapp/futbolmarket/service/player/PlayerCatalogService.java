@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.service;
+package ar.edu.unq.desapp.futbolmarket.service.player;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerFilter;

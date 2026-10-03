@@ -25,6 +25,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidPasswordChangeException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
+import ar.edu.unq.desapp.futbolmarket.service.user.AccountService;
 
 @ExtendWith(MockitoExtension.class)
 class AccountServiceTest {
