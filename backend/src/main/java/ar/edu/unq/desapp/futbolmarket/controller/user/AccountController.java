@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.controller;
+package ar.edu.unq.desapp.futbolmarket.controller.user;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ApiKeyResponse;
-import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ChangePasswordRequest;
-import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.ProfileResponse;
+import ar.edu.unq.desapp.futbolmarket.controller.user.dto.ApiKeyResponse;
+import ar.edu.unq.desapp.futbolmarket.controller.user.dto.ChangePasswordRequest;
+import ar.edu.unq.desapp.futbolmarket.controller.user.dto.ProfileResponse;
 import ar.edu.unq.desapp.futbolmarket.service.user.AccountService;
 import ar.edu.unq.desapp.futbolmarket.shared.ApiError;
 import ar.edu.unq.desapp.futbolmarket.config.OpenApiConfig;

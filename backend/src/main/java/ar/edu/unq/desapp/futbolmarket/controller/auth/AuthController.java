@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.controller;
+package ar.edu.unq.desapp.futbolmarket.controller.auth;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -7,10 +7,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.LoginRequest;
-import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.LoginResponse;
-import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.RegisterRequest;
-import ar.edu.unq.desapp.futbolmarket.auth.controller.dto.RegisterResponse;
+import ar.edu.unq.desapp.futbolmarket.controller.auth.dto.LoginRequest;
+import ar.edu.unq.desapp.futbolmarket.controller.auth.dto.LoginResponse;
+import ar.edu.unq.desapp.futbolmarket.controller.auth.dto.RegisterRequest;
+import ar.edu.unq.desapp.futbolmarket.controller.auth.dto.RegisterResponse;
 import ar.edu.unq.desapp.futbolmarket.service.auth.AuthService;
 import ar.edu.unq.desapp.futbolmarket.shared.ApiError;
 import io.swagger.v3.oas.annotations.Operation;

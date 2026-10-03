@@ -1,7 +1,7 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.controller;
+package ar.edu.unq.desapp.futbolmarket.controller.player;
 
-import ar.edu.unq.desapp.futbolmarket.catalog.controller.dto.PlayerPageResponse;
-import ar.edu.unq.desapp.futbolmarket.catalog.controller.dto.PlayerResponse;
+import ar.edu.unq.desapp.futbolmarket.controller.player.dto.PlayerPageResponse;
+import ar.edu.unq.desapp.futbolmarket.controller.player.dto.PlayerResponse;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerFilter;

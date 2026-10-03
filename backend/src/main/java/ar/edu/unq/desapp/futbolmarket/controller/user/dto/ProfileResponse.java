@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.controller.dto;
+package ar.edu.unq.desapp.futbolmarket.controller.user.dto;
 
 import java.math.BigDecimal;
 

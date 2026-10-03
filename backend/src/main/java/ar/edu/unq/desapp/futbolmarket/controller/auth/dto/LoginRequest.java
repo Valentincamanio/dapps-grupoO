@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.controller.dto;
+package ar.edu.unq.desapp.futbolmarket.controller.auth.dto;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
 import jakarta.validation.constraints.NotBlank;
