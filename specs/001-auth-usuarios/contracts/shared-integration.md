@@ -1,3 +1,5 @@
+> **OBSOLETO**: la constitución 2.0.0 prohíbe los contratos de integración entre contextos y entre features (ver [specs/003](../../003-monolito-por-capas/plan.md)). Se conserva como registro histórico.
+
 # Contrato de integración con `shared/`
 
 **Rama**: `001-auth-usuarios` | **Fecha**: 2026-09-18 | **Plan**: [../plan.md](../plan.md)

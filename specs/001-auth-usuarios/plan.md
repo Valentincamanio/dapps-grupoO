@@ -1,3 +1,5 @@
+> **Estructura de paquetes histórica**: reemplazada por la constitución 2.0.0 (ver [specs/003](../003-monolito-por-capas/plan.md)).
+
 # Plan de implementación: Registro, credenciales y acceso autenticado
 
 **Rama**: `001-auth-usuarios` | **Fecha**: 2026-09-18 | **Especificación**: [spec.md](./spec.md)
