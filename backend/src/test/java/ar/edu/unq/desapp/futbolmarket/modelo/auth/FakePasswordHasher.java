@@ -1,6 +1,5 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.auth;
 
-import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
 
 /**
  * Doble de test determinístico del puerto {@link PasswordHasher}: evita el costo de BCrypt y

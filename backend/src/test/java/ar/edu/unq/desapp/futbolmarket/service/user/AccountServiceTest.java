@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.service;
+package ar.edu.unq.desapp.futbolmarket.service.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,13 +19,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.FakePasswordHasher;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.FakePasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidPasswordChangeException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
-import ar.edu.unq.desapp.futbolmarket.service.user.AccountService;
 
 @ExtendWith(MockitoExtension.class)
 class AccountServiceTest {

@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.controller;
+package ar.edu.unq.desapp.futbolmarket.e2e;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;

@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.service;
+package ar.edu.unq.desapp.futbolmarket.service.player;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
@@ -8,7 +8,6 @@ import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.PlayerNotFoundExce
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
-import ar.edu.unq.desapp.futbolmarket.service.player.PlayerCatalogService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

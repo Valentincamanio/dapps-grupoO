@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.service;
+package ar.edu.unq.desapp.futbolmarket.service.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -21,13 +21,12 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
-import ar.edu.unq.desapp.futbolmarket.auth.modelo.FakePasswordHasher;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.FakePasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.config.AuthProperties;
-import ar.edu.unq.desapp.futbolmarket.service.user.AdminAccountInitializer;
 
 /**
  * Como el {@code FakePasswordHasher} arma el hash con la contraseña en claro adentro, verificar que

@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -12,12 +12,9 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.FakePasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
-import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
-import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
-import ar.edu.unq.desapp.futbolmarket.modelo.user.RegisteredUser;
-import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidPasswordChangeException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidUserDataException;
 

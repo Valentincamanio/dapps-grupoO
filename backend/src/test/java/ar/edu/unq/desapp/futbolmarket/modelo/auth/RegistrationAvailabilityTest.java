@@ -1,11 +1,10 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.auth;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
-import ar.edu.unq.desapp.futbolmarket.modelo.auth.RegistrationAvailability;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameAndEmailException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;

@@ -1,10 +1,9 @@
-package ar.edu.unq.desapp.futbolmarket.auth.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
 
 class ApiKeyTest {
 

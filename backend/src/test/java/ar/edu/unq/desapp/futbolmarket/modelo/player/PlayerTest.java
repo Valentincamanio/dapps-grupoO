@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.modelo;
+package ar.edu.unq.desapp.futbolmarket.modelo.player;
 
 import org.junit.jupiter.api.Test;
 
@@ -8,8 +8,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
-import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
-import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.CatalogInvariantException;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;

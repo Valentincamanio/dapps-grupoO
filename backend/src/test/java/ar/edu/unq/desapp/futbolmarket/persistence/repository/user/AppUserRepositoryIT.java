@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.persistence;
+package ar.edu.unq.desapp.futbolmarket.persistence.repository.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,7 +19,6 @@ import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.user.AppUserMapper;
-import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 
 @DataJpaTest
 @ActiveProfiles("test")
