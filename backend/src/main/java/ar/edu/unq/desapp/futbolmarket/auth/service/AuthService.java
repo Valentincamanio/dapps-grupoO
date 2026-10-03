@@ -13,7 +13,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.auth.RegistrationAvailability;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.SessionToken;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.SessionTokenIssuer;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.config.AuthProperties;
 
 /**

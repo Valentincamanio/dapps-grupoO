@@ -18,8 +18,8 @@ import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.mapper.AppUserMapper;
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.mapper.user.AppUserMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 
 @DataJpaTest
 @ActiveProfiles("test")

@@ -1,10 +1,10 @@
-package ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.interfaces;
+package ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.user;
 
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.entity.AppUserSQL;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.user.AppUserSQL;
 
 /**
  * Acceso a la tabla {@code app_user}. Solo derived queries: no hay SQL nativo (principio VI).

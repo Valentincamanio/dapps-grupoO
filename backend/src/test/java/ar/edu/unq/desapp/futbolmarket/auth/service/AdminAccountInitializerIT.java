@@ -18,8 +18,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.interfaces.AppUserSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.user.AppUserSQLDAO;
 
 /**
  * Alta del administrador contra la base real.

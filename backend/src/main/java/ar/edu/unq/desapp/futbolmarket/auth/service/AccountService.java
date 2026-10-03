@@ -6,7 +6,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 import lombok.RequiredArgsConstructor;
 
 /**

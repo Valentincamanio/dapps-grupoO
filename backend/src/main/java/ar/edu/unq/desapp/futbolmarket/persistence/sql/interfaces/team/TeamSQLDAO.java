@@ -1,6 +1,6 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.interfaces;
+package ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.team;
 
-import ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.entity.TeamSQL;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.team.TeamSQL;
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import org.springframework.data.jpa.repository.JpaRepository;
 

@@ -1,11 +1,11 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.persistence.repository;
+package ar.edu.unq.desapp.futbolmarket.persistence.repository.player;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerFilter;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
-import ar.edu.unq.desapp.futbolmarket.catalog.persistence.mapper.PlayerMapper;
-import ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.entity.PlayerSQL;
-import ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.interfaces.PlayerSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.persistence.mapper.player.PlayerMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.player.PlayerSQL;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.player.PlayerSQLDAO;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;

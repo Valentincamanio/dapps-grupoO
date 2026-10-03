@@ -1,10 +1,10 @@
-package ar.edu.unq.desapp.futbolmarket.auth.persistence.mapper;
+package ar.edu.unq.desapp.futbolmarket.persistence.mapper.user;
 
 import org.springframework.stereotype.Component;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.entity.AppUserSQL;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.user.AppUserSQL;
 
 /**
  * Traduce campo a campo entre {@link AppUser} y {@link AppUserSQL}, en las dos direcciones y sin

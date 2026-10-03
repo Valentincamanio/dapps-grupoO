@@ -1,10 +1,10 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.persistence.repository;
+package ar.edu.unq.desapp.futbolmarket.persistence.repository.team;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
-import ar.edu.unq.desapp.futbolmarket.catalog.persistence.mapper.TeamMapper;
-import ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.entity.TeamSQL;
-import ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.interfaces.TeamSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.persistence.mapper.team.TeamMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.team.TeamSQL;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.team.TeamSQLDAO;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 

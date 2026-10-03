@@ -7,7 +7,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.PlayerNotFoundException;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
-import ar.edu.unq.desapp.futbolmarket.catalog.persistence.repository.PlayerRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

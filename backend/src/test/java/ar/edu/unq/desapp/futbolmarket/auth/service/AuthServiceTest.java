@@ -30,7 +30,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailExcept
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameAndEmailException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.repository.AppUserRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.config.AuthProperties;
 
 @ExtendWith(MockitoExtension.class)

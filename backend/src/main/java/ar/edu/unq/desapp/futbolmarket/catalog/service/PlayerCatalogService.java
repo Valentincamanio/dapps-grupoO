@@ -4,7 +4,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerPage;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerFilter;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.PlayerNotFoundException;
-import ar.edu.unq.desapp.futbolmarket.catalog.persistence.repository.PlayerRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
 import org.springframework.stereotype.Service;
 
 @Service

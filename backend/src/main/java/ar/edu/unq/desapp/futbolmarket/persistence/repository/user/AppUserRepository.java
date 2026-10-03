@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.persistence.repository;
+package ar.edu.unq.desapp.futbolmarket.persistence.repository.user;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -10,8 +10,8 @@ import org.springframework.stereotype.Repository;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.mapper.AppUserMapper;
-import ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.interfaces.AppUserSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.persistence.mapper.user.AppUserMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.user.AppUserSQLDAO;
 import lombok.RequiredArgsConstructor;
 
 /**

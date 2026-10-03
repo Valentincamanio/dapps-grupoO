@@ -1,4 +1,4 @@
-package ar.edu.unq.desapp.futbolmarket.auth.persistence.sql.entity;
+package ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.user;
 
 import java.math.BigDecimal;
 

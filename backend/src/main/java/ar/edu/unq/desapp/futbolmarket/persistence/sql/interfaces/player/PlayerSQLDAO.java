@@ -1,8 +1,8 @@
-package ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.interfaces;
+package ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.player;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
-import ar.edu.unq.desapp.futbolmarket.catalog.persistence.sql.entity.PlayerSQL;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.player.PlayerSQL;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
