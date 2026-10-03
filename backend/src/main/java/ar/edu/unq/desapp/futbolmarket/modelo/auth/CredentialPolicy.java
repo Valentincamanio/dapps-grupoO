@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
  * Única fuente de verdad de las reglas de formato de las credenciales.
  *
  * <p>Las constantes las comparten los DTO de request, en sus anotaciones de Bean Validation, y
- * las fábricas de {@link AppUser}, que deciden con los predicados qué excepción lanzar. Al
+ * las fábricas de {@link ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser}, que deciden con los predicados qué excepción lanzar. Al
  * compartir la fuente, el DTO y el modelo no pueden divergir.</p>
  *
  * <p>Los mensajes son literales y no se arman con {@code formatted}, porque las anotaciones de
