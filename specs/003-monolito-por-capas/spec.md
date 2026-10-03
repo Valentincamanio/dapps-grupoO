@@ -10,6 +10,8 @@
 ### Sesión 2026-10-03
 
 - P: ¿Cómo se reparten las clases de `auth/` entre los contextos `auth` y `user`? → R: Por responsabilidad (opción A). La cuenta de usuario, su modelo, su persistencia, el perfil, el cambio de contraseña, la API key y el admin inicial van a `user`. Registro, login, tokens de sesión, política de credenciales y hashing van a `auth`. El detalle clase por clase está en FR-008.
+- P: ¿Cómo se comprueba, antes de dar por terminada la feature, que SonarCloud queda con menos de 10 issues, si el CI solo corre el análisis en los push a `main`? → R: Se mantiene el umbral de la constitución (menos de 10 issues). Se verifica en el análisis de `main` después del merge, sin chequeo previo en el PR.
+- P: ¿Se entrega la reestructuración en un único PR contra `develop` o en varios PRs más chicos, y cómo se coordina con el trabajo en curso? → R: Un único PR contra `develop`, sin congelar el trabajo en curso. Quien tenga ramas abiertas las rebasea sobre `develop` después del merge y resuelve los conflictos.
 
 ## Contexto
 
@@ -70,7 +72,7 @@ Como integrante del equipo, quiero que todos los tests existentes sigan existien
 
 1. **Dado** la suite reestructurada, **cuando** se ejecuta completa, **entonces** corren 212 tests en 25 clases, todos pasan y ninguno se omite.
 2. **Dado** un archivo de test movido, **cuando** se revisa su diff contra la versión anterior, **entonces** las únicas líneas cambiadas son la declaración `package` y los imports.
-3. **Dado** un test que usa MockMvc, **cuando** se busca su ubicación, **entonces** está en `e2e/`.
+3. **Dado** un test con MockMvc que estaba en un paquete que deja de existir (hoy `PlayerControllerIT`), **cuando** se busca su ubicación, **entonces** está en `e2e/`.
 4. **Dado** un test de modelo, servicio o persistencia, **cuando** se busca su ubicación, **entonces** replica la capa y el contexto de la clase que prueba.
 
 ---
@@ -88,7 +90,7 @@ Como integrante del equipo, quiero que la aplicación compile, levante con el pe
 1. **Dado** el código reestructurado, **cuando** se construye el proyecto, **entonces** el build termina con éxito.
 2. **Dado** el código reestructurado y una base local con datos de una corrida anterior, **cuando** se levanta con el perfil local, **entonces** arranca sin errores y los datos existentes siguen accesibles.
 3. **Dado** la aplicación levantada, **cuando** se abre la documentación interactiva, **entonces** muestra las mismas operaciones, agrupadas bajo las mismas secciones, que antes del cambio.
-4. **Dado** el código reestructurado, **cuando** se lo analiza con SonarCloud, **entonces** reporta menos de 10 issues.
+4. **Dado** el código reestructurado ya mergeado a `main`, **cuando** SonarCloud lo analiza, **entonces** reporta menos de 10 issues.
 
 ### Casos borde
 
@@ -99,6 +101,7 @@ Como integrante del equipo, quiero que la aplicación compile, levante con el pe
 - **`.gitkeep` en un paquete con clases** (hoy `shared/.gitkeep`): se borra en el mismo cambio, según la constitución.
 - **Contextos sin clases en una capa**: no se crea la carpeta. Por ejemplo, si un contexto no tiene controller, no existe `controller/<contexto>/`.
 - **Test que falla después del movimiento**: se corrige el código de producción (imports, ubicación), nunca el test.
+- **Ramas abiertas durante el refactor**: no se congelan. Después del merge, cada rama abierta se rebasea sobre `develop` y lleva sus clases nuevas o modificadas al árbol por capa. Las clases que agregue van en `<capa>/<contexto>/`, nunca en `auth/` ni `catalog/`.
 
 ## Requisitos *(obligatorio)*
 
@@ -141,7 +144,7 @@ Como integrante del equipo, quiero que la aplicación compile, levante con el pe
 
 - **FR-015**: Todos los tests existentes DEBEN conservarse. Solo se mueven los que quedan en un paquete que deja de existir.
 - **FR-016**: En cada test movido, solo pueden cambiar la declaración `package` y los imports. Ningún método, nombre, aserción ni dato puede cambiar.
-- **FR-017**: Los tests movidos DEBEN replicar la capa y el contexto de la clase que prueban. Los tests con MockMvc DEBEN vivir en `e2e/`. Los tests de `security/`, `config/` y `shared/` quedan en su paquete transversal.
+- **FR-017**: Los tests movidos DEBEN replicar la capa y el contexto de la clase que prueban. Los tests con MockMvc que se mueven DEBEN ir a `e2e/`. Los tests de `security/`, `config/` y `shared/` quedan en su paquete transversal aunque usen MockMvc (por ejemplo, `GlobalExceptionHandlerIT`), porque ese paquete no deja de existir.
 
 ### Entidades clave
 
@@ -157,7 +160,7 @@ No aplica: no se agregan ni se modifican conceptos de dominio ni datos. Los conc
 - **SC-004**: En el diff de los archivos de test hay 0 líneas cambiadas que no sean `package` o imports.
 - **SC-005**: La aplicación levanta con el perfil local en el primer intento y el estado de salud informa que está operativa.
 - **SC-006**: La documentación interactiva muestra las mismas 7 operaciones de negocio, bajo las mismas secciones, que antes del cambio.
-- **SC-007**: SonarCloud reporta menos de 10 issues sobre el código reestructurado.
+- **SC-007**: El análisis de SonarCloud sobre `main`, posterior al merge de esta feature, reporta menos de 10 issues.
 - **SC-008**: Hay 0 paquetes de primer nivel por feature, 0 carpetas vacías y 0 archivos `.gitkeep` en paquetes con clases.
 
 ## Supuestos
@@ -168,6 +171,7 @@ No aplica: no se agregan ni se modifican conceptos de dominio ni datos. Los conc
 - `CatalogInvariantException` se ubica en el contexto `player`, porque el jugador es la entidad principal del antiguo catálogo, aunque `Team` también la use.
 - `AdminAccountInitializer` es un servicio y se ubica en `service/user/`.
 - Los tests de `auth/` siguen el mismo reparto que FR-008. Por ejemplo, `AppUserTest` y `ApiKeyTest` van a `modelo/user/`, `CredentialPolicyTest` y `RegistrationAvailabilityTest` a `modelo/auth/`, y `AuthServiceTest` a `service/auth/`. `FakePasswordHasher` implementa `PasswordHasher` y va a `modelo/auth/`; si lo usan tests de otro contexto, esos tests lo importan desde ahí.
-- SonarCloud solo analiza la rama principal en el CI actual. El umbral de SC-007 se verifica sobre el análisis disponible (análisis local o el de `main` después del merge), y la forma de verificarlo se define en el plan.
+- SonarCloud solo analiza la rama principal en el CI actual (plan Free). Por eso SC-007 no se puede verificar en el PR y se confirma recién con el análisis de `main` después del merge. Antes del merge, la calidad se cuida con las reglas de la constitución (Principio V) y con la revisión del PR.
 - Los planes de `specs/001` y `specs/002` describen la estructura por feature de la v1.0.0. Quedan como registro histórico y no se reescriben.
+- La reestructuración se entrega en un único PR contra `develop`, de modo que el árbol pasa de por feature a por capa en un solo merge y nunca queda en un estado híbrido. Resolver los conflictos de las ramas abiertas queda a cargo de quien las tenga, después del merge, y está fuera del alcance de esta feature.
 - Fuera de alcance: cualquier funcionalidad de mercado, renombrar clases, cambiar lógica, agregar tests nuevos y corregir issues de calidad que no surjan del propio movimiento.
