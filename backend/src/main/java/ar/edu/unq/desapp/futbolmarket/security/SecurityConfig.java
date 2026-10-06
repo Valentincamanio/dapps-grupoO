@@ -20,7 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
-import ar.edu.unq.desapp.futbolmarket.auth.service.AuthService;
+import ar.edu.unq.desapp.futbolmarket.service.auth.AuthService;
 import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 

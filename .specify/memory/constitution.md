@@ -1,31 +1,45 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (plantilla sin completar) -> 1.0.0
-Bump rationale: MAJOR inicial. Primera ratificacion: el documento pasa de ser la
-plantilla con placeholders a una constitucion con principios vinculantes.
+Version change: 1.0.0 -> 2.0.0
+Bump rationale: MAJOR. Se redefine el Principio I de forma incompatible: la
+organizacion por feature (auth/, catalog/) se reemplaza por una organizacion por
+capa y, dentro de cada capa, por contexto del dominio. El sistema es UN monolito
+con un unico modelo de dominio; los contextos no son fronteras.
 
-Principios agregados (7, expandidos desde las 5 ranuras de la plantilla):
-  - I. Arquitectura en Capas Estricta (NO NEGOCIABLE)
-  - II. Modelo Rico
-  - III. Cada Validacion en su Nivel
-  - IV. Estrategia de Tests (NO NEGOCIABLE)
-  - V. Calidad de Codigo Medible
-  - VI. Persistencia Explicita y Portable
-  - VII. Idioma
+Principios modificados:
+  - I. Arquitectura en Capas Estricta (NO NEGOCIABLE)  [redefinido]
+      * Nuevo arbol de paquetes por capa -> contexto.
+      * Contextos vigentes: user, player, team, league, position.
+      * Reglas de contextos y reglas de monolito agregadas.
+      * "El modelo vive en <feature>/modelo/" -> "El modelo vive en
+        modelo/<contexto>/. No existe domain/."
+      * DTO: <feature>/controller/dto/ -> controller/<contexto>/dto/.
+      * Regla de .gitkeep alineada con "no se crean carpetas vacias".
+  - IV. Estrategia de Tests (NO NEGOCIABLE)  [ampliado]
+      * Estructura setup - execute - verify obligatoria.
+      * Los tests replican capa y contexto; e2e/ para MockMvc.
+      * REGLA INNEGOCIABLE: mover un test (solo package e imports) no cuenta como
+        modificarlo.
+  - VII. Idioma  [excepcion reformulada: modelo/ en espanol, contextos en ingles]
 
-Secciones agregadas:
-  - Stack Tecnologico                            (reemplaza [SECTION_2_NAME])
-  - Flujo de Trabajo y Definicion de Terminado   (reemplaza [SECTION_3_NAME])
-  - Governance                                   (completada)
+Secciones modificadas:
+  - Stack Tecnologico: la prohibicion de reemplazar "la estructura de paquetes
+    existente" pasa a remitir al arbol del Principio I.
+  - Flujo de Trabajo y Definicion de Terminado: "Trabajo en paralelo" reemplazado
+    (sin duenos de paquete ni de contexto); dos reglas nuevas para el agente; la
+    regla de .gitkeep se alinea con "no se crean carpetas vacias".
 
+Secciones agregadas: ninguna.
 Secciones removidas: ninguna.
 
-Ambiguedades resueltas por consulta al equipo (2026-09-02):
-  - El modelo vive siempre en <feature>/modelo/. El paquete domain/ de primer
-    nivel se elimina del arbol.
-  - persistence/repository/ envuelve al *SQLDAO e invoca al mapper. El servicio
-    nunca ve el mapper, el SQLDAO ni las clases *SQL.
+Plantillas a revisar:
+  - .specify/templates/plan-template.md   seccion de estructura de codigo  (pendiente)
+  - .specify/templates/tasks-template.md  rutas de ejemplo                 (pendiente)
+  - .specify/templates/spec-template.md   sin impacto
+
+Historicos: los planes de specs/001 y specs/002 describen la estructura por feature
+de la v1.0.0 y quedan como registro historico; no se reescriben.
 
 TODOs diferidos: ninguno.
 -->
@@ -63,32 +77,69 @@ Reglas verificables, sin excepciones:
   `toSQL`). El mapper traduce campo a campo y NO contiene logica de negocio.
 - El controller solo habla con el servicio. Nunca inyecta un repository, un SQLDAO
   ni un mapper.
-- Las clases `Request` y `Response` viven en `<feature>/controller/dto/` y NUNCA
+- Las clases `Request` y `Response` viven en `controller/<contexto>/dto/` y NUNCA
   cruzan hacia el servicio. El controller las convierte antes de delegar y arma la
   respuesta a partir de lo que el servicio le devuelve.
 - El servicio recibe y devuelve objetos de modelo. No conoce JPA ni las clases `*SQL`.
 - Ninguna clase de persistencia ni de modelo sale del backend en una respuesta HTTP.
   Lo que sale es siempre un `Response` del paquete `dto`.
 
-Estructura de paquetes. Se organiza por feature y dentro de cada feature por capa.
-Este arbol es el unico valido; no se inventan paquetes nuevos:
+Estructura de paquetes. El sistema es un monolito. Se organiza primero POR CAPA y,
+dentro de cada capa, POR CONTEXTO del dominio. Este arbol es el unico valido:
 
     ar.edu.unq.desapp.futbolmarket
-    +-- catalog/
-    |   +-- controller/
-    |   |   +-- dto/              Request y Response
-    |   +-- service/
-    |   +-- modelo/               modelo puro, sin anotaciones
-    |   +-- persistence/
-    |       +-- repository/       PlayerRepository: envuelve al DAO + mapper
-    |       +-- sql/
-    |       |   +-- entity/       PlayerSQL, con anotaciones JPA
-    |       |   +-- interfaces/   PlayerSQLDAO extends JpaRepository<PlayerSQL, Long>
-    |       +-- mapper/           PlayerMapper.toDomain / toSQL
-    +-- auth/                     misma estructura
-    +-- security/                 filtros, JwtService, SecurityConfig
-    +-- config/                   clases @Configuration
-    +-- shared/                   excepciones y RestControllerAdvice
+    +-- controller/
+    |   +-- <contexto>/           controllers del contexto
+    |       +-- dto/              Request y Response del contexto
+    +-- service/
+    |   +-- <contexto>/
+    +-- modelo/
+    |   +-- <contexto>/           modelo puro, sin anotaciones
+    |       +-- exception/        excepciones de dominio del contexto
+    +-- persistence/
+    |   +-- repository/
+    |   |   +-- <contexto>/       envuelve al SQLDAO e invoca al mapper
+    |   +-- mapper/
+    |   |   +-- <contexto>/       toDomain / toSQL
+    |   +-- sql/
+    |       +-- entity/
+    |       |   +-- <contexto>/   clases *SQL con anotaciones JPA
+    |       +-- interfaces/
+    |           +-- <contexto>/   *SQLDAO extends JpaRepository
+    +-- security/                 transversal: filtros, JwtService, SecurityConfig
+    +-- config/                   transversal: clases @Configuration
+    +-- shared/                   transversal: ApiError, bases de excepcion y
+                                  RestControllerAdvice
+
+Contextos vigentes: `user`, `player`, `team`, `league`, `position` y `auth`. Las entregas
+siguientes agregan los suyos (por ejemplo `market`) con el mismo criterio.
+
+Reglas de los contextos:
+
+- Un contexto es una carpeta DENTRO de una capa, nunca una capa nueva ni un modulo
+  aparte. No existen paquetes de primer nivel por feature (`auth/`, `catalog/`,
+  `market/`).
+- El nombre de un contexto es un sustantivo del dominio, en ingles y en singular.
+- Un contexto aparece solo en las capas donde tiene clases. No se crean carpetas vacias.
+- Si una clase sirve a varios contextos, va en el contexto de la entidad principal a la
+  que pertenece. Ante la duda, se pregunta al equipo.
+- `security/`, `config/` y `shared/` son transversales y no se dividen por contexto.
+- Un contexto nuevo se agrega con la feature que lo necesita y se declara en el plan de
+  esa feature.
+
+Reglas de monolito:
+
+- **Modelo unico.** Los contextos NO son fronteras: una clase de modelo puede
+  referenciar clases de modelo de otro contexto. No se duplica un mismo concepto en dos
+  contextos.
+- Las clases `*SQL` de distintos contextos se pueden relacionar con
+  `@ManyToOne`/`@OneToMany` cuando el modelo lo requiere. El mapper de un contexto puede
+  usar mappers de otros.
+- Un servicio puede inyectar repositories de cualquier contexto. Un caso de uso que
+  modifica objetos de varios contextos se resuelve en UN metodo de servicio
+  `@Transactional`, no orquestando servicios como si fueran remotos.
+- Un servicio puede depender de otro servicio solo si no se forma un ciclo.
+- No se escriben contratos de integracion entre contextos ni entre features.
 
 Decisiones de diseno explicitas sobre este arbol:
 
@@ -96,11 +147,12 @@ Decisiones de diseno explicitas sobre este arbol:
   punto del sistema donde conviven modelo y persistencia: recibe y devuelve modelo, y
   por dentro usa el `*SQLDAO` y el mapper. Esto mantiene al servicio totalmente
   ignorante de JPA.
-- **El modelo vive siempre dentro de su feature**, en `<feature>/modelo/`. NO existe un
-  paquete `domain/` de primer nivel; si aparece en el repo con un `.gitkeep`, se
-  elimina.
-- Los paquetes ya existen en el repo con un `.gitkeep`. Se usan tal cual. Cuando un
-  paquete deja de estar vacio, se borra su `.gitkeep` en el mismo commit.
+- **El modelo vive siempre en `modelo/<contexto>/`.** No existe `domain/`.
+- No se crean `.gitkeep` para reservar paquetes vacios. Si queda un `.gitkeep` en un
+  paquete que ya tiene clases, se borra en el mismo commit.
+- Se mantienen sin cambios respecto de la v1.0.0: las capas, la direccion de
+  dependencias, el modelo sin anotaciones, las clases `*SQL`, los mappers invocados
+  desde `repository/` y los DTO que no cruzan al servicio.
 
 ### II. Modelo Rico
 
@@ -112,7 +164,6 @@ La logica de negocio vive en los objetos de modelo, no en los servicios.
   decide algo del dominio es un defecto: esa decision pertenece al modelo.
 - Prohibidos los modelos anemicos. Una clase de modelo que es solo getters y setters,
   con toda la logica en el service, viola este principio.
-
 
 ### III. Cada Validacion en su Nivel
 
@@ -155,6 +206,18 @@ Convenciones:
 - Los tests no dependen del orden de ejecucion ni comparten estado.
 - No se escriben tests triviales solo para subir el coverage (getters, setters,
   constructores).
+- Todo test sigue la estructura setup - execute - verify, en tres bloques separados por
+  una linea en blanco:
+  - **setup**: se arma el escenario (datos, mocks, estado previo);
+  - **execute**: VARIAS acciones, las que se estan probando;
+  - **verify**: las aserciones con AssertJ sobre el resultado o el efecto.
+
+  No se mezclan acciones con aserciones ni se ejecutan varias acciones de prueba en el
+  mismo test.
+- Los tests replican la estructura de produccion: capa y contexto (`modelo/<contexto>/`,
+  `service/<contexto>/`, `persistence/.../<contexto>/`). Los end to end con MockMvc
+  viven en `e2e/`. Los tests de `security/`, `config/` y `shared/` quedan en su paquete
+  transversal.
 
 **NO trabajamos con TDD.** Los tests se escriben junto con la implementacion de cada
 tarea, no antes. Escribir el test primero, verlo fallar y despues implementar consume
@@ -164,6 +227,12 @@ y pasan.
 **REGLA INNEGOCIABLE**: no se modifica ni se borra un test existente, en ninguna fase del
 flujo, sin pedir permiso al equipo y recibir un "si" explicito. Un test que falla se
 arregla arreglando el codigo, no el test.
+
+Mover un test de paquete NO cuenta como modificarlo cuando solo cambian la declaracion
+`package` y los imports, y ningun metodo, nombre, asercion ni dato. Cualquier otro cambio
+sigue requiriendo el "si" explicito del equipo. En una reestructuracion se conservan
+TODOS los tests existentes y solo se mueven los que quedan en un paquete que deja de
+existir.
 
 ### V. Calidad de Codigo Medible
 
@@ -202,8 +271,9 @@ Desarrollamos contra H2, pero el mapeo no depende de H2:
 - **Mensajes de error de la API, documentacion, comentarios y specs**: en espanol.
 - Los identificadores no llevan acentos ni enie.
 - Terminos tecnicos y normativos: en ingles.
-- Excepcion aceptada y unica: el paquete `modelo/` conserva su nombre en espanol por
-  decision del equipo. No es precedente para otros paquetes.
+- Excepcion aceptada y unica: la capa `modelo/` conserva su nombre en espanol. Los
+  nombres de contexto (`user`, `player`, `team`, `league`, `position`, ...) van en
+  ingles.
 
 ## Stack Tecnologico
 
@@ -225,8 +295,8 @@ Prohibiciones y advertencias:
 - **NO usamos Docker** en ningun momento del desarrollo local. El proyecto se levanta con
   `./gradlew bootRun` y nada mas.
 - **NO usamos Testcontainers. NO usamos PostgreSQL.**
-- **No se reemplaza** el `build.gradle`, los `application*.yml` ni la estructura de
-  paquetes existente. El esqueleto ya funciona.
+- **No se reemplaza** el `build.gradle` ni los `application*.yml`. El esqueleto ya
+  funciona. La estructura de paquetes es la que fija el Principio I.
 - Spring Boot 4 renombro varios starters respecto de Boot 3 (por ejemplo
   `spring-boot-starter-web` pasa a llamarse `spring-boot-starter-webmvc`). No se copian
   dependencias de tutoriales de Boot 3 sin verificar el nombre real del artefacto.
@@ -248,9 +318,10 @@ condiciones:
 4. Los endpoints nuevos estan documentados en Swagger y se pueden ejecutar desde
    `/swagger-ui.html`.
 
-**Trabajo en paralelo.** Somos dos desarrolladores trabajando en simultaneo, cada uno con
-su propio agente de IA. Este documento es la unica fuente de verdad sobre estructura y
-estilo: el codigo de los dos tiene que parecerse. Ante una duda de forma, se sigue lo que
+**Trabajo en paralelo.** Somos dos desarrolladores. Ninguno es dueno de un paquete ni de
+un contexto: los dos trabajan sobre el mismo arbol. Los conflictos se evitan con PRs
+chicos y frecuentes contra `develop`, no con fronteras de paquetes. Este documento es la
+unica fuente de verdad sobre estructura y estilo: ante una duda de forma, se sigue lo que
 dice aca, no la preferencia del agente.
 
 **Como se espera que trabaje el agente:**
@@ -262,7 +333,11 @@ dice aca, no la preferencia del agente.
 - No inventar APIs, anotaciones ni metodos.
 - Si un pedido va contra esta constitucion, senalarlo antes de hacerlo.
 - Prohibido entregar codigo con `// TODO: implementar aca`.
-- Cuando un paquete deja de estar vacio, se borra su `.gitkeep` en el mismo commit.
+- No crear paquetes de primer nivel por feature. Una clase nueva va en
+  `<capa>/<contexto>/`. Si no queda claro a que contexto pertenece, preguntar.
+- No reescribir tests existentes al moverlos: solo `package` e imports.
+- No crear carpetas vacias ni `.gitkeep`. Si queda un `.gitkeep` en un paquete con
+  clases, se borra en el mismo commit.
 
 ## Governance
 
@@ -287,4 +362,4 @@ solo se levantan por enmienda.
 **Uso en runtime.** Los agentes leen este documento antes de cada tarea y lo citan cuando
 rechazan o corrigen un pedido.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-02 | **Last Amended**: 2026-09-02
+**Version**: 2.0.0 | **Ratified**: 2026-09-02 | **Last Amended**: 2026-10-03
