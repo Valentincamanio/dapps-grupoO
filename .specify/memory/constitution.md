@@ -1,31 +1,47 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 2.0.0 -> 2.1.0
-Bump rationale: MINOR. Se agrega una seccion nueva ("Frontend") con el stack, la
-estructura de carpetas, las reglas, los tests y la definicion de terminado del
-frontend. No se quita ni se redefine ningun principio.
+Version change: 2.1.0 -> 2.2.0
+Bump rationale: MINOR. Se agrega la capa adapter para integrar APIs externas y el
+arbol de paquetes del backend deja de ser una lista cerrada. Todo lo valido en la
+2.1.0 sigue siendo valido: no se quita ni se redefine de forma incompatible ningun
+principio.
 
-Principios modificados: ninguno.
-  - Los Principios I a VI siguen aplicando solo al backend.
-  - El Principio VII (Idioma) aplica tambien al frontend (sin cambio de texto).
-
-Secciones agregadas:
-  - Frontend (entre "Stack Tecnologico" y "Flujo de Trabajo y Definicion de
-    Terminado").
+Principios modificados:
+  - I. Arquitectura en Capas Estricta (NO NEGOCIABLE)  [ampliado]
+      * "Cuatro capas" -> "Cinco capas": se suma adapter, con su diagrama
+        Service -> Adapter -> API externa.
+      * Cuatro reglas nuevas del adapter: el servicio solo habla con la API externa
+        a traves de su adapter; el adapter recibe y devuelve modelo y sus DTO no
+        salen de el; traduce con su propio mapper y no persiste; traduce los errores
+        del proveedor a excepciones propias.
+      * Arbol: se agrega adapter/<proveedor>/dto/. "Este arbol es el unico valido"
+        -> "Este arbol es la base de la estructura", con una regla nueva: se pueden
+        agregar, mover o quitar carpetas con el aval explicito de al menos uno de
+        los dos desarrolladores, declarandolo en el plan de la feature.
+      * Reglas de los contextos: adapter/ se organiza por proveedor, no por contexto.
 
 Secciones modificadas:
-  - Stack Tecnologico, Monorepo: la linea de frontend remite a la seccion Frontend.
   - Flujo de Trabajo y Definicion de Terminado, "Como se espera que trabaje el
-    agente": regla nueva sobre donde va un archivo nuevo del frontend.
+    agente": una clase nueva tambien puede ir en adapter/<proveedor>/, y una regla
+    nueva: proponer una carpeta que ayude a organizar en vez de rechazarla porque no
+    figura en el arbol.
 
+Secciones agregadas: ninguna.
 Secciones removidas: ninguna.
+
+Fuera de esta enmienda: el arbol del frontend (seccion Frontend) sigue siendo cerrado.
 
 Plantillas a revisar:
   - .specify/templates/plan-template.md   seccion de estructura de codigo
-    (contemplar frontend/src y frontend/tests)                        (pendiente)
-  - .specify/templates/tasks-template.md  rutas de ejemplo del frontend (pendiente)
+    (contemplar frontend/src, frontend/tests y adapter/<proveedor>/)  (pendiente)
+  - .specify/templates/tasks-template.md  rutas de ejemplo del frontend y del
+    adapter                                                           (pendiente)
   - .specify/templates/spec-template.md   sin impacto
+
+Historico de la 2.1.0 (2.0.0 -> 2.1.0, MINOR): se agrego la seccion Frontend con su
+stack, estructura de carpetas, reglas, tests y definicion de terminado; el Principio
+VII aplica tambien al frontend.
 
 Historico de la 2.0.0 (1.0.0 -> 2.0.0, MAJOR): se redefinio el Principio I
 (organizacion por capa -> contexto), se amplio el IV y se reformulo la excepcion del VII.
@@ -45,13 +61,18 @@ como se lo extiende, no como se lo crea.
 
 ### I. Arquitectura en Capas Estricta (NO NEGOCIABLE)
 
-Cuatro capas: controller, servicio, modelo y persistencia. La direccion de las
-dependencias es unica y no admite atajos.
+Cinco capas: controller, servicio, modelo, persistencia y adapter. La direccion de
+las dependencias es unica y no admite atajos.
 
     Controller  ->  Service  ->  Repository  ->  SQLDAO  ->  H2
                         |             |
                         v             v
                      Modelo  <--   Mapper   -->  *SQL
+
+    Service  ->  Adapter  ->  API externa (Football-Data, WhoScored)
+                    |
+                    v
+                 Modelo
 
 Reglas verificables, sin excepciones:
 
@@ -72,9 +93,17 @@ Reglas verificables, sin excepciones:
 - El servicio recibe y devuelve objetos de modelo. No conoce JPA ni las clases `*SQL`.
 - Ninguna clase de persistencia ni de modelo sale del backend en una respuesta HTTP.
   Lo que sale es siempre un `Response` del paquete `dto`.
+- El servicio habla con una API externa SOLO a traves de su adapter. No usa un
+  cliente HTTP ni conoce el JSON del proveedor.
+- El adapter recibe y devuelve objetos de modelo. Los DTO del proveedor viven en
+  `adapter/<proveedor>/dto/` y NUNCA salen del adapter.
+- El adapter traduce con su propio mapper, campo a campo y sin logica de negocio.
+  No persiste: lo que trae lo guarda el servicio a traves de los repositories.
+- Los errores del proveedor (timeout, 4xx, 5xx, limite de requests) se traducen a
+  excepciones propias. Nunca se propaga una excepcion del cliente HTTP.
 
 Estructura de paquetes. El sistema es un monolito. Se organiza primero POR CAPA y,
-dentro de cada capa, POR CONTEXTO del dominio. Este arbol es el unico valido:
+dentro de cada capa, POR CONTEXTO del dominio. Este arbol es la base de la estructura:
 
     ar.edu.unq.desapp.futbolmarket
     +-- controller/
@@ -95,10 +124,18 @@ dentro de cada capa, POR CONTEXTO del dominio. Este arbol es el unico valido:
     |       |   +-- <contexto>/   clases *SQL con anotaciones JPA
     |       +-- interfaces/
     |           +-- <contexto>/   *SQLDAO extends JpaRepository
+    +-- adapter/
+    |   +-- <proveedor>/          una API externa: footballdata, whoscored
+    |       +-- dto/              JSON del proveedor; nunca sale del adapter
     +-- security/                 transversal: filtros, JwtService, SecurityConfig
     +-- config/                   transversal: clases @Configuration
     +-- shared/                   transversal: ApiError, bases de excepcion y
                                   RestControllerAdvice
+
+El arbol no es una lista cerrada. Se pueden agregar, mover o quitar carpetas con el
+aval explicito de al menos uno de los dos desarrolladores; el cambio se declara en el
+plan de la feature que lo introduce. Toda carpeta nueva respeta las reglas de este
+principio: direccion de dependencias, modelo sin anotaciones y DTO que no cruzan capas.
 
 Contextos vigentes: `user`, `player`, `team`, `league`, `position` y `auth`. Las entregas
 siguientes agregan los suyos (por ejemplo `market`) con el mismo criterio.
@@ -113,6 +150,8 @@ Reglas de los contextos:
 - Si una clase sirve a varios contextos, va en el contexto de la entidad principal a la
   que pertenece. Ante la duda, se pregunta al equipo.
 - `security/`, `config/` y `shared/` son transversales y no se dividen por contexto.
+- `adapter/` se organiza por proveedor (`footballdata`, `whoscored`), no por contexto:
+  un mismo proveedor trae datos de varios contextos.
 - Un contexto nuevo se agrega con la feature que lo necesita y se declara en el plan de
   esa feature.
 
@@ -400,7 +439,10 @@ dice aca, no la preferencia del agente.
 - Si un pedido va contra esta constitucion, senalarlo antes de hacerlo.
 - Prohibido entregar codigo con `// TODO: implementar aca`.
 - No crear paquetes de primer nivel por feature. Una clase nueva va en
-  `<capa>/<contexto>/`. Si no queda claro a que contexto pertenece, preguntar.
+  `<capa>/<contexto>/` o en `adapter/<proveedor>/`. Si no queda claro donde va,
+  preguntar.
+- Si una carpeta nueva ayuda a organizar, proponerla y esperar el aval de un
+  desarrollador. No rechazarla solo porque no figura en el arbol.
 - No reescribir tests existentes al moverlos: solo `package` e imports.
 - No crear carpetas vacias ni `.gitkeep`. Si queda un `.gitkeep` en un paquete con
   clases, se borra en el mismo commit.
@@ -430,4 +472,4 @@ solo se levantan por enmienda.
 **Uso en runtime.** Los agentes leen este documento antes de cada tarea y lo citan cuando
 rechazan o corrigen un pedido.
 
-**Version**: 2.1.0 | **Ratified**: 2026-09-02 | **Last Amended**: 2026-10-06
+**Version**: 2.2.0 | **Ratified**: 2026-09-02 | **Last Amended**: 2026-10-07
