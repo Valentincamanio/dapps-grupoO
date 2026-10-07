@@ -1,0 +1,674 @@
+openapi: 3.0.3
+info:
+  title: API del catálogo de jugadores y de la sincronización con Football-Data.org
+  version: 2.0.0
+  description: |
+    Contrato de la feature `005-integracion-football-data` de Futbol Market. Describe lo que
+    cambia en `GET /players` y `GET /players/{id}` respecto del contrato de la feature 002
+    (`specs/002-catalogo-jugadores/contracts/players-api.yaml`) y el endpoint nuevo
+    `POST /players/sync`.
+
+    Cambios en la consulta del catálogo:
+
+    - Los datos salen de Football-Data.org. El dataset ficticio ya no existe.
+    - El listado muestra solo jugadores activos, con o sin filtros. La paginación cuenta solo
+      a los activos.
+    - El detalle responde para cualquier jugador guardado, activo o inactivo, e indica su estado.
+    - Cada jugador suma `dateOfBirth`, `nationality`, `teamCrest` y `active`.
+    - `team` es el nombre oficial exacto del equipo, y el filtro por equipo compara contra ese
+      nombre (por ejemplo, `Liverpool FC` coincide y `Liverpool` no).
+    - No cambian la paginación, los filtros por liga y por posición, el rechazo de los valores
+      no admitidos ni el 404.
+    - Las consultas siguen siendo públicas por la excepción transitoria de FR-023 de la
+      feature 001.
+
+    La sincronización manual exige el rol `ADMIN` y acepta cualquiera de las dos credenciales
+    de la feature 001: el token de sesión o la clave de API.
+servers:
+  - url: http://localhost:8080
+    description: Perfil local (./gradlew bootRun)
+tags:
+  - name: Catálogo
+    description: Consulta pública del catálogo de jugadores.
+  - name: Sincronización
+    description: Disparo manual de la sincronización con Football-Data.org. Solo administradores.
+paths:
+  /players:
+    get:
+      tags: [Catálogo]
+      operationId: getPlayers
+      summary: Lista los jugadores activos, paginados
+      description: |
+        Devuelve solo jugadores activos, también al filtrar. Un jugador inactivo no aparece
+        aunque se filtre por su último equipo. `totalElements` y `totalPages` cuentan solo a los
+        activos.
+      parameters:
+        - $ref: '#/components/parameters/League'
+        - $ref: '#/components/parameters/Team'
+        - $ref: '#/components/parameters/Position'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Página de jugadores activos. Puede estar vacía.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerPageResponse'
+              examples:
+                paginaConResultados:
+                  summary: Filtro por el nombre oficial de un equipo
+                  value:
+                    content:
+                      - id: 1
+                        name: Alisson Becker
+                        position: GOALKEEPER
+                        team: Liverpool FC
+                        league: PREMIER
+                        dateOfBirth: '1992-10-02'
+                        nationality: Brazil
+                        teamCrest: https://crests.football-data.org/64.png
+                        active: true
+                    page: 0
+                    size: 10
+                    totalElements: 1
+                    totalPages: 1
+                    hasPrevious: false
+                    hasNext: false
+                nombreCorto:
+                  summary: El nombre corto no coincide (team=Liverpool)
+                  value:
+                    content: []
+                    page: 0
+                    size: 10
+                    totalElements: 0
+                    totalPages: 0
+                    hasPrevious: false
+                    hasNext: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /players/{id}:
+    get:
+      tags: [Catálogo]
+      operationId: getPlayer
+      summary: Obtiene el detalle de un jugador, activo o inactivo
+      description: |
+        Responde para cualquier jugador guardado. Un jugador inactivo no se trata como no
+        encontrado: se devuelve con `active` en `false` y su último equipo.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Jugador encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerResponse'
+              examples:
+                activo:
+                  value:
+                    id: 2
+                    name: Kostas Tsimikas
+                    position: DEFENDER
+                    team: Liverpool FC
+                    league: PREMIER
+                    dateOfBirth: '1996-05-12'
+                    nationality: Greece
+                    teamCrest: https://crests.football-data.org/64.png
+                    active: true
+                inactivo:
+                  summary: Dejó las cinco ligas; conserva su último equipo
+                  value:
+                    id: 3
+                    name: Federico Chiesa
+                    position: FORWARD
+                    team: Liverpool FC
+                    league: PREMIER
+                    dateOfBirth: '1997-10-25'
+                    nationality: Italy
+                    teamCrest: https://crests.football-data.org/64.png
+                    active: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: No existe un jugador con ese identificador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-07T15:00:00Z'
+                status: 404
+                error: Not Found
+                message: No se encontró el jugador con id 999999.
+                path: /players/999999
+  /players/sync:
+    post:
+      tags: [Sincronización]
+      operationId: synchronize
+      summary: Sincroniza el catálogo con Football-Data.org
+      description: |
+        Sin `league`, sincroniza las cinco ligas. Con `league`, sincroniza solo esa liga.
+
+        El request espera a que la sincronización termine y devuelve su informe con 200, aunque
+        alguna liga, o todas, haya fallado. Una liga que falla conserva exactamente lo que tenía.
+
+        Solo una sincronización completa con las cinco ligas en éxito inactiva a los jugadores
+        que no aparecieron en ningún plantel: `inactivationApplied` lo indica.
+
+        Hay a lo sumo una sincronización a la vez, sea manual, semanal o de arranque. La
+        respuesta de la fuente puede demorar el request hasta un minuto por el límite de
+        consultas del plan gratis.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SyncLeague'
+      responses:
+        '200':
+          description: Sincronización terminada. Devuelve el informe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncReportResponse'
+              examples:
+                completaExitosa:
+                  summary: Completa, con las cinco ligas en éxito (recortada a una liga)
+                  value:
+                    type: FULL
+                    origin: MANUAL
+                    startedAt: '2026-10-07T15:00:00Z'
+                    finishedAt: '2026-10-07T15:00:38Z'
+                    inactivationApplied: true
+                    leagues:
+                      - league: PREMIER
+                        status: SUCCEEDED
+                        failureReason: null
+                        season:
+                          externalId: '2502'
+                          startDate: '2026-08-21'
+                          endDate: '2027-05-30'
+                          currentMatchday: 6
+                        teams: { created: 20, updated: 0, skipped: 0 }
+                        players: { created: 545, updated: 0, skipped: 3 }
+                        matches: { created: 380, updated: 0, skipped: 0 }
+                        skippedPlayers:
+                          - externalId: '301113'
+                            name: Mahdi Nicoll-Jazuli
+                            team: Chelsea FC
+                            reason: MISSING_POSITION
+                        skippedMatches: []
+                        reactivatedPlayers: []
+                    duplicatedPlayers: []
+                    inactivatedPlayers: []
+                completaConUnaLigaFallida:
+                  summary: Completa, con una liga fallida; nadie se inactiva (recortada)
+                  value:
+                    type: FULL
+                    origin: MANUAL
+                    startedAt: '2026-10-07T15:10:00Z'
+                    finishedAt: '2026-10-07T15:10:52Z'
+                    inactivationApplied: false
+                    leagues:
+                      - league: BUNDESLIGA
+                        status: FAILED
+                        failureReason: La fuente no respondió a tiempo.
+                        season: null
+                        teams: { created: 0, updated: 0, skipped: 0 }
+                        players: { created: 0, updated: 0, skipped: 0 }
+                        matches: { created: 0, updated: 0, skipped: 0 }
+                        skippedPlayers: []
+                        skippedMatches: []
+                        reactivatedPlayers: []
+                    duplicatedPlayers: []
+                    inactivatedPlayers: []
+                unaSolaLiga:
+                  summary: Una sola liga, ya sincronizada antes
+                  value:
+                    type: SINGLE_LEAGUE
+                    origin: MANUAL
+                    startedAt: '2026-10-07T15:20:00Z'
+                    finishedAt: '2026-10-07T15:20:06Z'
+                    inactivationApplied: false
+                    leagues:
+                      - league: SERIE_A
+                        status: SUCCEEDED
+                        failureReason: null
+                        season:
+                          externalId: '2510'
+                          startDate: '2026-08-23'
+                          endDate: '2027-05-30'
+                          currentMatchday: 6
+                        teams: { created: 0, updated: 20, skipped: 0 }
+                        players: { created: 1, updated: 540, skipped: 0 }
+                        matches: { created: 0, updated: 380, skipped: 0 }
+                        skippedPlayers: []
+                        skippedMatches: []
+                        reactivatedPlayers:
+                          - id: 812
+                            externalId: '44512'
+                            name: Nombre Apellido
+                            team: SSC Napoli
+                    duplicatedPlayers:
+                      - externalId: '99001'
+                        name: Nombre Apellido
+                        keptTeam: AC Milan
+                        ignoredTeam: AC Monza
+                    inactivatedPlayers: []
+        '400':
+          $ref: '#/components/responses/UnsupportedLeague'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/SyncInProgress'
+        '503':
+          $ref: '#/components/responses/SyncDisabled'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de sesión obtenido en POST /auth/login.
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clave de API entregada en el registro o en la regeneración.
+  parameters:
+    League:
+      name: league
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/League'
+    Team:
+      name: team
+      in: query
+      required: false
+      description: |
+        Nombre oficial exacto del equipo, tal como lo informa la fuente (por ejemplo,
+        `Liverpool FC` o `FC Bayern München`). Se recortan los espacios de los extremos y se
+        colapsan los internos.
+      schema:
+        type: string
+        minLength: 1
+    Position:
+      name: position
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/Position'
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Índice base cero. Por defecto, 0.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      required: false
+      description: Cantidad de resultados por página. Por defecto, 10; máximo, 50.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
+    SyncLeague:
+      name: league
+      in: query
+      required: false
+      description: |
+        Liga a sincronizar. Sin este parámetro se sincronizan las cinco. Un valor que no es una
+        de las cinco se rechaza con 400 indicando el valor recibido, sin consultar la fuente.
+      schema:
+        $ref: '#/components/schemas/League'
+  schemas:
+    League:
+      type: string
+      enum: [PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1]
+    Position:
+      type: string
+      enum: [GOALKEEPER, DEFENDER, MIDFIELDER, FORWARD]
+      description: Traducción de Goalkeeper, Defence, Midfield y Offence de la fuente.
+    PlayerResponse:
+      type: object
+      required: [id, name, position, team, league, dateOfBirth, nationality, teamCrest, active]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        position:
+          $ref: '#/components/schemas/Position'
+        team:
+          type: string
+          description: Nombre oficial exacto del equipo.
+        league:
+          $ref: '#/components/schemas/League'
+        dateOfBirth:
+          type: string
+          format: date
+          nullable: true
+          description: Nuevo. `null` si la fuente no la informa.
+        nationality:
+          type: string
+          nullable: true
+          description: Nuevo. `null` si la fuente no la informa.
+        teamCrest:
+          type: string
+          format: uri
+          nullable: true
+          description: Nuevo. Dirección de la imagen del escudo del equipo; no se descarga.
+        active:
+          type: boolean
+          description: Nuevo. En el listado siempre es `true`; en el detalle puede ser `false`.
+    PlayerPageResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages, hasPrevious, hasNext]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerResponse'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 1
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Cantidad de jugadores activos que cumplen los filtros.
+        totalPages:
+          type: integer
+          minimum: 0
+        hasPrevious:
+          type: boolean
+        hasNext:
+          type: boolean
+    SyncType:
+      type: string
+      enum: [FULL, SINGLE_LEAGUE]
+    SyncOrigin:
+      type: string
+      enum: [WEEKLY, STARTUP, MANUAL]
+      description: El disparo manual siempre informa MANUAL; los otros dos orígenes solo aparecen en el registro.
+    LeagueSyncStatus:
+      type: string
+      enum: [SUCCEEDED, FAILED]
+    EntityCounts:
+      type: object
+      required: [created, updated, skipped]
+      description: Un dato que ya existía y vuelve a llegar cuenta como actualizado, haya cambiado o no.
+      properties:
+        created:
+          type: integer
+          minimum: 0
+        updated:
+          type: integer
+          minimum: 0
+        skipped:
+          type: integer
+          minimum: 0
+    SeasonSummary:
+      type: object
+      required: [externalId, startDate, endDate, currentMatchday]
+      properties:
+        externalId:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        currentMatchday:
+          type: integer
+          nullable: true
+    PlayerSummary:
+      type: object
+      required: [id, externalId, name, team]
+      properties:
+        id:
+          type: integer
+          format: int64
+        externalId:
+          type: string
+        name:
+          type: string
+        team:
+          type: string
+          description: Su equipo; para un inactivado, el último.
+    SkippedPlayer:
+      type: object
+      required: [externalId, name, team, reason]
+      description: Jugador nuevo que no se guardó.
+      properties:
+        externalId:
+          type: string
+        name:
+          type: string
+          nullable: true
+        team:
+          type: string
+        reason:
+          type: string
+          enum: [MISSING_NAME, MISSING_POSITION]
+    SkippedMatch:
+      type: object
+      required: [externalId, homeTeamExternalId, awayTeamExternalId, utcDate, reason]
+      description: Partido que no se guardó. La liga no falla por esto.
+      properties:
+        externalId:
+          type: string
+        homeTeamExternalId:
+          type: string
+        awayTeamExternalId:
+          type: string
+        utcDate:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          enum: [UNKNOWN_TEAM, UNKNOWN_STATUS]
+    DuplicatedPlayer:
+      type: object
+      required: [externalId, name, keptTeam, ignoredTeam]
+      description: |
+        Jugador que la fuente informó en dos planteles. Queda en su equipo actual si es uno de
+        los dos; si no, en el primero en el orden de procesamiento.
+      properties:
+        externalId:
+          type: string
+        name:
+          type: string
+        keptTeam:
+          type: string
+        ignoredTeam:
+          type: string
+    LeagueSyncReport:
+      type: object
+      required: [league, status, failureReason, season, teams, players, matches, skippedPlayers, skippedMatches, reactivatedPlayers]
+      properties:
+        league:
+          $ref: '#/components/schemas/League'
+        status:
+          $ref: '#/components/schemas/LeagueSyncStatus'
+        failureReason:
+          type: string
+          nullable: true
+          description: Motivo en español, solo si la liga falló. Nunca contiene la credencial.
+        season:
+          allOf:
+            - $ref: '#/components/schemas/SeasonSummary'
+          nullable: true
+          description: Temporada en curso guardada. `null` si la liga falló.
+        teams:
+          $ref: '#/components/schemas/EntityCounts'
+        players:
+          $ref: '#/components/schemas/EntityCounts'
+        matches:
+          $ref: '#/components/schemas/EntityCounts'
+        skippedPlayers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkippedPlayer'
+        skippedMatches:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkippedMatch'
+        reactivatedPlayers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerSummary'
+    SyncReportResponse:
+      type: object
+      required: [type, origin, startedAt, finishedAt, inactivationApplied, leagues, duplicatedPlayers, inactivatedPlayers]
+      properties:
+        type:
+          $ref: '#/components/schemas/SyncType'
+        origin:
+          $ref: '#/components/schemas/SyncOrigin'
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        inactivationApplied:
+          type: boolean
+          description: |
+            `true` solo en una sincronización completa con las cinco ligas en éxito. En ese caso
+            `inactivatedPlayers` lista a los que no aparecieron en ningún plantel.
+        leagues:
+          type: array
+          description: Una entrada por liga pedida, en el orden PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1.
+          items:
+            $ref: '#/components/schemas/LeagueSyncReport'
+        duplicatedPlayers:
+          type: array
+          items:
+            $ref: '#/components/schemas/DuplicatedPlayer'
+        inactivatedPlayers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerSummary'
+    ApiError:
+      type: object
+      description: Formato de error común del backend.
+      required: [timestamp, status, error, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          format: int32
+        error:
+          type: string
+          description: Frase estándar del status HTTP (por ejemplo, Service Unavailable).
+        message:
+          type: string
+          description: Mensaje claro en español, sin detalles internos.
+        path:
+          type: string
+        violations:
+          type: array
+          description: Solo en errores de validación del cuerpo.
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+  responses:
+    BadRequest:
+      description: Parámetro de consulta o identificador con formato o valor inválido. Sin cambios respecto de 002.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-07T15:00:00Z'
+            status: 400
+            error: Bad Request
+            message: Los parámetros enviados no son válidos.
+            path: /players
+    UnsupportedLeague:
+      description: La liga pedida no es una de las cinco. No se consulta la fuente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-07T15:00:00Z'
+            status: 400
+            error: Bad Request
+            message: "La liga 'MLS' no es una de las admitidas: PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1."
+            path: /players/sync
+    Unauthorized:
+      description: Falta la credencial, o es inválida o está vencida. No se consulta la fuente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-07T15:00:00Z'
+            status: 401
+            error: Unauthorized
+            message: 'Se requiere una credencial: un token de sesión (Authorization: Bearer) o una clave de API (X-API-Key).'
+            path: /players/sync
+    Forbidden:
+      description: La credencial es válida pero no es de un administrador. No se consulta la fuente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-07T15:00:00Z'
+            status: 403
+            error: Forbidden
+            message: No tiene permisos para acceder a este recurso.
+            path: /players/sync
+    SyncInProgress:
+      description: Ya hay una sincronización en curso (manual, semanal o de arranque).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-07T15:00:00Z'
+            status: 409
+            error: Conflict
+            message: Ya hay una sincronización en curso.
+            path: /players/sync
+    SyncDisabled:
+      description: La sincronización está deshabilitada porque falta la credencial de la fuente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-07T15:00:00Z'
+            status: 503
+            error: Service Unavailable
+            message: 'La sincronización con Football-Data.org está deshabilitada: falta configurar la credencial de la fuente (FOOTBALL_DATA_TOKEN).'
+            path: /players/sync
