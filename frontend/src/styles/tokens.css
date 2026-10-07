@@ -1,0 +1,43 @@
+/* Variables de diseño tomadas de mockups/pizarra-tactica.html */
+:root {
+  /* Pizarrón */
+  --board: #1f3b2d;
+  --board2: #173024;
+
+  /* Marco y fondo de madera */
+  --wood: #7a4b25;
+  --wood2: #5b3519;
+  --wood-frame: #8a5a2b;
+
+  /* Tiza */
+  --chalk: #f4f1e6;
+  --chalk-dim: rgba(244, 241, 230, 0.55);
+  --chalk-faint: rgba(244, 241, 230, 0.25);
+
+  /* Post-its */
+  --yellow: #ffe873;
+  --blue: #9fd8ff;
+  --green: #b9f5a0;
+  --pink: #ff9ec4;
+  --ink: #2b2b2b;
+  --ink-soft: #4a4a4a;
+  --marker-red: #c0392b;
+
+  /* Cinta adhesiva */
+  --tape: rgba(244, 241, 230, 0.85);
+  --tape-ink: #333;
+
+  /* Chinche */
+  --pin: radial-gradient(circle at 35% 30%, #fff 0, #e33 40%, #800 100%);
+
+  /* Sombras */
+  --shadow-board: inset 0 0 60px rgba(0, 0, 0, 0.6), 0 12px 40px rgba(0, 0, 0, 0.5);
+  --shadow-note: 2px 6px 12px rgba(0, 0, 0, 0.45);
+  --shadow-pin: 0 3px 3px rgba(0, 0, 0, 0.4);
+  --shadow-chalk-text: 0 1px 2px #000;
+
+  /* Tipografías */
+  --font-hand: 'Patrick Hand', cursive;
+  --font-script: 'Caveat', cursive;
+  --font-marker: 'Permanent Marker', cursive;
+}
