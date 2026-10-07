@@ -26,6 +26,16 @@ No se agrega ninguna capacidad nueva al sistema existente.
 
 **Fuera del alcance, de forma explícita** (en línea con RF-016 de `002-catalogo-jugadores`): precios, valores, cotizaciones, compras, ventas, órdenes, porcentajes de jugadores, portfolio, presupuesto, puntajes o "estrellas" de jugadores y armado de equipos. El diseño de referencia incluye elementos de este tipo (presupuesto, valor en créditos, estrellas, botón "+ al equipo", jugadores ubicados en la cancha, nota "no pasarse del presupuesto"): esos elementos NO se reproducen. Del diseño se toma la estética, no esas funciones.
 
+## Clarificaciones
+
+### Sesión 2026-10-07
+
+- P: ¿Cómo se elige el equipo en el filtro por equipo? → R: Con un desplegable con estilo de tiza ("equipo: todos ▾"), debajo de las pestañas de liga; al abrirlo se ve la lista de equipos para elegir uno, más la opción "todos".
+- P: ¿De qué depende el color de cada post-it? → R: De la posición, con un color fijo por posición: arquero amarillo, defensor celeste, mediocampista verde y delantero rosa (los cuatro colores del mockup).
+- P: ¿Cuántos post-its entran en cada hoja de la pizarra? → R: 12 por hoja (se reparte parejo en 1, 2, 3 o 4 columnas).
+- P: ¿Cómo se escriben los filtros en la dirección de la página? → R: Con nombres y valores iguales a los del backend: `position`, `league`, `team` y `page` (por ejemplo `?position=DEFENDER&league=LA_LIGA&team=Real%20Madrid&page=2`).
+- P: ¿Qué pasa si se toca una zona de la cancha que ya está activa? → R: Se desactiva: se quita el filtro de posición (igual que "todos") y se vuelve a la primera hoja.
+
 ## Escenarios de usuario y pruebas *(obligatorio)*
 
 ### Historia de usuario 1 - Acceso: registrarse e iniciar sesión (Prioridad: P1)
@@ -60,7 +70,7 @@ Como cualquier persona, con o sin sesión iniciada, quiero ver todos los jugador
 **Escenarios de aceptación**:
 
 1. **Dado** una persona, con o sin sesión iniciada, **cuando** abre la pizarra sin filtros, **entonces** ve la primera hoja de jugadores como post-its, cada uno con nombre, posición (en español), equipo y liga (con su nombre legible).
-2. **Dado** que hay más jugadores que los que entran en una hoja, **cuando** elige "hoja siguiente" y luego "hoja anterior", **entonces** ve la hoja correspondiente sin repetir ni omitir jugadores, y se le indica en qué hoja está y cuántas hay ("hoja 2 de 6").
+2. **Dado** que hay más jugadores que los que entran en una hoja, **cuando** elige "hoja siguiente" y luego "hoja anterior", **entonces** ve la hoja correspondiente sin repetir ni omitir jugadores, y se le indica en qué hoja está y cuántas hay ("hoja 2 de 5").
 3. **Dado** que está en la primera hoja, **entonces** "hoja anterior" no está disponible; **dado** que está en la última, **entonces** "hoja siguiente" no está disponible.
 4. **Dado** un post-it en la pizarra, **cuando** la persona lo toca o lo activa con el teclado, **entonces** se abre la ficha de ese jugador (historia 5).
 5. **Dado** cualquier post-it, **entonces** no ofrece ninguna otra acción: no hay botones de comprar, vender, "sumar al plantel" ni similares (ni siquiera deshabilitados), no se puede seleccionar, marcar ni arrastrar, y no muestra precio, valor ni puntaje.
@@ -78,9 +88,9 @@ Como cualquier persona, con o sin sesión iniciada, quiero filtrar los post-its 
 **Escenarios de aceptación**:
 
 1. **Dado** la pizarra sin filtros, **cuando** la persona toca la zona "defensa", **entonces** solo se ven defensores, la zona queda marcada como activa y se vuelve a la primera hoja.
-2. **Dado** una zona activa, **cuando** toca "todos", **entonces** se quita el filtro de posición y "todos" queda marcado como activo.
+2. **Dado** una zona activa, **cuando** toca "todos" o vuelve a tocar esa misma zona, **entonces** se quita el filtro de posición, "todos" queda marcado como activo y se vuelve a la primera hoja.
 3. **Dado** la pizarra, **cuando** elige la pestaña de una liga, **entonces** solo se ven jugadores de esa liga, la pestaña queda marcada como activa y se vuelve a la primera hoja; la pestaña "todas" quita el filtro de liga.
-4. **Dado** la pizarra, **cuando** elige un equipo, **entonces** solo se ven jugadores de ese equipo y se vuelve a la primera hoja. Si hay una liga elegida, la lista de equipos ofrecidos se limita a los de esa liga.
+4. **Dado** la pizarra, **cuando** abre el desplegable de equipo y elige uno de la lista, **entonces** solo se ven jugadores de ese equipo y se vuelve a la primera hoja. Si hay una liga elegida, la lista de equipos ofrecidos se limita a los de esa liga.
 5. **Dado** filtros de posición, liga y equipo combinados, **entonces** cada post-it visible cumple todos los filtros a la vez.
 6. **Dado** una combinación de filtros aplicada, **cuando** la persona recarga la página o comparte la dirección con otra persona, aunque no tenga sesión iniciada, **entonces** se ve la misma combinación de filtros y la misma hoja.
 7. **Dado** una combinación sin jugadores, **entonces** se muestra una nota en tiza que describe la combinación (por ejemplo "no hay arqueros de ese equipo en la pizarra") y una opción para limpiar los filtros; al elegirla, se vuelve a la pizarra completa en la primera hoja.
@@ -151,7 +161,7 @@ Como persona con sesión iniciada (es la única sección que la exige), quiero u
 - **Carga**: mientras se espera una respuesta (pizarra, ficha, buscador, vestuario, formularios), se muestra "el DT está pensando..." y los botones de envío no se pueden accionar dos veces.
 - **Error de red o del servidor**: se muestra una nota en tiza que explica que no se pudo conectar y una opción "reintentar" que repite la última consulta, sin perder filtros, hoja ni datos ingresados.
 - **Dirección con filtros inválidos** (posición o liga inexistentes, hoja negativa o no numérica): se ignora el valor inválido y se muestra la pizarra como si ese filtro no estuviera, sin pantalla de error.
-- **Hoja fuera de rango** en la dirección (por ejemplo, hoja 40 de 6): se muestra la nota de pizarra vacía con la opción de volver a la primera hoja.
+- **Hoja fuera de rango** en la dirección (por ejemplo, hoja 40 de 5): se muestra la nota de pizarra vacía con la opción de volver a la primera hoja.
 - **Equipo de la dirección que no pertenece a la liga elegida**: se muestra la nota en tiza de combinación sin jugadores, con la opción de limpiar filtros.
 - **Cambio de liga con un equipo elegido de otra liga**: el filtro de equipo se quita al cambiar a una liga a la que ese equipo no pertenece.
 - **Buscador con espacios** al principio o al final: se ignoran; el mínimo de 2 letras se cuenta sin esos espacios.
@@ -185,12 +195,13 @@ Como persona con sesión iniciada (es la única sección que la exige), quiero u
 
 **Pizarra y filtros**
 
-- **RF-013**: La pizarra DEBE mostrar todos los jugadores del catálogo como post-its, organizados en hojas, con controles "hoja anterior" y "hoja siguiente" y una indicación de hoja actual y total de hojas.
+- **RF-013**: La pizarra DEBE mostrar todos los jugadores del catálogo como post-its, organizados en hojas de 12 post-its (la última puede tener menos), con controles "hoja anterior" y "hoja siguiente" y una indicación de hoja actual y total de hojas.
 - **RF-014**: Cada post-it DEBE mostrar nombre, posición, equipo y liga, y su única acción DEBE ser abrir la ficha del jugador.
-- **RF-015**: La pizarra DEBE ofrecer una cancha dibujada en tiza con cuatro zonas (arco, defensa, mediocampo, delantera) y una opción "todos"; activar una zona DEBE filtrar por la posición correspondiente (arquero, defensor, mediocampista, delantero) y marcarla como activa.
-- **RF-016**: La pizarra DEBE ofrecer pestañas de liga para las cinco ligas del catálogo y una pestaña "todas", y DEBE ofrecer un filtro por equipo cuyas opciones son los equipos presentes en el catálogo, limitadas a la liga elegida si la hay.
+- **RF-014a**: El color de cada post-it DEBE depender de la posición del jugador, con un color fijo por posición: arquero amarillo, defensor celeste, mediocampista verde y delantero rosa. La posición también DEBE figurar en texto, para que el color no sea la única señal.
+- **RF-015**: La pizarra DEBE ofrecer una cancha dibujada en tiza con cuatro zonas (arco, defensa, mediocampo, delantera) y una opción "todos"; activar una zona DEBE filtrar por la posición correspondiente (arquero, defensor, mediocampista, delantero) y marcarla como activa. Volver a activar la zona que ya está activa DEBE quitar el filtro de posición, igual que "todos".
+- **RF-016**: La pizarra DEBE ofrecer pestañas de liga para las cinco ligas del catálogo y una pestaña "todas", y DEBE ofrecer un filtro por equipo en forma de desplegable con estilo de tiza, ubicado debajo de las pestañas de liga, que al abrirse muestra la lista de equipos presentes en el catálogo (limitada a la liga elegida si la hay, ordenada alfabéticamente) más una opción "todos", y permite elegir uno con mouse, toque o teclado.
 - **RF-017**: Los filtros de posición, liga y equipo DEBEN combinarse de forma acumulativa.
-- **RF-018**: Los filtros activos y la hoja actual DEBEN reflejarse en la dirección de la página, de modo que una recarga o una dirección compartida reproduzcan la misma vista.
+- **RF-018**: Los filtros activos y la hoja actual DEBEN reflejarse en la dirección de la página, de modo que una recarga o una dirección compartida reproduzcan la misma vista. Los parámetros DEBEN llamarse `position`, `league`, `team` y `page`, y `position` y `league` DEBEN usar los valores del backend tal cual (por ejemplo `DEFENDER`, `LA_LIGA`); `team` lleva el nombre del equipo y `page` el número de hoja contado desde 1. Los filtros sin valor no aparecen en la dirección.
 - **RF-019**: Al cambiar cualquier filtro, la pizarra DEBE volver a la primera hoja.
 - **RF-020**: Cuando la combinación de filtros no tiene jugadores, la pizarra DEBE mostrar una nota en tiza que describa la combinación y una opción para limpiar todos los filtros.
 
@@ -261,11 +272,10 @@ Como persona con sesión iniciada (es la única sección que la exige), quiero u
 - El catálogo tiene entre 50 y 60 jugadores (RF-001 de `002-catalogo-jugadores`), por lo que el buscador y la lista de equipos pueden armarse obteniendo el catálogo completo con la consulta paginada existente (como máximo 50 jugadores por consulta), sin agregar una búsqueda por nombre al sistema. RF-016 de 002 excluye la búsqueda por nombre del sistema, no de la interfaz.
 - La pizarra, los filtros, el buscador y las fichas son públicos, igual que la consulta del catálogo en el sistema (supuesto de `002-catalogo-jugadores`); solo el vestuario exige sesión, porque es lo único que usa el perfil y la gestión de la cuenta.
 - El registro no inicia sesión por sí mismo (no devuelve token); al continuar desde la vista de la clave, la interfaz inicia sesión con las credenciales recién ingresadas, sin guardarlas.
-- La hoja de la pizarra muestra una cantidad fija razonable de post-its (por defecto, la del sistema: 10); la persona no elige el tamaño de hoja.
-- En la dirección de la página, la hoja se muestra numerada desde 1 para la persona, aunque el sistema numere desde 0.
+- La persona no elige el tamaño de hoja: siempre son 12 post-its por hoja.
+- El parámetro `page` de la dirección cuenta las hojas desde 1, como las ve la persona, aunque el sistema las numere desde 0.
 - La sesión se conserva al recargar dentro de la misma pestaña, pero no se comparte entre pestañas ni sobrevive al cierre del navegador, según la regla de la constitución sobre el token de sesión.
 - El saldo se muestra tal como lo informa el perfil, en créditos y con dos decimales; no se actualiza en tiempo real.
 - Las reglas de validación de usuario, correo y contraseña son las del sistema (001-auth-usuarios); la interfaz puede adelantar validaciones de forma para guiar a la persona, pero el mensaje que manda es el del sistema.
-- Los post-its toman su color de la posición del jugador para que la pizarra sea legible de un vistazo; el color no es la única señal de la posición (también se muestra en texto).
 - El pipeline de integración continua del backend ya existe en GitHub Actions; el del frontend se agrega con los mismos disparadores.
 - No se requiere soporte para navegadores sin JavaScript ni modo sin conexión.
