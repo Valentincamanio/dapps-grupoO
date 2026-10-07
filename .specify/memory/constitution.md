@@ -1,36 +1,20 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 2.1.0 -> 2.2.0
-Bump rationale: MINOR. Se agrega la capa adapter para integrar APIs externas y el
-arbol de paquetes del backend deja de ser una lista cerrada. Todo lo valido en la
-2.1.0 sigue siendo valido: no se quita ni se redefine de forma incompatible ningun
-principio.
+Version change: 2.2.0 -> 2.2.1
+Bump rationale: PATCH. Aclaracion del Principio III: la lista de status del advice
+suma el 503 y deja de leerse como una lista cerrada. No se quita ni se redefine
+ningun principio.
 
 Principios modificados:
-  - I. Arquitectura en Capas Estricta (NO NEGOCIABLE)  [ampliado]
-      * "Cuatro capas" -> "Cinco capas": se suma adapter, con su diagrama
-        Service -> Adapter -> API externa.
-      * Cuatro reglas nuevas del adapter: el servicio solo habla con la API externa
-        a traves de su adapter; el adapter recibe y devuelve modelo y sus DTO no
-        salen de el; traduce con su propio mapper y no persiste; traduce los errores
-        del proveedor a excepciones propias.
-      * Arbol: se agrega adapter/<proveedor>/dto/. "Este arbol es el unico valido"
-        -> "Este arbol es la base de la estructura", con una regla nueva: se pueden
-        agregar, mover o quitar carpetas con el aval explicito de al menos uno de
-        los dos desarrolladores, declarandolo en el plan de la feature.
-      * Reglas de los contextos: adapter/ se organiza por proveedor, no por contexto.
+  - III. Cada Validacion en su Nivel  [aclarado]
+      * Status del advice: (400, 401, 403, 404, 409) -> (400, 401, 403, 404, 409 y 503).
+      * Esos status son la base: una feature puede sumar otro con el aval explicito
+        del desarrollador que la implementa, declarandolo en su plan.
 
-Secciones modificadas:
-  - Flujo de Trabajo y Definicion de Terminado, "Como se espera que trabaje el
-    agente": una clase nueva tambien puede ir en adapter/<proveedor>/, y una regla
-    nueva: proponer una carpeta que ayude a organizar en vez de rechazarla porque no
-    figura en el arbol.
-
+Secciones modificadas: ninguna.
 Secciones agregadas: ninguna.
 Secciones removidas: ninguna.
-
-Fuera de esta enmienda: el arbol del frontend (seccion Frontend) sigue siendo cerrado.
 
 Plantillas a revisar:
   - .specify/templates/plan-template.md   seccion de estructura de codigo
@@ -38,6 +22,11 @@ Plantillas a revisar:
   - .specify/templates/tasks-template.md  rutas de ejemplo del frontend y del
     adapter                                                           (pendiente)
   - .specify/templates/spec-template.md   sin impacto
+
+Historico de la 2.2.0 (2.1.0 -> 2.2.0, MINOR): se agrego la capa adapter (cinco capas,
+con sus reglas y adapter/<proveedor>/dto/ en el arbol), el arbol de paquetes del backend
+dejo de ser una lista cerrada (se cambia con el aval de un desarrollador, declarado en el
+plan) y adapter/ se organiza por proveedor. El arbol del frontend sigue siendo cerrado.
 
 Historico de la 2.1.0 (2.0.0 -> 2.1.0, MINOR): se agrego la seccion Frontend con su
 stack, estructura de carpetas, reglas, tests y definicion de terminado; el Principio
@@ -209,7 +198,9 @@ Las excepciones son propias y con nombre: `PlayerNotFoundException`,
 usar excepciones genericas de la JDK para expresar reglas de dominio.
 
 Un unico `@RestControllerAdvice` en `shared/` centraliza el manejo y devuelve siempre el
-mismo formato de error JSON, con el status code correcto (400, 401, 403, 404, 409).
+mismo formato de error JSON, con el status code correcto (400, 401, 403, 404, 409 y 503).
+Estos status son la base, no una lista cerrada: una feature puede sumar otro status code
+con el aval explicito del desarrollador que la implementa, declarandolo en su plan.
 Nunca se filtran stack traces ni mensajes internos al cliente.
 
 ### IV. Estrategia de Tests (NO NEGOCIABLE)
@@ -472,4 +463,4 @@ solo se levantan por enmienda.
 **Uso en runtime.** Los agentes leen este documento antes de cada tarea y lo citan cuando
 rechazan o corrigen un pedido.
 
-**Version**: 2.2.0 | **Ratified**: 2026-09-02 | **Last Amended**: 2026-10-07
+**Version**: 2.2.1 | **Ratified**: 2026-09-02 | **Last Amended**: 2026-10-07
