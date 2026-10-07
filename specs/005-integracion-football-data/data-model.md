@@ -154,8 +154,9 @@ Record
 `(String externalId, String seasonExternalId, Instant utcDate, Integer matchday, MatchStatus status, String homeTeamExternalId, String awayTeamExternalId, Score fullTime, Score halfTime, MatchWinner winner)`.
 Es un partido tal como lo informa la fuente: los equipos van por `externalId`.
 
-- `externalId`, `utcDate` y los dos `externalId` de equipo son obligatorios. Si falta alguno, es
-  un error de formato.
+- `externalId`, `utcDate` y los dos `externalId` de equipo son obligatorios, y los dos equipos
+  tienen que ser distintos. Si no se cumple, es un error de formato y la liga falla (D5 y D7).
+  Así `Match` nunca falla al escribir, dentro de la transacción de la liga.
 - `status` queda en `null` si la fuente informa un estado desconocido (D7).
 - `toNewMatch(Season season, Team home, Team away)` devuelve un `Match` sin id.
 
@@ -165,7 +166,7 @@ El enum no cambia sus valores. Suma:
 
 | Elemento | Detalle |
 |---|---|
-| `static League fromName(String value)` | Devuelve la liga cuyo nombre coincide exactamente con el valor, distinguiendo mayúsculas como el enlace de enums de Spring. Si no coincide, o si es `null` o está en blanco, lanza `UnsupportedLeagueException`. |
+| `static League fromName(String value)` | Devuelve la liga cuyo nombre coincide con el valor recortado, distinguiendo mayúsculas, igual que el enlace de enums de Spring: ` PREMIER ` se acepta y `premier` no. Si no coincide, o si es `null` o está en blanco, lanza `UnsupportedLeagueException`, cuyo mensaje repite el valor recibido. |
 
 ### Snapshot de una liga y reglas de la sincronización (`modelo/sync/`, nuevo)
 
@@ -187,7 +188,7 @@ plantel (FR-015; [research.md](./research.md) D9).
 |---|---|
 | `static of(List<LeagueSnapshot> snapshots)` | Recorre las ligas en el orden recibido, que es el del enum, y los equipos y planteles en el orden de la fuente. Junta los equipos distintos en los que aparece cada `externalId`. |
 | `duplicatedPlayerExternalIds()` | Los jugadores que aparecen en más de un equipo. |
-| `resolve(List<Player> currentPlayers)` | Elige para cada duplicado su equipo actual, si es uno de los informados, y si no el primero en el orden. Arma un `DuplicatedPlayer` por cada aparición ignorada. |
+| `resolve(List<Player> currentPlayers)` | Elige para cada duplicado su equipo actual, si es uno de los informados. Si no, un jugador guardado queda en el primero en el orden, y uno nuevo en la primera aparición con nombre y posición (o en la primera, si ninguna los tiene). Arma un `DuplicatedPlayer` por cada aparición ignorada. |
 | `keeps(String playerExternalId, String teamExternalId)` | `true` si esa aparición se escribe: el jugador no está duplicado, o ese es el equipo elegido. |
 | `duplicates()` | Los `DuplicatedPlayer` para el informe. |
 
@@ -245,6 +246,10 @@ mientras corre. No la comparten dos hilos: hay a lo sumo una corrida a la vez.
 - `leagues` va en el orden del enum, una por liga pedida.
 - `inactivationApplied` es el valor de `canDeactivate()` al terminar.
 - `duration()` y `failedLeagues()` sirven para el log.
+- `Optional<InactivationSkipReason> inactivationSkipReason()` dice por qué no se inactivó a
+  nadie: vacío si se aplicó la inactivación, `SINGLE_LEAGUE` si fue de una sola liga y
+  `FAILED_LEAGUES` si hubo ligas fallidas. Así esa decisión queda en el modelo y el logger solo
+  la escribe (Principio II).
 
 **LeagueSyncResult**: record
 `(League league, LeagueSyncStatus status, String failureReason, Season season, EntityCounts teams, EntityCounts players, EntityCounts matches, List<SkippedPlayer> skippedPlayers, List<SkippedMatch> skippedMatches, List<Player> reactivatedPlayers)`.
@@ -258,6 +263,7 @@ cero y listas vacías.
 | `SyncType` | Enum `FULL` o `SINGLE_LEAGUE`. |
 | `SyncOrigin` | Enum `WEEKLY`, `STARTUP` o `MANUAL`. |
 | `LeagueSyncStatus` | Enum `SUCCEEDED` o `FAILED`. |
+| `InactivationSkipReason` | Enum `SINGLE_LEAGUE` o `FAILED_LEAGUES`. |
 | `EntityCounts` | Record `(int created, int updated, int skipped)`. |
 | `SkippedPlayer` | Record `(String externalId, String name, String teamName, PlayerSkipReason reason)`. `name` puede ser `null`. |
 | `PlayerSkipReason` | Enum `MISSING_NAME` o `MISSING_POSITION`. |

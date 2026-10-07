@@ -50,7 +50,7 @@ Resultado esperado: `BUILD SUCCESSFUL`. La suite cubre:
     - partidos con un equipo fuera del catálogo o un estado desconocido;
     - conteos.
   - `SquadAssignment`: duplicados en la misma liga y entre ligas, y la regla de "conserva su
-    equipo actual; si no, la primera aparición".
+    equipo actual; si no, la primera aparición, y para un jugador nuevo la primera completa".
   - `SyncRun`: solo la completa con las cinco ligas en éxito inactiva, a quiénes inactiva y el
     armado del informe.
 - **Adapter**, con `MockRestServiceServer` y fixtures reales:
@@ -59,8 +59,9 @@ Resultado esperado: `BUILD SUCCESSFUL`. La suite cubre:
   - el header `X-Auth-Token`;
   - 403, 404, 5xx, timeout y JSON inválido, que terminan en `ExternalSourceException` con su
     motivo;
-  - 429 con espera y un reintento, y 429 dos veces;
-  - el ritmo preventivo con `X-Requests-Available-Minute`.
+  - 429 con espera y un reintento, 429 dos veces y 429 que pide más de 2 minutos;
+  - el ritmo preventivo con `X-Requests-Available-Minute`, y que una espera ya cumplida o una
+    respuesta sin ese header no deja una espera pendiente.
 
   Ningún test duerme: usan `RecordingSleeper` y un `Clock` fijo.
 - **Configuración**: el cron de `application.yaml` da como próxima ejecución el lunes a las 04:00
@@ -70,6 +71,8 @@ Resultado esperado: `BUILD SUCCESSFUL`. La suite cubre:
   - `SyncService`: deshabilitada → 503; en curso → 409; una liga fallida no frena a las demás;
     una sola liga no inactiva; las cinco fallidas devuelven igual el informe.
   - `SyncScheduler` y `StartupSync`: catálogo vacío o con datos, sin token, con otra en curso.
+  - `SyncReportLogger`: las líneas por liga, los detalles y el motivo de que no se inactivara
+    a nadie quedan en el registro.
 - **Integración**, contra H2 en memoria:
   - los repositories de equipos, jugadores, temporadas y partidos: upsert por `externalId`,
     índices únicos, listado solo de activos y carga con su equipo;

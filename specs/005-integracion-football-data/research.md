@@ -221,9 +221,12 @@ Ninguna de las alternativas resuelve algo que el classpath no resuelva.
 | 429 después del reintento | `HttpClientErrorException` | `Se excedió el límite de consultas de la fuente (429).` |
 | 5xx | `HttpServerErrorException` | `La fuente respondió con un error (5xx).` |
 | JSON ilegible o de otro tipo | `RestClientException` de conversión | `La respuesta de la fuente no tiene el formato esperado.` |
-| Datos que violan invariantes (un equipo sin id o sin nombre, una temporada sin fechas) | `CatalogInvariantException` al mapear | Igual que el anterior |
+| Datos que violan invariantes (un equipo sin id o sin nombre, una temporada sin fechas, un partido con el mismo equipo de local y de visitante) | `CatalogInvariantException` al mapear | Igual que el anterior |
 | Ningún equipo en la liga (FR-039) | Invariante de `LeagueSnapshot` | `La fuente no informó ningún equipo para la liga.` |
 | Partidos de otra temporada | Invariante de `LeagueSnapshot` | `La fuente informó partidos de otra temporada.` |
+| 429 que pide esperar más de 120 s (D6) | Header `X-RequestCounter-Reset` | `Se excedió el límite de consultas de la fuente (429).` |
+| Espera del límite de consultas interrumpida (D6) | `InterruptedException` en `ThreadSleeper` | `Se interrumpió la espera por el límite de consultas de la fuente.` |
+| Falla al guardar una liga ya descargada (D8) | `DataAccessException` en `SyncWriteService` | `No se pudieron guardar los datos de la liga.` |
 
 - El campo `message` del cuerpo de error de la fuente no va al informe: está en inglés y no
   agrega nada. Se registra en WARN junto con la liga, porque ayuda a diagnosticar y no contiene
@@ -256,6 +259,10 @@ exactamente 10. La fuente informa `X-Requests-Available-Minute` y `X-RequestCoun
      renovación.
    - Con el contador libre, las 10 requests salen sin esperas. Si una sincronización anterior
      consumió parte del minuto, la siguiente espera la renovación en lugar de recibir un 429.
+   - Si una respuesta no trae `X-Requests-Available-Minute`, o después de esperar la
+     renovación, el estado se limpia: la request siguiente sale sin esperar hasta que otra
+     respuesta informe el contador de nuevo. Así un valor viejo nunca provoca una segunda
+     espera, tampoco con el `Clock` fijo de los tests.
 2. **Ante un 429**:
    - Espera los segundos de `X-RequestCounter-Reset`, o 60 s si el header falta o no se puede
      leer, y reintenta una vez.
@@ -263,7 +270,8 @@ exactamente 10. La fuente informa `X-Requests-Available-Minute` y `X-RequestCoun
    - Ningún otro status se reintenta. Un timeout deja la liga fallida (FR-037).
 3. **Tope de seguridad**: si el header pide más de 120 s, no se espera y la liga queda fallida
    por límite de consultas. En el plan gratis el contador se renueva cada minuto, así que con
-   la fuente respondiendo con normalidad no ocurre.
+   la fuente respondiendo con normalidad no ocurre. El tope está en FR-038 desde el
+   2026-10-07.
 4. **La espera es inyectable**: pasa por la interfaz `Sleeper` (`void sleep(Duration)`).
    - En producción la implementa `ThreadSleeper`.
    - En los tests, `RecordingSleeper` registra las esperas sin dormir.
@@ -309,11 +317,17 @@ exactamente 10. La fuente informa `X-Requests-Available-Minute` y `X-RequestCoun
 | Si se puede inactivar (FR-017 y FR-018) y a quién | `SyncRun.canDeactivate` y `SyncRun.playersToDeactivate` | Negocio (D10). |
 | Reactivar y cambiar de equipo (FR-016 y FR-019) | `Player.updateFrom` | Negocio. |
 | Conteos y listas del informe (FR-043 y FR-044) | `LeagueSync`, `SyncRun` y `SyncReport` | Negocio. |
+| Por qué no se inactivó a nadie (una sola liga o ligas fallidas) | `SyncReport.inactivationSkipReason()` | Negocio: el logger solo lo escribe (D19). |
 
 El partido con estado desconocido es una decisión de este plan. El spec no lo menciona, y la
 opción es omitirlo e informarlo como con un equipo desconocido: guardarlo sin estado violaría
 FR-023, y dar por fallida la liga entera por un valor nuevo de la fuente sería
 desproporcionado.
+
+Un partido con el mismo equipo de local y de visitante es distinto: no es un valor nuevo de la
+fuente sino un dato imposible. `MatchSnapshot` lo rechaza y la liga falla por error de formato
+(D5). Así `Match` nunca falla al escribir, dentro de la transacción de la liga, con una excepción
+que el orquestador no captura.
 
 ## D8. Flujo de una sincronización y transacciones
 
@@ -382,14 +396,18 @@ SyncService.synchronizeAll(origin)  |  SyncService.synchronizeLeague(league)
 
 ## D9. Jugador informado en dos planteles
 
-**Decisión**. El equipo decidió el 2026-10-07 que el jugador conserva su equipo actual.
+**Decisión**. El equipo decidió el 2026-10-07 que el jugador conserva su equipo actual. Ese
+mismo día se precisó qué pasa con un jugador nuevo (análisis de `/speckit-analyze`, I2).
 
 1. `SquadAssignment` recorre los snapshots descargados en orden: las ligas en el orden del
    enum, y los equipos y sus planteles en el orden de la fuente. Por cada `externalId` junta
    los equipos distintos en los que aparece.
 2. Si un jugador aparece en más de un equipo:
    - si ya está guardado y su equipo actual es uno de ellos, queda en ese equipo;
-   - si no, queda en el primero según el orden de procesamiento.
+   - si ya está guardado y su equipo actual no es uno de ellos, queda en el primero según el
+     orden de procesamiento;
+   - si es nuevo, queda en la primera aparición con nombre y posición. Si ninguna los tiene,
+     queda en la primera, y se saltea (FR-012).
 3. Las demás apariciones se ignoran al escribir. Cada una va al informe como un
    `DuplicatedPlayer`, con el `externalId`, el nombre, el equipo que queda y el equipo ignorado.
 4. El jugador cuenta como presente para la inactivación.
@@ -402,9 +420,10 @@ Detalles:
   ninguno.
 - Si la liga del equipo elegido falla al escribir, el jugador no se mueve y la otra aparición
   igual se ignora. Es la opción conservadora: nada cambia por un dato dudoso.
-- **Caso borde aceptado**: un jugador nuevo cuya aparición elegida llega sin posición se
-  saltea, y la otra aparición se ignora. Se crea en una sincronización posterior. Es poco
-  probable: al 2026-10-06 había 15 jugadores sin posición.
+- **Jugador nuevo incompleto en una aparición**: si otra aparición trae nombre y posición, se
+  elige esa. Así un jugador nuevo se saltea solo si ninguna aparición está completa, como pide
+  FR-004. Un jugador guardado no necesita esta preferencia: conserva su nombre y su posición
+  aunque la aparición elegida no los traiga (FR-013).
 
 **Justificación**: un jugador que la fuente lista en dos clubes no se muda de liga por el orden
 de la respuesta.
@@ -592,18 +611,23 @@ liga por liga, pero podía mudar al jugador a un equipo nuevo solo por el orden 
   - Los dos rechazos ocurren antes del controller, así que no se consulta la fuente (FR-029 y
     SC-010).
 - **Parámetro `league`**: se recibe como `String` y se convierte con `League.fromName`, en el
-  modelo.
+  modelo. Que sea una de las cinco ligas es una invariante del dominio (Entidad Liga del spec),
+  así que validarlo en el modelo cumple el Principio III.
   - Un valor que no es una de las cinco ligas lanza `UnsupportedLeagueException` (400), con el
     mensaje `La liga 'X' no es una de las admitidas: PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A,
     LIGUE_1.` (FR-030).
+  - `fromName` recorta los espacios de los extremos y distingue mayúsculas, igual que el enlace
+    de enums de Spring: ` PREMIER ` se acepta y `premier` no.
   - El enlace a enum de Spring falla con `MethodArgumentTypeMismatchException`, que el advice
     responde con el mensaje genérico, sin el valor. Cambiar ese handler cambiaría también
     `GET /players` (FR-048) y sus tests.
-  - `?league=` vacío da el mismo 400.
+  - `?league=` vacío da el mismo 400. En esto se aparta del enlace de Spring, que convierte el
+    texto vacío en `null`: acá un parámetro presente pero vacío es un pedido mal formado.
 - **Errores**:
   - 409: `SyncInProgressException`, que extiende `ConflictException`.
   - 503: `SyncDisabledException`, que extiende la base nueva `ServiceUnavailableException` de
-    `shared/` (decisión del equipo). El advice suma su handler. El mensaje es `La
+    `shared/` (decisión del equipo, que admite el Principio III desde la constitución 2.2.1). El
+    advice suma su handler. El mensaje es `La
     sincronización con Football-Data.org está deshabilitada: falta configurar la credencial de
     la fuente (FOOTBALL_DATA_TOKEN).`
 - **Swagger**:
@@ -625,6 +649,11 @@ liga por liga, pero podía mudar al jugador a un equipo nuevo solo por el orden 
 - **202 Accepted y procesar en segundo plano**: FR-032 pide esperar y devolver el informe.
 - **409 para la sincronización deshabilitada**: el equipo eligió el 503, que la distingue de
   "hay otra en curso".
+- **Validar `league` con Bean Validation (`@Pattern` sobre el `String`)**: la violación termina
+  en `HandlerMethodValidationException`, que el advice responde con el mensaje genérico, sin el
+  valor que pide FR-030.
+- **Cambiar el handler de `MethodArgumentTypeMismatchException` para que repita el valor**:
+  alteraría la respuesta de `GET /players` (FR-048) y sus tests.
 
 ## D16. Persistencia
 
@@ -716,13 +745,17 @@ adapter convierte el id numérico con `String.valueOf`. Las columnas nuevas son 
 **Decisión**:
 
 - El informe es modelo (`SyncReport`), lo arma `SyncRun` y no se guarda (FR-045).
-- `SyncReportLogger` (`service/sync/`) registra con SLF4J:
-  - una línea en INFO al empezar;
+- La línea de inicio (`Sincronización FULL (STARTUP) iniciada.`) la escribe `SyncService` en
+  INFO al tomar el semáforo, como se ve en quickstart 2.3.
+- `SyncReportLogger` (`service/sync/`) registra el informe con SLF4J:
   - una línea por liga: en INFO si se procesó, con los conteos y la temporada, y en WARN si
     falló, con el motivo;
   - líneas de detalle en INFO, solo si hay algo para listar: jugadores omitidos (nombre y
     equipo), partidos omitidos, duplicados, reactivados e inactivados;
   - una línea final en INFO con la duración y los totales y, si no se inactivó a nadie, por qué.
+    El motivo lo da el modelo (`SyncReport.inactivationSkipReason()`); el logger solo lo
+    traduce a texto.
+- `SyncReportLoggerTest` verifica esas líneas con `OutputCaptureExtension` (FR-044 y FR-045).
 - El disparo manual devuelve el mismo informe en la respuesta.
 - Hay ejemplos de las líneas en [quickstart.md](./quickstart.md).
 
@@ -767,7 +800,7 @@ adapter convierte el id numérico con `String.valueOf`. Las columnas nuevas son 
 | Unitarios de modelo | `TeamTest`, `PlayerTest` (modificado y ampliado), `SeasonTest`, `MatchTest`, `LeagueTest`, `LeagueSnapshotTest`, `LeagueSyncTest`, `SquadAssignmentTest` y `SyncRunTest` |
 | Adapter | `FootballDataMapperTest` (sin HTTP) y `FootballDataAdapterTest` (`MockRestServiceServer`, `RecordingSleeper` y un `Clock` fijo) |
 | Configuración | `FootballDataPropertiesTest` |
-| Unitarios de servicio | `SyncServiceTest`, `SyncSchedulerTest`, `StartupSyncTest` y `PlayerCatalogServiceTest` (modificado) |
+| Unitarios de servicio | `SyncServiceTest`, `SyncSchedulerTest`, `StartupSyncTest`, `SyncReportLoggerTest` y `PlayerCatalogServiceTest` (modificado) |
 | Integración contra H2 | `TeamRepositoryIT`, `SeasonRepositoryIT`, `MatchRepositoryIT`, `PlayerRepositoryIT` (modificado y ampliado) y `SyncWriteServiceIT` |
 | End to end | `SyncControllerIT`, `SyncDisabledIT` y `PlayerControllerIT` (modificado y ampliado) |
 
@@ -837,4 +870,5 @@ adapter convierte el id numérico con `String.valueOf`. Las columnas nuevas son 
 - [specs/001-auth-usuarios/research.md](../001-auth-usuarios/research.md): D11 (propiedades
   desconocidas explícitas), D12 (inicializador no transaccional) y D17 (patrón de e2e con
   administrador).
-- `.specify/memory/constitution.md`, versión 2.2.0.
+- `.specify/memory/constitution.md`, versión 2.2.1 (la 2.2.0 más la enmienda del 2026-10-07,
+  que suma el 503 al Principio III).

@@ -77,10 +77,12 @@ El usuario resolvió cuatro puntos antes de escribir el diseño:
 2. **Sincronización deshabilitada: 503.**
    - Se agrega la base `ServiceUnavailableException` en `shared/` y su handler en el advice.
    - Así "este servidor no puede sincronizar" se distingue de "hay otra en curso" (409).
-   - Ver D15 y Seguimiento de complejidad.
+   - Lo admite el Principio III desde la constitución 2.2.1. Ver D15.
 3. **Jugador en dos planteles: conserva su equipo actual.**
-   - Si el jugador ya está en uno de los equipos que lo informan, queda ahí. Si no, queda en la
-     primera aparición según el orden de procesamiento.
+   - Si el jugador ya está en uno de los equipos que lo informan, queda ahí. Si no, un jugador
+     guardado queda en la primera aparición según el orden de procesamiento, y uno nuevo en la
+     primera aparición con nombre y posición (si ninguna los tiene, en la primera).
+   - Así un jugador nuevo se saltea solo si ninguna de sus apariciones está completa (FR-004).
    - Consecuencia: la sincronización descarga todas las ligas pedidas antes de escribir.
    - Ver D8 y D9.
 4. **Propiedad `futbolmarket.football-data.sync.on-startup`.**
@@ -89,11 +91,11 @@ El usuario resolvió cuatro puntos antes de escribir el diseño:
      arranque en segundo plano. En local y en producción, FR-033 se cumple igual.
    - Ver D13.
 
-No se encontraron contradicciones entre el spec, el pedido y la constitución. Dos puntos rozan
-el Principio III y quedan registrados en Seguimiento de complejidad:
+No se encontraron contradicciones entre el spec, el pedido y la constitución:
 
-- el 503 (decisión 2);
-- la validación del parámetro `league` en el modelo.
+- el 503 (decisión 2) lo admite el Principio III desde la constitución 2.2.1;
+- la validación del parámetro `league` en el modelo cumple el Principio III, porque "una de las
+  cinco ligas" es una invariante del dominio (D15).
 
 ### Validación de las decisiones técnicas propuestas en el pedido
 
@@ -132,6 +134,11 @@ divergencias, pero conviene tenerlos a la vista:
   HU2.
 - **Partido con un estado desconocido**: el spec no lo menciona. Se omite y se informa, igual que
   un partido con un equipo fuera del catálogo (FR-024). Guardarlo sin estado violaría FR-023.
+- **Partido con el mismo equipo de local y de visitante**: el spec no lo menciona. Es un dato
+  imposible, no un valor nuevo de la fuente, así que se trata como error de formato y la liga
+  falla (D5 y D7).
+- **Tope de 2 minutos ante un 429**: lo propuso D6 y el 2026-10-07 se sumó a FR-038, así que
+  tampoco es una divergencia.
 - **`sync.on-startup`**: solo vale `false` en el perfil test. FR-033 se cumple en local y en
   producción.
 
@@ -203,7 +210,7 @@ No queda ningún NEEDS CLARIFICATION: todo se resolvió en [research.md](./resea
 |---|---|---|
 | I. Capas estrictas (NO NEGOCIABLE) | Cumple | Ver el detalle debajo de la tabla. |
 | II. Modelo rico | Cumple | Las decisiones viven en el modelo: `LeagueSync` (crear, actualizar, saltear, reactivar, omitir partidos), `SquadAssignment` (dos planteles), `SyncRun` (si se inactiva y a quién) y `Player`, `Team`, `Season` y `Match` (`updateFrom` y `deactivate`). Los `if` de los servicios deciden cosas de la aplicación, no del dominio: si hay token, si el semáforo está libre y si el catálogo está vacío al arrancar. |
-| III. Validación en su nivel | Cumple, con dos notas | Las invariantes están en el modelo, con excepciones propias y con nombre. Los controles de existencia y posibilidad (habilitada, en curso) están en el servicio. El advice sigue siendo único. Las dos notas (el 503 y `league` validado por el modelo) están en Seguimiento de complejidad. |
+| III. Validación en su nivel | Cumple | Las invariantes están en el modelo, con excepciones propias y con nombre: entre ellas, que `league` sea una de las cinco ligas (D15). Los controles de existencia y posibilidad (habilitada, en curso) están en el servicio. El advice sigue siendo único y responde el 503 que admite la constitución 2.2.1. |
 | IV. Tests (NO NEGOCIABLE) | Cumple | Hay unitarios de modelo sin Spring, de servicio con mocks, del adapter con `MockRestServiceServer`, integración contra H2 y end to end en `e2e/`. Los únicos tests existentes que se tocan son cuatro que se modifican y uno que se borra, con el sí explícito de Lucas del 2026-10-06 (D21). Los demás quedan iguales, y los constructores de conveniencia de `Player` evitan cambios innecesarios. |
 | V. Calidad medible | Cumple | Ver el detalle debajo de la tabla. |
 | VI. Persistencia explícita | Cumple | Las cuatro tablas tienen `@Table(name = ...)` y los índices únicos tienen nombre. Solo hay derived queries, JPQL y `@EntityGraph`. Los enums nuevos son `VARCHAR`. `Instant` se mapea a `TIMESTAMP WITH TIME ZONE`. `open-in-view` y los perfiles no cambian. |
@@ -253,7 +260,7 @@ Detalle del principio V:
   `toString` lo enmascara.
 - **Limpieza**: se quita el import sin uso de `Team`.
 
-**Resultado**: la puerta pasa, con las dos notas del Principio III justificadas.
+**Resultado**: la puerta pasa.
 
 ### Después del diseño
 
@@ -322,7 +329,8 @@ adapter/                                          # NUEVO: primera clase de la c
 config/
 ├── ApplicationConfig.java                        # CAMBIA: + FootballDataProperties, @EnableScheduling y @EnableAsync
 ├── FootballDataProperties.java                   # NUEVO: futbolmarket.football-data.* (token enmascarado)
-├── FootballDataClientConfig.java                 # NUEVO: bean RestClient (URL base, X-Auth-Token, timeouts)
+├── FootballDataClientConfig.java                 # NUEVO: bean RestClient (URL base, X-Auth-Token, timeouts);
+│                                                 #   applyDefaults estático, que reutiliza el test del adapter
 └── PlayerCatalogDataSeeder.java                  # SE BORRA (FR-002)
 controller/
 ├── player/PlayerController.java                  # CAMBIA: arma PlayerResponse con los campos nuevos
@@ -341,7 +349,7 @@ modelo/
 ├── sync/                                         # NUEVO contexto
 │   ├── LeagueSnapshot.java   SquadAssignment.java   LeagueSync.java   SyncRun.java
 │   ├── SyncReport.java   LeagueSyncResult.java   EntityCounts.java
-│   ├── SyncType.java   SyncOrigin.java   LeagueSyncStatus.java
+│   ├── SyncType.java   SyncOrigin.java   LeagueSyncStatus.java   InactivationSkipReason.java
 │   ├── SkippedPlayer.java   PlayerSkipReason.java   SkippedMatch.java   MatchSkipReason.java   DuplicatedPlayer.java
 │   └── exception/
 │       └── ExternalSourceException.java   SyncInProgressException.java   SyncDisabledException.java
@@ -407,7 +415,8 @@ java/ar/edu/unq/desapp/futbolmarket/
 │   ├── player/PlayerTest.java                    # SE MODIFICA: Team con externalId; + updateFrom y deactivate
 │   ├── season/SeasonTest.java                    # NUEVO
 │   ├── sync/
-│   │   └── LeagueSnapshotTest.java   LeagueSyncTest.java   SquadAssignmentTest.java   SyncRunTest.java   # NUEVOS
+│   │   ├── LeagueSnapshotTest.java   LeagueSyncTest.java   SquadAssignmentTest.java   SyncRunTest.java   # NUEVOS
+│   │   └── SnapshotFixtures.java                 # NUEVO: datos de prueba compartidos (snapshots de las cinco ligas)
 │   └── team/TeamTest.java                        # NUEVO
 ├── persistence/repository/
 │   ├── match/MatchRepositoryIT.java              # NUEVO (H2 sync-it)
@@ -417,7 +426,7 @@ java/ar/edu/unq/desapp/futbolmarket/
 └── service/
     ├── player/PlayerCatalogServiceTest.java      # SE MODIFICA: Team con externalId
     └── sync/
-        └── SyncServiceTest.java   SyncSchedulerTest.java   StartupSyncTest.java   SyncWriteServiceIT.java   # NUEVOS
+        └── SyncServiceTest.java   SyncSchedulerTest.java   StartupSyncTest.java   SyncReportLoggerTest.java   SyncWriteServiceIT.java   # NUEVOS
 resources/
 ├── application-test.yml                          # CAMBIA: + football-data (sin token, URL .invalid, cron "-", on-startup false)
 └── footballdata/                                 # NUEVO: teams-pl.json, matches-pl.json, teams-empty.json, error-403.json
@@ -434,7 +443,7 @@ resources/
 
 **Decisión de estructura**:
 
-- Se usa el árbol de la constitución 2.2.0. Es el primer uso de `adapter/<proveedor>/`.
+- Se usa el árbol de la constitución 2.2.1, que es el mismo de la 2.2.0. Es el primer uso de `adapter/<proveedor>/`.
 - Los contextos `season`, `match` y `sync` quedan declarados en este plan.
 - No se crea ninguna carpeta fuera del árbol, ni carpetas vacías ni `.gitkeep`.
 - Los tests replican capa y contexto. Los end to end viven en `e2e/` y las fixtures en
@@ -516,9 +525,11 @@ así que un conflicto se resuelve conservando las dos partes.
 
 ## Seguimiento de complejidad
 
-Esta sección registra dos desvíos justificados del Principio III.
+No hay desvíos de la constitución. Los dos puntos que se habían registrado acá quedaron
+resueltos el 2026-10-07:
 
-| Desvío | Por qué hace falta | Alternativa más simple descartada |
-|---|---|---|
-| El parámetro `league` de `POST /players/sync` se recibe como `String` y lo valida el modelo (`League.fromName` lanza `UnsupportedLeagueException`), en lugar de validarlo Bean Validation en el request. | FR-030 pide rechazar indicando el valor no admitido. El enlace a enum de Spring termina en el handler genérico del advice, que no repite el valor. Cambiar ese handler cambiaría también la respuesta de `GET /players` (FR-048) y sus tests. Además, "una de las cinco ligas" es una invariante del dominio (Entidad Liga del spec), y el principio ubica las invariantes en el modelo. | Bean Validation con `@Pattern` sobre el `String`: la violación termina en `HandlerMethodValidationException`, que el advice responde con el mensaje genérico, sin el valor. Cambiar el handler de `MethodArgumentTypeMismatchException`: altera `GET /players`. |
-| Se agrega el status 503 con una base nueva, `ServiceUnavailableException`, en `shared/`. El principio enumera 400, 401, 403, 404 y 409. | Decisión del equipo del 2026-10-07: "la sincronización está deshabilitada en este servidor" es un problema de configuración del servidor, y no tiene que confundirse con "hay otra en curso" (409). La base sigue el patrón de las demás (sin tipos de Spring), el advice sigue siendo único y el formato de error es el mismo. | Responder 409 en los dos casos: el cliente los distinguiría solo por el texto del mensaje. |
+- **El 503**: lo admite el Principio III desde la enmienda 2.2.1 de la constitución, que suma el
+  503 a la lista de status y la deja como base, no como lista cerrada.
+- **La validación de `league` en el modelo**: cumple el Principio III, porque "una de las cinco
+  ligas" es una invariante del dominio (Entidad Liga del spec), y el principio ubica las
+  invariantes en el modelo. El detalle y las alternativas descartadas están en research D15.

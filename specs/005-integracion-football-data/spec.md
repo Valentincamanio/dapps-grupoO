@@ -66,6 +66,10 @@ Decisiones abiertas que quedaron al escribir el spec, resueltas por el equipo:
   -> A: Dispara una sincronizacion completa en segundo plano, sin demorar el arranque. Si
   el catalogo ya tiene datos, no hace nada. Se descarto esperar al disparo manual o a la
   corrida del lunes.
+- Q: Que pasa si la fuente pide esperar mas de lo razonable antes de reintentar? -> A: Si
+  pide mas de 2 minutos, no se espera y la liga se da por fallida. Con el plan gratis el
+  contador se renueva cada minuto, asi que con la fuente respondiendo con normalidad no
+  ocurre, y el disparo manual sigue respondiendo en menos de 2 minutos (SC-003).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -323,7 +327,8 @@ otra esta en curso.
   la fuente escribe con dieresis sobre la u: se guarda tal cual y el filtro por equipo solo
   coincide con el nombre escrito exactamente igual, dieresis incluida.
 - La fuente informa que se excedio el limite de consultas: se espera lo que ella indica y
-  se reintenta una vez; si vuelve a fallar, la liga se da por fallida.
+  se reintenta una vez; si vuelve a fallar, la liga se da por fallida. Si pide esperar mas
+  de 2 minutos, no se espera y la liga se da por fallida.
 - La fuente tarda mas de 30 segundos en responder una consulta: la liga se da por fallida y
   se sigue con las demas.
 - La fuente responde bien pero no informa ningun equipo para una liga: la liga se da por
@@ -488,7 +493,8 @@ otra esta en curso.
   responde en 30 segundos, y MUST seguir con las demas.
 - **FR-038**: Cuando la fuente informa que se excedio el limite de consultas, el sistema
   MUST esperar el tiempo que ella indica y reintentar una sola vez; si vuelve a fallar, MUST
-  dar la liga por fallida.
+  dar la liga por fallida. Si el tiempo indicado supera los 2 minutos, el sistema MUST NOT
+  esperar y MUST dar la liga por fallida.
 - **FR-039**: El sistema MUST dar por fallida una liga para la que la fuente no informa
   ningun equipo.
 

@@ -492,7 +492,8 @@ components:
       required: [externalId, name, keptTeam, ignoredTeam]
       description: |
         Jugador que la fuente informó en dos planteles. Queda en su equipo actual si es uno de
-        los dos; si no, en el primero en el orden de procesamiento.
+        los dos. Si no, un jugador guardado queda en el primero en el orden de procesamiento, y
+        uno nuevo en la primera aparición con nombre y posición.
       properties:
         externalId:
           type: string
