@@ -245,34 +245,34 @@ cambia uno solo, el resto deja de compilar.
 
 ### 2C. Modelo de la sincronización (paso 4 del plan)
 
-- [ ] T040 [P] Crear los tipos del informe en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/, según la tabla "Tipos del informe" de data-model.md:
+- [X] T040 [P] Crear los tipos del informe en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/, según la tabla "Tipos del informe" de data-model.md:
   - los enums `SyncType.java`, `SyncOrigin.java`, `LeagueSyncStatus.java`, `MatchSkipReason.java` e `InactivationSkipReason.java` (`SINGLE_LEAGUE` y `FAILED_LEAGUES`);
   - los records `EntityCounts.java`, `SkippedPlayer.java`, `SkippedMatch.java` y `DuplicatedPlayer.java`
-- [ ] T041 [P] Crear la base `ServiceUnavailableException extends RuntimeException` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared/ServiceUnavailableException.java, sin tipos de Spring y con el Javadoc de `ConflictException` adaptado al 503, que admite el Principio III desde la constitución 2.2.1. El handler del advice llega en T084 (HU3): mientras tanto, un disparo sin token respondería 500, pero ningún test lo ejecuta antes de esa tarea
-- [ ] T042 Crear las excepciones de backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/exception/ (data-model.md, "Excepciones", y research D5) (depende de T041):
+- [X] T041 [P] Crear la base `ServiceUnavailableException extends RuntimeException` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared/ServiceUnavailableException.java, sin tipos de Spring y con el Javadoc de `ConflictException` adaptado al 503, que admite el Principio III desde la constitución 2.2.1. El handler del advice llega en T084 (HU3): mientras tanto, un disparo sin token respondería 500, pero ningún test lo ejecuta antes de esa tarea
+- [X] T042 Crear las excepciones de backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/exception/ (data-model.md, "Excepciones", y research D5) (depende de T041):
   - `ExternalSourceException.java` extiende `RuntimeException`, con constructores `(String reason)` y `(String reason, Throwable cause)`. Declara como constantes públicas los motivos que comparten el adapter y el modelo: `La respuesta de la fuente no tiene el formato esperado.`, `La fuente no informó ningún equipo para la liga.` y `La fuente informó partidos de otra temporada.`;
   - `SyncInProgressException.java` extiende `ConflictException`, con `Ya hay una sincronización en curso.`;
   - `SyncDisabledException.java` extiende `ServiceUnavailableException`, con el mensaje exacto de data-model.md
-- [ ] T043 Crear `LeagueSyncResult` (con `static failed(League, String reason)`) y `SyncReport` (con `duration()`, `failedLeagues()` y `Optional<InactivationSkipReason> inactivationSkipReason()`: vacío si se aplicó la inactivación, `SINGLE_LEAGUE` si fue de una sola liga y `FAILED_LEAGUES` si hubo ligas fallidas) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueSyncResult.java y backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncReport.java, con los componentes exactos de data-model.md y las listas copiadas (depende de T040)
-- [ ] T044 Crear el record `LeagueSnapshot(League league, Season season, List<TeamSnapshot> teams, List<MatchSnapshot> matches)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueSnapshot.java (depende de T042):
+- [X] T043 Crear `LeagueSyncResult` (con `static failed(League, String reason)`) y `SyncReport` (con `duration()`, `failedLeagues()` y `Optional<InactivationSkipReason> inactivationSkipReason()`: vacío si se aplicó la inactivación, `SINGLE_LEAGUE` si fue de una sola liga y `FAILED_LEAGUES` si hubo ligas fallidas) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueSyncResult.java y backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncReport.java, con los componentes exactos de data-model.md y las listas copiadas (depende de T040)
+- [X] T044 Crear el record `LeagueSnapshot(League league, Season season, List<TeamSnapshot> teams, List<MatchSnapshot> matches)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueSnapshot.java (depende de T042):
   - los tres invariantes de data-model.md lanzan `ExternalSourceException` con su motivo constante: sin equipos (FR-039), una temporada nula o de otra liga, y un partido de otra temporada;
   - un partido con `seasonExternalId` en `null` se acepta;
   - las listas se copian;
   - `teamExternalIds()`, `playerExternalIds()`, `matchExternalIds()` y `matchTeamExternalIds()` devuelven los ids de local y visitante
-- [ ] T045 Crear `SquadAssignment` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SquadAssignment.java, con los métodos y las reglas de data-model.md y research D9 (depende de T044):
+- [X] T045 Crear `SquadAssignment` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SquadAssignment.java, con los métodos y las reglas de data-model.md y research D9 (depende de T044):
   - `static of(List<LeagueSnapshot>)` recorre las ligas en el orden recibido y los equipos y planteles en el orden de la fuente;
   - `duplicatedPlayerExternalIds()`;
   - `resolve(List<Player> currentPlayers)`: queda el equipo actual si es uno de los informados. Si no, un jugador guardado queda en el primero, y uno nuevo en la primera aparición con nombre y posición (`PlayerSnapshot.isComplete()`), o en la primera si ninguna lo está (research D9);
   - `keeps(playerExternalId, teamExternalId)`;
   - `duplicates()` arma un `DuplicatedPlayer` por cada aparición ignorada, con el nombre del jugador y los nombres de los dos equipos;
   - el mismo jugador dos veces en el mismo equipo no cuenta como duplicado
-- [ ] T046 Crear `LeagueSync` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueSync.java (depende de T043 y T045):
+- [X] T046 Crear `LeagueSync` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueSync.java (depende de T043 y T045):
   - se construye con `(LeagueSnapshot snapshot, SquadAssignment assignment)` y acumula los conteos, los omitidos y los reactivados;
   - `teamsToSave`, `playersToSave` (las cinco reglas en orden de data-model.md), `seasonToSave` y `matchesToSave` (primero el estado desconocido con `UNKNOWN_STATUS`; después el equipo fuera del catálogo con `UNKNOWN_TEAM`, sin que la liga falle; después los existentes y los nuevos), con las firmas de data-model.md;
   - `matchesToSave` guarda la temporada recibida para el resultado;
   - `result()` devuelve un `LeagueSyncResult` `SUCCEEDED` con esa temporada;
   - un existente que vuelve a llegar cuenta como actualizado, haya cambiado o no
-- [ ] T047 Crear la clase mutable `SyncRun` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncRun.java, con los métodos y las reglas de data-model.md (depende de T045 y T046):
+- [X] T047 Crear la clase mutable `SyncRun` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncRun.java, con los métodos y las reglas de data-model.md (depende de T045 y T046):
   - `full(origin, startedAt)` y `singleLeague(league, startedAt)`, este último siempre `MANUAL`;
   - `leagues()`;
   - `registerSnapshots`, que guarda como vistos todos los `externalId` de los planteles: omitidos, duplicados y sin posición incluidos;
@@ -281,19 +281,19 @@ cambia uno solo, el resto deja de compilar.
   - `canDeactivate()`: solo si es `FULL` y las cinco ligas quedaron `SUCCEEDED`;
   - `playersToDeactivate(activePlayers)`;
   - `finish(finishedAt, inactivated)`: devuelve el `SyncReport` con las ligas en el orden del enum, aunque los resultados se hayan registrado en otro orden
-- [ ] T048 [P] Crear el helper de test `SnapshotFixtures` (clase pública `final` con fábricas estáticas) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SnapshotFixtures.java (depende de T044):
+- [X] T048 [P] Crear el helper de test `SnapshotFixtures` (clase pública `final` con fábricas estáticas) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SnapshotFixtures.java (depende de T044):
   - `snapshot(League)` devuelve un `LeagueSnapshot` válido y chico: una temporada, dos equipos con jugadores de las cuatro posiciones y dos partidos entre ellos, uno `FINISHED` con resultado y uno `TIMED` sin resultado. Ningún id se repite entre ligas;
   - la Premier usa los datos reales de contracts/football-data-api.md: `Liverpool FC` (64, con su escudo) y `Chelsea FC` (61), con Alisson Becker, Kostas Tsimikas y Federico Chiesa. La Bundesliga incluye a `FC Bayern München`;
   - fábricas sueltas (`season`, `team`, `player` y `match`) para armar variantes.
 
   Lo reutilizan los tests de modelo, de servicio, de integración y end to end, para no duplicar datos
-- [ ] T049 [P] Escribir `LeagueSnapshotTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueSnapshotTest.java con estos casos (depende de T048):
+- [X] T049 [P] Escribir `LeagueSnapshotTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueSnapshotTest.java con estos casos (depende de T048):
   - una liga sin equipos lanza `ExternalSourceException` con `La fuente no informó ningún equipo para la liga.`;
   - una temporada de otra liga falla con el motivo de formato;
   - un partido de otra temporada falla con su motivo;
   - un partido sin `seasonExternalId` se acepta;
   - los cuatro métodos de ids devuelven los esperados
-- [ ] T050 [P] Escribir `SquadAssignmentTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SquadAssignmentTest.java con estos casos (depende de T048):
+- [X] T050 [P] Escribir `SquadAssignmentTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SquadAssignmentTest.java con estos casos (depende de T048):
   - sin duplicados, `keeps` es `true` para todos;
   - detecta duplicados dentro de una liga y entre dos ligas;
   - un jugador guardado cuyo equipo actual es uno de los informados queda ahí, aunque no sea el primero;
@@ -303,7 +303,7 @@ cambia uno solo, el resto deja de compilar.
   - uno nuevo sin ninguna aparición completa queda en la primera;
   - `duplicates()` lista cada aparición ignorada con el nombre del jugador, el equipo que queda y el ignorado;
   - el mismo jugador dos veces en un equipo no es duplicado
-- [ ] T051 [P] Escribir `LeagueSyncTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueSyncTest.java, con los casos de quickstart.md sección 1 (depende de T048):
+- [X] T051 [P] Escribir `LeagueSyncTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueSyncTest.java, con los casos de quickstart.md sección 1 (depende de T048):
   - equipos nuevos y existentes, con sus conteos;
   - un jugador nuevo completo se crea;
   - uno nuevo sin nombre se omite con `MISSING_NAME` y uno sin posición con `MISSING_POSITION`, los dos con su equipo en `SkippedPlayer` (FR-012);
@@ -316,14 +316,14 @@ cambia uno solo, el resto deja de compilar.
   - un partido con estado desconocido se omite con `UNKNOWN_STATUS` y uno con un equipo fuera del catálogo con `UNKNOWN_TEAM`;
   - un partido existente se actualiza y uno nuevo se crea;
   - `result()` trae los conteos, las listas y la temporada
-- [ ] T052 [P] Escribir `SyncRunTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncRunTest.java con estos casos (depende de T048):
+- [X] T052 [P] Escribir `SyncRunTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncRunTest.java con estos casos (depende de T048):
   - `full` pide las cinco ligas en el orden del enum, y `singleLeague` una sola, `SINGLE_LEAGUE` y `MANUAL`;
   - `canDeactivate` es `true` solo con `FULL` y cinco éxitos, y es `false` con una liga fallida (en la descarga o en la escritura) y con una sola liga;
   - `playersToDeactivate` devuelve los activos no vistos, y una lista vacía si no se puede inactivar;
   - los omitidos, los duplicados y los sin posición cuentan como vistos;
   - `finish` ordena las ligas por el enum y fija `inactivationApplied` (FR-017, FR-018 y SC-009);
   - `inactivationSkipReason()` del informe está vacío si se inactivó, es `SINGLE_LEAGUE` en una de una sola liga y `FAILED_LEAGUES` en una completa con una liga fallida
-- [ ] T053 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T053 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 ### 2D. Adapter de Football-Data.org (paso 5 del plan)
 
