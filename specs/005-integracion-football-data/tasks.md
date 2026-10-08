@@ -87,28 +87,28 @@ escritos y en verde, y cada fase termina con `./gradlew build` en verde.
 **Propósito**: sacar el dataset ficticio y dejar la configuración y el cliente HTTP listos (paso 1
 del plan).
 
-- [ ] T001 Borrar el dataset ficticio y su carga (FR-002, research D20): backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/PlayerCatalogDataSeeder.java, backend/src/main/resources/data/players.json (con la carpeta `data/`, que queda vacía) y backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/PlayerCatalogDataSeederIT.java. Todavía no tocar `TeamRepository.findOrCreate` ni `PlayerRepository.existsByExternalId`: se quitan en T017 y T018
-- [ ] T002 [P] En backend/src/main/resources/application.yaml agregar el bloque `football-data` dentro del bloque `futbolmarket` existente, después de `security`, exactamente como figura en contracts/configuration.md ("Cambios en los archivos existentes"). No reemplazar el archivo. El token es solo el placeholder `${FOOTBALL_DATA_TOKEN:}`, sin ningún valor (FR-040)
-- [ ] T003 [P] En backend/src/test/resources/application-test.yml agregar, dentro del bloque `futbolmarket` existente, `football-data.token: ""`, `football-data.base-url: http://football-data.invalid/v4`, `football-data.sync.cron: "-"` y `football-data.sync.on-startup: false`, como indica contracts/configuration.md. No tocar las claves existentes
-- [ ] T004 [P] Crear el record `FootballDataProperties` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/FootballDataProperties.java, siguiendo el patrón de `JwtProperties` (research D14):
+- [X] T001 Borrar el dataset ficticio y su carga (FR-002, research D20): backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/PlayerCatalogDataSeeder.java, backend/src/main/resources/data/players.json (con la carpeta `data/`, que queda vacía) y backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/PlayerCatalogDataSeederIT.java. Todavía no tocar `TeamRepository.findOrCreate` ni `PlayerRepository.existsByExternalId`: se quitan en T017 y T018
+- [X] T002 [P] En backend/src/main/resources/application.yaml agregar el bloque `football-data` dentro del bloque `futbolmarket` existente, después de `security`, exactamente como figura en contracts/configuration.md ("Cambios en los archivos existentes"). No reemplazar el archivo. El token es solo el placeholder `${FOOTBALL_DATA_TOKEN:}`, sin ningún valor (FR-040)
+- [X] T003 [P] En backend/src/test/resources/application-test.yml agregar, dentro del bloque `futbolmarket` existente, `football-data.token: ""`, `football-data.base-url: http://football-data.invalid/v4`, `football-data.sync.cron: "-"` y `football-data.sync.on-startup: false`, como indica contracts/configuration.md. No tocar las claves existentes
+- [X] T004 [P] Crear el record `FootballDataProperties` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/FootballDataProperties.java, siguiendo el patrón de `JwtProperties` (research D14):
   - `@ConfigurationProperties("futbolmarket.football-data")` y `@Validated`;
   - componentes: `token` (opcional, sin `@NotBlank`), `baseUrl` (`URI`, `@NotNull`), `connectTimeout` y `readTimeout` (`Duration`, `@NotNull`) y el record anidado `Sync(String cron, String zone, boolean onStartup)` (`@NotNull @Valid`);
   - los constructores compactos lanzan `IllegalArgumentException`, con un mensaje en español, ante una duración cero o negativa, un `cron` que no es ni `CronExpression.isValidExpression` ni `"-"` (`Scheduled.CRON_DISABLED`) o una `zone` que `ZoneId.of` rechaza;
   - `hasToken()` devuelve `true` solo si el token no es `null` ni está en blanco;
   - `toString()` enmascara el token con `****`
-- [ ] T005 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/ApplicationConfig.java sumar `FootballDataProperties.class` a `@EnableConfigurationProperties` y agregar `@EnableScheduling` y `@EnableAsync` (research D12 y D13), actualizando el Javadoc (depende de T004)
-- [ ] T006 [P] Crear `FootballDataClientConfig` (`@Configuration`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/FootballDataClientConfig.java (research D3) (depende de T004):
+- [X] T005 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/ApplicationConfig.java sumar `FootballDataProperties.class` a `@EnableConfigurationProperties` y agregar `@EnableScheduling` y `@EnableAsync` (research D12 y D13), actualizando el Javadoc (depende de T004)
+- [X] T006 [P] Crear `FootballDataClientConfig` (`@Configuration`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/FootballDataClientConfig.java (research D3) (depende de T004):
   - la constante pública `AUTH_TOKEN_HEADER = "X-Auth-Token"`;
   - el método estático público `RestClient.Builder applyDefaults(RestClient.Builder builder, FootballDataProperties properties)`, que pone la `baseUrl` y, solo si `hasToken()`, el header por defecto con el token. El test del adapter (T063) lo reutiliza para verificar el header;
   - el bean `RestClient footballDataRestClient(FootballDataProperties)`: `applyDefaults(RestClient.builder(), properties)` con un `JdkClientHttpRequestFactory` sobre `HttpClient.newBuilder().connectTimeout(connectTimeout).build()` y `setReadTimeout(readTimeout)`;
   - sin interceptores de logging
-- [ ] T007 [P] Escribir `FootballDataPropertiesTest` (unitario, sin Spring) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/FootballDataPropertiesTest.java con estos casos (depende de T004):
+- [X] T007 [P] Escribir `FootballDataPropertiesTest` (unitario, sin Spring) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/FootballDataPropertiesTest.java con estos casos (depende de T004):
   - acepta el cron `0 0 4 * * MON` y el cron `-`;
   - rechaza un cron inválido, una zona inexistente y un timeout cero o negativo;
   - `hasToken()` es `false` con `null`, `""` y `"   "`;
   - `toString()` no contiene el token;
   - leyendo `application.yaml` con `YamlPropertySourceLoader`, `connect-timeout` es `10s` y `read-timeout` es `30s` (FR-037)
-- [ ] T008 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T008 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 ---
 

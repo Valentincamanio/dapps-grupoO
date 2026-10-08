@@ -23,3 +23,12 @@ futbolmarket:
   security:
     jwt:
       expiration: 24h
+  football-data:
+    token: ${FOOTBALL_DATA_TOKEN:}
+    base-url: https://api.football-data.org/v4
+    connect-timeout: 10s
+    read-timeout: 30s
+    sync:
+      cron: "0 0 4 * * MON"
+      zone: America/Argentina/Buenos_Aires
+      on-startup: true
