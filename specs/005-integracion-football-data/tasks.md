@@ -327,7 +327,7 @@ cambia uno solo, el resto deja de compilar.
 
 ### 2D. Adapter de Football-Data.org (paso 5 del plan)
 
-- [ ] T054 [P] Crear los records del JSON del proveedor en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/dto/ (research D4 y contracts/football-data-api.md):
+- [X] T054 [P] Crear los records del JSON del proveedor en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/dto/ (research D4 y contracts/football-data-api.md):
   - `CompetitionTeamsDto(SeasonDto season, List<TeamDto> teams)`;
   - `SeasonDto(Long id, LocalDate startDate, LocalDate endDate, Integer currentMatchday)`;
   - `TeamDto(Long id, String name, String crest, List<PersonDto> squad)`;
@@ -340,18 +340,18 @@ cambia uno solo, el resto deja de compilar.
   - `ErrorDto(String message, Integer errorCode)`.
 
   Todos llevan `@JsonIgnoreProperties(ignoreUnknown = true)` (`com.fasterxml.jackson.annotation`) y usan wrappers, nunca primitivos
-- [ ] T055 [P] Crear el enum `FootballDataCompetition` (`PL` ↔ `PREMIER`, `BL1` ↔ `BUNDESLIGA`, `PD` ↔ `LA_LIGA`, `SA` ↔ `SERIE_A` y `FL1` ↔ `LIGUE_1`, con `code()` y `static of(League)`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataCompetition.java
-- [ ] T056 [P] Crear la espera inyectable (research D6):
+- [X] T055 [P] Crear el enum `FootballDataCompetition` (`PL` ↔ `PREMIER`, `BL1` ↔ `BUNDESLIGA`, `PD` ↔ `LA_LIGA`, `SA` ↔ `SERIE_A` y `FL1` ↔ `LIGUE_1`, con `code()` y `static of(League)`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataCompetition.java
+- [X] T056 [P] Crear la espera inyectable (research D6):
   - la interfaz `Sleeper` (`void sleep(Duration duration)`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/Sleeper.java;
   - `ThreadSleeper` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/ThreadSleeper.java: usa `Thread.sleep` y, ante `InterruptedException`, restaura la marca de interrupción y lanza `ExternalSourceException` con el motivo constante `Se interrumpió la espera por el límite de consultas de la fuente.` (research D5)
-- [ ] T057 Crear `FootballDataMapper` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataMapper.java, que traduce el vocabulario del proveedor y no decide nada de negocio (research D7) (depende de T054):
+- [X] T057 Crear `FootballDataMapper` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataMapper.java, que traduce el vocabulario del proveedor y no decide nada de negocio (research D7) (depende de T054):
   - `toLeagueSnapshot(League, CompetitionTeamsDto, CompetitionMatchesDto)`;
   - posiciones: `Goalkeeper`, `Defence`, `Midfield` y `Offence` pasan a la posición del modelo, y cualquier otro valor o `null` queda en `null` (FR-011);
   - `status` y `winner` pasan al enum del mismo nombre, y un valor desconocido queda en `null`;
   - un `fullTime` o `halfTime` con `home` y `away` en `null` queda como `Score` nulo;
   - cada id pasa a texto con `String.valueOf`, pero un id `null` queda `null` y nunca la cadena `"null"`, para que el invariante lo rechace;
   - las listas `null` quedan vacías
-- [ ] T058 Crear `FootballDataClient` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataClient.java (depende de T054 y T056):
+- [X] T058 Crear `FootballDataClient` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataClient.java (depende de T054 y T056):
   - recibe por constructor el `RestClient` `footballDataRestClient`, el `Sleeper` y el `Clock`;
   - `fetchTeams(String code)` (`GET /competitions/{code}/teams`) y `fetchMatches(String code)` (`GET /competitions/{code}/matches`);
   - ritmo preventivo: después de cada respuesta, también las de error, guarda `X-Requests-Available-Minute` y el instante de renovación (`X-RequestCounter-Reset` más `clock.instant()`). Antes de cada request, si no quedan disponibles y la renovación no pasó, duerme hasta la renovación. Una respuesta sin `X-Requests-Available-Minute`, o una espera hasta la renovación ya cumplida, limpia el estado: la request siguiente sale sin esperar (research D6);
@@ -360,17 +360,17 @@ cambia uno solo, el resto deja de compilar.
   - registra en WARN el `message` del `ErrorDto` de la fuente junto con el código de la competición;
   - nunca registra headers, ni el token ni `X-Authenticated-Client`;
   - los nombres de headers y las esperas son constantes con nombre
-- [ ] T059 Crear `FootballDataAdapter` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataAdapter.java (depende de T055, T057 y T058):
+- [X] T059 Crear `FootballDataAdapter` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataAdapter.java (depende de T055, T057 y T058):
   - `LeagueSnapshot fetchLeague(League league)` hace exactamente las dos requests de la liga, primero equipos y después partidos (FR-005), y mapea con `FootballDataMapper`;
   - un `CatalogInvariantException` o un cuerpo `null` pasa a `ExternalSourceException` con el motivo de formato;
   - no persiste nada
-- [ ] T060 [P] Crear las fixtures en backend/src/test/resources/footballdata/, armadas a partir de las respuestas reales recortadas de contracts/football-data-api.md, con sus campos desconocidos y sus `null` (research D21):
+- [X] T060 [P] Crear las fixtures en backend/src/test/resources/footballdata/, armadas a partir de las respuestas reales recortadas de contracts/football-data-api.md, con sus campos desconocidos y sus `null` (research D21):
   - `teams-pl.json`: Liverpool FC y Chelsea FC, las cuatro posiciones y un jugador con `position: null`;
   - `matches-pl.json`: partidos `FINISHED`, `TIMED` y `POSTPONED`, con `odds` y `referees`;
   - `teams-empty.json`: temporada válida y `teams: []`;
   - `error-403.json`: el cuerpo real del 403
-- [ ] T061 [P] Crear el doble `RecordingSleeper` (implementa `Sleeper`: registra las duraciones en una lista y no duerme) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/RecordingSleeper.java
-- [ ] T062 Escribir `FootballDataMapperTest` (unitario, sin HTTP) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataMapperTest.java con estos casos (depende de T057):
+- [X] T061 [P] Crear el doble `RecordingSleeper` (implementa `Sleeper`: registra las duraciones en una lista y no duerme) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/RecordingSleeper.java
+- [X] T062 Escribir `FootballDataMapperTest` (unitario, sin HTTP) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataMapperTest.java con estos casos (depende de T057):
   - las cuatro posiciones traducidas, y `null` o un valor desconocido sin posición (HU1, escenario 2);
   - los once estados, y uno desconocido en `null`;
   - los tres ganadores, y `null`;
@@ -378,7 +378,7 @@ cambia uno solo, el resto deja de compilar.
   - los ids como texto;
   - el nombre oficial y el escudo del equipo, sin `shortName`;
   - las listas `null` quedan vacías
-- [ ] T063 Escribir `FootballDataAdapterTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataAdapterTest.java (depende de T059, T060 y T061):
+- [X] T063 Escribir `FootballDataAdapterTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataAdapterTest.java (depende de T059, T060 y T061):
   - armado: un `RestClient.Builder` configurado con `FootballDataClientConfig.applyDefaults` y un token de prueba, enlazado a `MockRestServiceServer.bindTo(builder)`, más `RecordingSleeper` y un `Clock` fijo. Sin Spring;
   - camino feliz: dos requests (`/competitions/PL/teams` y `/competitions/PL/matches`) con el header `X-Auth-Token`, y `server.verify()` confirma que no hubo otras (FR-005). El snapshot trae la temporada, los equipos, los jugadores con sus posiciones traducidas, el jugador sin posición y los partidos. Los campos desconocidos se ignoran;
   - errores, cada uno con su motivo de D5: 403 con `error-403.json`, 404, 500, timeout simulado con `withException(new HttpTimeoutException(...))`, otra `IOException` y JSON inválido;
@@ -391,7 +391,7 @@ cambia uno solo, el resto deja de compilar.
   - con el reloj fijo, después de esa espera de 30 s la request que sigue no vuelve a esperar;
   - una respuesta sin `X-Requests-Available-Minute` no deja una espera pendiente;
   - el mensaje de ninguna `ExternalSourceException` contiene el token
-- [ ] T064 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T064 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 ### 2E. Servicios de la sincronización (paso 6 del plan)
 
