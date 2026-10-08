@@ -3,6 +3,7 @@ package ar.edu.unq.desapp.futbolmarket.persistence.repository.player;
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerFilter;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerSnapshot;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.team.TeamRepository;
@@ -14,7 +15,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -82,5 +88,108 @@ class PlayerRepositoryIT {
 
         assertThat(page.content()).isEmpty();
         assertThat(page.totalElements()).isZero();
+    }
+
+    @Test
+    void saveAllDevuelveLosJugadoresConIdYConLosCamposNuevos() {
+        Team liverpool = teamRepository.save(liverpool());
+
+        List<Player> saved = playerRepository.saveAll(List.of(alisson(liverpool), chiesa(liverpool, false)));
+
+        assertThat(saved).allSatisfy(player -> assertThat(player.id()).isNotNull());
+        assertThat(saved)
+                .extracting(Player::externalId, Player::dateOfBirth, Player::nationality, Player::active)
+                .containsExactly(
+                        tuple("1795", LocalDate.of(1992, 10, 2), "Brazil", true),
+                        tuple("1780", LocalDate.of(1997, 10, 25), "Italy", false));
+    }
+
+    @Test
+    void saveAllActualizaAUnJugadorExistenteEnLaMismaFila() {
+        Team juventus = teamRepository.save(new Team("109", "Juventus FC", null, League.SERIE_A));
+        Team liverpool = teamRepository.save(liverpool());
+        Player saved = playerRepository.save(chiesa(juventus, true));
+        var snapshot = new PlayerSnapshot("1780", "Federico Chiesa", Position.FORWARD, LocalDate.of(1997, 10, 25), "Italy");
+
+        List<Player> updated = playerRepository.saveAll(List.of(saved.updateFrom(snapshot, liverpool)));
+        Optional<Player> reloaded = playerRepository.findById(saved.id());
+
+        assertThat(updated).extracting(Player::id).containsExactly(saved.id());
+        assertThat(reloaded).hasValueSatisfying(player -> assertThat(player.team()).isEqualTo(liverpool));
+        assertThat(playerDAO.count()).isEqualTo(1);
+    }
+
+    @Test
+    void findAllByExternalIdsDevuelveSoloLosPedidosConSuEquipoAunqueEstenInactivos() {
+        Team liverpool = teamRepository.save(liverpool());
+        playerRepository.saveAll(List.of(alisson(liverpool), tsimikas(liverpool), chiesa(liverpool, false)));
+
+        List<Player> found = playerRepository.findAllByExternalIds(List.of("1795", "1780"));
+
+        assertThat(found).extracting(Player::externalId).containsExactlyInAnyOrder("1795", "1780");
+        assertThat(found).extracting(player -> player.team().name()).containsOnly("Liverpool FC");
+    }
+
+    @Test
+    void findAllByExternalIdsConUnaColeccionVaciaDevuelveUnaListaVacia() {
+        Team liverpool = teamRepository.save(liverpool());
+        playerRepository.save(alisson(liverpool));
+
+        List<Player> found = playerRepository.findAllByExternalIds(List.of());
+
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void findAllActiveExcluyeALosInactivos() {
+        Team liverpool = teamRepository.save(liverpool());
+        playerRepository.saveAll(List.of(alisson(liverpool), chiesa(liverpool, false)));
+
+        List<Player> active = playerRepository.findAllActive();
+
+        assertThat(active).extracting(Player::externalId).containsExactly("1795");
+    }
+
+    @Test
+    void hasPlayersEsFalsoConLaTablaVacia() {
+        boolean hasPlayers = playerRepository.hasPlayers();
+
+        assertThat(hasPlayers).isFalse();
+    }
+
+    @Test
+    void hasPlayersEsVerdaderoDespuesDeGuardarUnJugador() {
+        Team liverpool = teamRepository.save(liverpool());
+        playerRepository.save(alisson(liverpool));
+
+        boolean hasPlayers = playerRepository.hasPlayers();
+
+        assertThat(hasPlayers).isTrue();
+    }
+
+    @Test
+    void findByIdDevuelveAUnJugadorInactivo() {
+        Team liverpool = teamRepository.save(liverpool());
+        Player inactive = playerRepository.save(chiesa(liverpool, false));
+
+        Optional<Player> found = playerRepository.findById(inactive.id());
+
+        assertThat(found).contains(inactive);
+    }
+
+    private static Team liverpool() {
+        return new Team("64", "Liverpool FC", "https://crests.football-data.org/64.png", League.PREMIER);
+    }
+
+    private static Player alisson(Team team) {
+        return new Player(null, "1795", "Alisson Becker", Position.GOALKEEPER, team, LocalDate.of(1992, 10, 2), "Brazil", true);
+    }
+
+    private static Player tsimikas(Team team) {
+        return new Player(null, "7383", "Kostas Tsimikas", Position.DEFENDER, team, LocalDate.of(1996, 5, 12), "Greece", true);
+    }
+
+    private static Player chiesa(Team team, boolean active) {
+        return new Player(null, "1780", "Federico Chiesa", Position.FORWARD, team, LocalDate.of(1997, 10, 25), "Italy", active);
     }
 }

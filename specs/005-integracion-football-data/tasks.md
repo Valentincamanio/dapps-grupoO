@@ -165,29 +165,29 @@ cambia uno solo, el resto deja de compilar.
 - [X] T020 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/player/PlayerRepositoryIT.java solo como indica D21: cada `teamRepository.findOrCreate(name, league)` pasa a `teamRepository.save(new Team(externalId, name, null, league))`, con un `externalId` distinto por equipo dentro de cada test (por ejemplo `"57"` para Arsenal, `"61"` para Chelsea y `"5"` para Bayern Munich). Nada más cambia
 - [X] T021 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/player/PlayerCatalogServiceTest.java solo como indica D21: las dos construcciones `new Team(id, name, league)` pasan a `new Team(id, "57", name, null, league)`
 - [X] T022 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/PlayerControllerIT.java solo como indica D21: las tres construcciones `new Team(2L, "Arsenal", League.PREMIER)` pasan a `new Team(2L, "57", "Arsenal", null, League.PREMIER)`
-- [ ] T023 [P] Escribir `TeamTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/team/TeamTest.java con estos casos:
+- [X] T023 [P] Escribir `TeamTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/team/TeamTest.java con estos casos:
   - `Team` rechaza un `externalId` faltante o en blanco con su mensaje;
   - recorta el nombre y el `externalId`, y deja en `null` un escudo en blanco;
   - `updateFrom` conserva `id` y `externalId` y toma el nombre oficial, el escudo y la liga;
   - `TeamSnapshot` copia el plantel y convierte un `null` en lista vacía;
   - `toNewTeam` arma un equipo sin id
-- [ ] T024 Agregar métodos a `PlayerTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/player/PlayerTest.java (depende de T019):
+- [X] T024 Agregar métodos a `PlayerTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/player/PlayerTest.java (depende de T019):
   - los constructores de conveniencia dejan al jugador activo y sin fecha de nacimiento ni nacionalidad;
   - `updateFrom` conserva el nombre si el snapshot no lo trae y la posición si llega sin posición;
   - `updateFrom` cambia de equipo (y, con él, de liga), toma la fecha de nacimiento y la nacionalidad aunque vengan vacías y reactiva a un inactivo;
   - `deactivate` deja al jugador inactivo con su último equipo
-- [ ] T025 Agregar métodos a `PlayerRepositoryIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/player/PlayerRepositoryIT.java (depende de T020):
+- [X] T025 Agregar métodos a `PlayerRepositoryIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/player/PlayerRepositoryIT.java (depende de T020):
   - `saveAll` devuelve los jugadores con id y con los campos nuevos;
   - `findAllByExternalIds` devuelve solo los pedidos, con el nombre de su equipo accesible, y con una colección vacía devuelve una lista vacía;
   - `findAllActive` excluye a los inactivos;
   - `hasPlayers` es `false` con la tabla vacía y `true` después de guardar uno;
   - `findById` devuelve a un jugador inactivo
-- [ ] T026 [P] Escribir `TeamRepositoryIT` (`@SpringBootTest`, `@ActiveProfiles("test")`, base `testdb`; en `@BeforeEach` borra jugadores y equipos con sus DAOs, como `PlayerRepositoryIT`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/team/TeamRepositoryIT.java con estos casos:
+- [X] T026 [P] Escribir `TeamRepositoryIT` (`@SpringBootTest`, `@ActiveProfiles("test")`, base `testdb`; en `@BeforeEach` borra jugadores y equipos con sus DAOs, como `PlayerRepositoryIT`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/team/TeamRepositoryIT.java con estos casos:
   - `saveAll` y `findAllByExternalIds` guardan y recuperan `externalId`, nombre, escudo y liga;
   - un nombre con diéresis (`FC Bayern München`) se guarda tal cual;
   - un `externalId` repetido lanza `DataIntegrityViolationException` (`ux_teams_external_id`);
   - con una colección vacía, `findAllByExternalIds` devuelve una lista vacía
-- [ ] T027 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T027 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 ### 2B. Temporadas y partidos (paso 3 del plan)
 
