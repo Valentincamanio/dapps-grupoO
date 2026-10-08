@@ -191,14 +191,14 @@ cambia uno solo, el resto deja de compilar.
 
 ### 2B. Temporadas y partidos (paso 3 del plan)
 
-- [ ] T028 [P] Crear en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/match/:
+- [X] T028 [P] Crear en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/match/:
   - el record `Score(Integer home, Integer away)` en `Score.java`: cada valor es `null` o mayor o igual a 0, y si no lanza `CatalogInvariantException`;
   - el enum `MatchStatus` en `MatchStatus.java`, con los once valores de data-model.md;
   - el enum `MatchWinner` en `MatchWinner.java` (`HOME_TEAM`, `AWAY_TEAM` y `DRAW`)
-- [ ] T029 [P] Crear el record `Season(Long id, String externalId, League league, LocalDate startDate, LocalDate endDate, Integer currentMatchday)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/season/Season.java (data-model.md, "Season"):
+- [X] T029 [P] Crear el record `Season(Long id, String externalId, League league, LocalDate startDate, LocalDate endDate, Integer currentMatchday)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/season/Season.java (data-model.md, "Season"):
   - invariantes con `CatalogInvariantException` y mensajes en español: `externalId` y `league` obligatorios; las dos fechas obligatorias, y el fin no puede ser anterior al inicio; `currentMatchday`, si viene, mayor o igual a 1;
   - `updateFrom(Season reported)` conserva `id`, `externalId` y `league`, y toma las fechas y la jornada
-- [ ] T030 Crear en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/match/ los records de data-model.md (depende de T028 y T029):
+- [X] T030 Crear en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/match/ los records de data-model.md (depende de T028 y T029):
   - `MatchSnapshot` en `MatchSnapshot.java`:
     - `externalId`, `utcDate` y los dos `externalId` de equipo son obligatorios, y los de equipo además tienen que ser distintos. Así `Match` nunca falla al escribir (data-model.md y research D7);
     - `status` y `seasonExternalId` pueden venir en `null`;
@@ -207,41 +207,41 @@ cambia uno solo, el resto deja de compilar.
     - `externalId`, `season`, `utcDate`, `status`, `homeTeam` y `awayTeam` son obligatorios, y los dos equipos tienen que ser distintos;
     - `matchday`, `fullTime`, `halfTime` y `winner` son opcionales;
     - `updateFrom(MatchSnapshot, Team home, Team away)` conserva `id`, `externalId` y `season`
-- [ ] T031 [P] Crear las entidades (data-model.md, "SeasonSQL" y "MatchSQL"; los enums como `String`, sin `@Enumerated`):
+- [X] T031 [P] Crear las entidades (data-model.md, "SeasonSQL" y "MatchSQL"; los enums como `String`, sin `@Enumerated`):
   - `SeasonSQL`, tabla `seasons` con el índice único `ux_seasons_external_id`, en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/entity/season/SeasonSQL.java;
   - `MatchSQL`, tabla `matches` con el índice único `ux_matches_external_id`, en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/entity/match/MatchSQL.java. Tiene `season`, `homeTeam` y `awayTeam` como `@ManyToOne(fetch = LAZY, optional = false)` con sus `@JoinColumn`, `utcDate` como `Instant` y las cuatro columnas del resultado;
   - las dos con Lombok, como `TeamSQL`
-- [ ] T032 Crear los DAOs (depende de T031):
+- [X] T032 Crear los DAOs (depende de T031):
   - `SeasonSQLDAO` con `Optional<SeasonSQL> findByExternalId(String)`, en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/interfaces/season/SeasonSQLDAO.java;
   - `MatchSQLDAO` con `@EntityGraph(attributePaths = {"season", "homeTeam", "awayTeam"}) List<MatchSQL> findAllByExternalIdIn(Collection<String>)`, en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/interfaces/match/MatchSQLDAO.java
-- [ ] T033 Crear los mappers (`@Component`), que traducen campo a campo (depende de T029, T030 y T031):
+- [X] T033 Crear los mappers (`@Component`), que traducen campo a campo (depende de T029, T030 y T031):
   - `SeasonMapper` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/mapper/season/SeasonMapper.java: `league` pasa de `String` a `League` con `name()` y `valueOf`;
   - `MatchMapper` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/mapper/match/MatchMapper.java: usa `SeasonMapper` y `TeamMapper`. `Score` se reparte en dos columnas y, si las dos vienen en `null`, queda `null`. `status` y `winner` se traducen entre `String` y enum
-- [ ] T034 Crear los repositories (`@Repository`), que reciben y devuelven modelo (depende de T032 y T033):
+- [X] T034 Crear los repositories (`@Repository`), que reciben y devuelven modelo (depende de T032 y T033):
   - `SeasonRepository` (`findByExternalId` y `save`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/season/SeasonRepository.java;
   - `MatchRepository` (`findAllByExternalIds`, que con una colección vacía devuelve `List.of()`, y `saveAll`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/match/MatchRepository.java;
   - ninguno borra datos (FR-007)
-- [ ] T035 [P] Escribir `SeasonTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/season/SeasonTest.java con estos casos (depende de T029):
+- [X] T035 [P] Escribir `SeasonTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/season/SeasonTest.java con estos casos (depende de T029):
   - rechaza la falta de cada dato obligatorio;
   - rechaza un fin anterior al inicio;
   - rechaza la jornada 0 y acepta una jornada `null`;
   - `updateFrom` conserva id, `externalId` y liga, y toma las fechas y la jornada
-- [ ] T036 [P] Escribir `MatchTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/match/MatchTest.java con estos casos (depende de T030):
+- [X] T036 [P] Escribir `MatchTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/match/MatchTest.java con estos casos (depende de T030):
   - `Match` rechaza los datos obligatorios faltantes y un mismo equipo como local y visitante;
   - `Score` rechaza un valor negativo y acepta los dos en `null`;
   - `MatchSnapshot` rechaza la falta de un `externalId`, de la fecha o de un equipo, y dos equipos iguales;
   - un partido `TIMED` sin resultado pasa con `updateFrom` a `FINISHED` con su resultado y su ganador, y conserva id, `externalId` y temporada
-- [ ] T037 Escribir `SeasonRepositoryIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/season/SeasonRepositoryIT.java (depende de T034):
+- [X] T037 Escribir `SeasonRepositoryIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/season/SeasonRepositoryIT.java (depende de T034):
   - configuración: `@SpringBootTest`, `@ActiveProfiles("test")` y `@TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:sync-it;DB_CLOSE_DELAY=-1")`. Es la misma configuración que T038 y T069, para compartir el contexto (research D21);
   - `@BeforeEach` borra partidos, temporadas, jugadores y equipos, en ese orden;
   - casos: guarda y recupera por `externalId` la liga, las fechas y la jornada; la jornada `null` vuelve como `null`; un `externalId` repetido lanza `DataIntegrityViolationException`
-- [ ] T038 Escribir `MatchRepositoryIT`, con la misma configuración y la misma limpieza que T037, en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/match/MatchRepositoryIT.java (depende de T034):
+- [X] T038 Escribir `MatchRepositoryIT`, con la misma configuración y la misma limpieza que T037, en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/match/MatchRepositoryIT.java (depende de T034):
   - `saveAll` guarda partidos con su temporada y sus equipos;
   - `findAllByExternalIds` los devuelve con la temporada y los dos equipos accesibles;
   - un partido sin jugar vuelve con `fullTime`, `halfTime` y `winner` en `null`;
   - un partido jugado vuelve con su resultado y su ganador;
   - un `externalId` repetido lanza `DataIntegrityViolationException`
-- [ ] T039 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T039 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 ### 2C. Modelo de la sincronización (paso 4 del plan)
 
