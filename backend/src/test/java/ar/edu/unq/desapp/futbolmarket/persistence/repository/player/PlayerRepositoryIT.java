@@ -39,7 +39,7 @@ class PlayerRepositoryIT {
 
     @Test
     void persisteMapeaYPaginaJugadoresOrdenadosPorId() {
-        Team team = teamRepository.findOrCreate("Arsenal", League.PREMIER);
+        Team team = teamRepository.save(new Team("57", "Arsenal", null, League.PREMIER));
         Player firstPlayer = playerRepository.save(new Player("arsenal-01", "Bukayo Saka", Position.FORWARD, team));
         Player secondPlayer = playerRepository.save(new Player("arsenal-02", "William Saliba", Position.DEFENDER, team));
 
@@ -56,9 +56,9 @@ class PlayerRepositoryIT {
 
     @Test
     void aplicaFiltrosIndividualesYCombinadosConOrdenEstable() {
-        Team arsenal = teamRepository.findOrCreate("Arsenal", League.PREMIER);
-        Team chelsea = teamRepository.findOrCreate("Chelsea", League.PREMIER);
-        Team bayern = teamRepository.findOrCreate("Bayern Munich", League.BUNDESLIGA);
+        Team arsenal = teamRepository.save(new Team("57", "Arsenal", null, League.PREMIER));
+        Team chelsea = teamRepository.save(new Team("61", "Chelsea", null, League.PREMIER));
+        Team bayern = teamRepository.save(new Team("5", "Bayern Munich", null, League.BUNDESLIGA));
         Player arsenalForward = playerRepository.save(new Player("arsenal-01", "Bukayo Saka", Position.FORWARD, arsenal));
         playerRepository.save(new Player("arsenal-02", "William Saliba", Position.DEFENDER, arsenal));
         playerRepository.save(new Player("chelsea-01", "Cole Palmer", Position.FORWARD, chelsea));
@@ -75,7 +75,7 @@ class PlayerRepositoryIT {
 
     @Test
     void devuelvePaginaVaciaParaFiltrosValidosSinCoincidencias() {
-        Team arsenal = teamRepository.findOrCreate("Arsenal", League.PREMIER);
+        Team arsenal = teamRepository.save(new Team("57", "Arsenal", null, League.PREMIER));
         playerRepository.save(new Player("arsenal-01", "Bukayo Saka", Position.FORWARD, arsenal));
 
         var page = playerRepository.findPage(0, 10, new PlayerFilter(League.PREMIER, "Arsenal", Position.GOALKEEPER));

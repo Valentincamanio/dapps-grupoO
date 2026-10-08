@@ -45,7 +45,7 @@ class PlayerControllerIT {
 
     @Test
     void devuelveLaRespuestaPaginadaYLosMetadatosDeNavegacion() throws Exception {
-        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "Arsenal", League.PREMIER));
+        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "57", "Arsenal", null, League.PREMIER));
         given(playerCatalogService.getPlayers(1, 1)).willReturn(new PlayerPage(List.of(player), 1, 1, 2));
 
         mockMvc.perform(get("/players?page=1&size=1").accept(MediaType.APPLICATION_JSON))
@@ -88,7 +88,7 @@ class PlayerControllerIT {
 
     @Test
     void aplicaFiltrosCombinadosAlListado() throws Exception {
-        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "Arsenal", League.PREMIER));
+        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "57", "Arsenal", null, League.PREMIER));
         var filter = new PlayerFilter(League.PREMIER, "Arsenal", Position.FORWARD);
         given(playerCatalogService.getPlayers(0, 10, filter)).willReturn(new PlayerPage(List.of(player), 0, 10, 1));
 
@@ -119,7 +119,7 @@ class PlayerControllerIT {
 
     @Test
     void devuelveElDetalleDelJugadorExistente() throws Exception {
-        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "Arsenal", League.PREMIER));
+        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "57", "Arsenal", null, League.PREMIER));
         given(playerCatalogService.getPlayer(7L)).willReturn(player);
 
         mockMvc.perform(get("/players/7").accept(MediaType.APPLICATION_JSON))

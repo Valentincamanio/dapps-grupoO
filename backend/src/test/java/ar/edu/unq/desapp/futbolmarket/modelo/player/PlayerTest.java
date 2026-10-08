@@ -13,14 +13,14 @@ import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
 
 class PlayerTest {
-    private final Team river = new Team(1L, "River", League.LA_LIGA);
+    private final Team river = new Team(1L, "river", "River", null, League.LA_LIGA);
 
     @Test
     void rechazaEquipoSinNombreOLiga() {
-        assertThatThrownBy(() -> new Team(" ", League.PREMIER))
+        assertThatThrownBy(() -> new Team("57", " ", null, League.PREMIER))
                 .isInstanceOf(CatalogInvariantException.class)
                 .hasMessage("El nombre del equipo es obligatorio.");
-        assertThatThrownBy(() -> new Team("Arsenal", null))
+        assertThatThrownBy(() -> new Team("57", "Arsenal", null, null))
                 .isInstanceOf(CatalogInvariantException.class)
                 .hasMessage("La liga del equipo es obligatoria.");
     }

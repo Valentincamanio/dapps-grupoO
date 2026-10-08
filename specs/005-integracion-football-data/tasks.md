@@ -125,46 +125,46 @@ servicios que orquestan (pasos 2 a 6 del plan). Cada bloque deja `./gradlew buil
 `Team` y `Player` cambian junto con su persistencia y con los cuatro tests de D21, porque si
 cambia uno solo, el resto deja de compilar.
 
-- [ ] T009 [P] Crear el enum `PlayerSkipReason` (`MISSING_NAME` y `MISSING_POSITION`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerSkipReason.java
-- [ ] T010 Crear el record `PlayerSnapshot(String externalId, String name, Position position, LocalDate dateOfBirth, String nationality)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/player/PlayerSnapshot.java, con las reglas de data-model.md (depende de T009):
+- [X] T009 [P] Crear el enum `PlayerSkipReason` (`MISSING_NAME` y `MISSING_POSITION`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerSkipReason.java
+- [X] T010 Crear el record `PlayerSnapshot(String externalId, String name, Position position, LocalDate dateOfBirth, String nationality)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/player/PlayerSnapshot.java, con las reglas de data-model.md (depende de T009):
   - `externalId` obligatorio y recortado: si falta, lanza `CatalogInvariantException` con el mensaje de `Player` (`El identificador externo del jugador es obligatorio.`);
   - `name` y `nationality` recortados, y un valor en blanco queda en `null`;
   - `isComplete()`: `true` si tiene nombre y posición;
   - `missingDataReason()`: revisa primero el nombre y después la posición. Solo se usa con un snapshot incompleto;
   - `toNewPlayer(Team team)`: un `Player` sin id y activo
-- [ ] T011 Crear el record `TeamSnapshot(String externalId, String name, String crest, List<PlayerSnapshot> squad)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/team/TeamSnapshot.java (depende de T010):
+- [X] T011 Crear el record `TeamSnapshot(String externalId, String name, String crest, List<PlayerSnapshot> squad)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/team/TeamSnapshot.java (depende de T010):
   - `externalId` y `name` con los invariantes y los mensajes de `Team`;
   - `squad` se copia con `List.copyOf`, y un `null` queda como lista vacía;
   - `toNewTeam(League league)`: un `Team` sin id
-- [ ] T012 Cambiar el record `Team` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/team/Team.java a `(Long id, String externalId, String name, String crest, League league)` (data-model.md, "Team") (depende de T011):
+- [X] T012 Cambiar el record `Team` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/team/Team.java a `(Long id, String externalId, String name, String crest, League league)` (data-model.md, "Team") (depende de T011):
   - `externalId` es obligatorio y se recorta. Su mensaje es `El identificador externo del equipo es obligatorio.`, y los mensajes de `name` y `league` no cambian;
   - `crest` en blanco queda en `null`;
   - el constructor sin id pasa a ser `Team(externalId, name, crest, league)` y reemplaza a `Team(name, league)`;
   - `updateFrom(TeamSnapshot snapshot, League league)` conserva `id` y `externalId`, y toma el nombre, el escudo y la liga;
   - se quita el import sin uso de `java.util.Objects`
-- [ ] T013 Cambiar el record `Player` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/player/Player.java a `(Long id, String externalId, String name, Position position, Team team, LocalDate dateOfBirth, String nationality, boolean active)` (data-model.md, "Player") (depende de T010 y T012):
+- [X] T013 Cambiar el record `Player` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/player/Player.java a `(Long id, String externalId, String name, Position position, Team team, LocalDate dateOfBirth, String nationality, boolean active)` (data-model.md, "Player") (depende de T010 y T012):
   - los invariantes y los mensajes existentes no cambian;
   - `nationality` se recorta, y en blanco queda en `null`;
   - se conservan `Player(externalId, name, position, team)` y `Player(id, externalId, name, position, team)`: sin fecha de nacimiento ni nacionalidad, y activo;
   - `updateFrom(PlayerSnapshot snapshot, Team team)` aplica la regla de data-model.md: el nombre y la posición del snapshot si los trae y, si no, los actuales; el equipo recibido; la fecha de nacimiento y la nacionalidad del snapshot aunque vengan vacías; y `active = true`;
   - `deactivate()` devuelve el mismo jugador con `active = false` y su último equipo;
   - `league()` no cambia
-- [ ] T014 [P] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/entity/team/TeamSQL.java:
+- [X] T014 [P] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/entity/team/TeamSQL.java:
   - agregar `externalId` (`@Column(name = "external_id", nullable = false, length = 32)`) y `crest` (`@Column(length = 512)`);
   - cambiar a `@Table(name = "teams", indexes = @Index(name = "ux_teams_external_id", columnList = "external_id", unique = true))`;
   - ampliar el constructor con los dos campos nuevos (data-model.md, "TeamSQL")
-- [ ] T015 [P] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/entity/player/PlayerSQL.java agregar `dateOfBirth` (`@Column(name = "date_of_birth")`), `nationality` (`@Column(length = 100)`) y `active` (`@Column(nullable = false)`, `boolean`), y ampliar el constructor (data-model.md, "PlayerSQL")
-- [ ] T016 Actualizar backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/mapper/team/TeamMapper.java (suma `externalId` y `crest`) y backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/mapper/player/PlayerMapper.java (suma `dateOfBirth`, `nationality` y `active`). Traducen campo a campo, sin lógica (depende de T012 a T015)
-- [ ] T017 Actualizar el acceso a equipos (data-model.md, "DAOs" y "Repositories") (depende de T016):
+- [X] T015 [P] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/entity/player/PlayerSQL.java agregar `dateOfBirth` (`@Column(name = "date_of_birth")`), `nationality` (`@Column(length = 100)`) y `active` (`@Column(nullable = false)`, `boolean`), y ampliar el constructor (data-model.md, "PlayerSQL")
+- [X] T016 Actualizar backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/mapper/team/TeamMapper.java (suma `externalId` y `crest`) y backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/mapper/player/PlayerMapper.java (suma `dateOfBirth`, `nationality` y `active`). Traducen campo a campo, sin lógica (depende de T012 a T015)
+- [X] T017 Actualizar el acceso a equipos (data-model.md, "DAOs" y "Repositories") (depende de T016):
   - en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/interfaces/team/TeamSQLDAO.java, quitar `findByNameAndLeague` y agregar `List<TeamSQL> findAllByExternalIdIn(Collection<String> externalIds)`;
   - en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/team/TeamRepository.java, quitar `findOrCreate` y agregar `List<Team> findAllByExternalIds(Collection<String>)` (`@Transactional(readOnly = true)`; con una colección vacía devuelve `List.of()` sin consultar) y `List<Team> saveAll(List<Team>)` (`@Transactional`, devuelve los equipos con su id). `save` se conserva
-- [ ] T018 Actualizar el acceso a jugadores (depende de T016):
+- [X] T018 Actualizar el acceso a jugadores (depende de T016):
   - en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/interfaces/player/PlayerSQLDAO.java, agregar `@EntityGraph(attributePaths = "team") List<PlayerSQL> findAllByExternalIdIn(Collection<String>)` y `@EntityGraph(attributePaths = "team") List<PlayerSQL> findAllByActiveTrue()`. `findAllByOrderByIdAsc` y el JPQL de `findAllByFilters` todavía no cambian (el filtro por `active` llega en T090);
   - en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/player/PlayerRepository.java, quitar `existsByExternalId` y agregar `findAllByExternalIds(Collection<String>)` (con una colección vacía devuelve `List.of()` sin consultar), `findAllActive()`, `saveAll(List<Player>)` y `boolean hasPlayers()` (`playerDAO.count() > 0`). `save`, `findByExternalId`, `findById` y `findPage` se conservan
-- [ ] T019 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/player/PlayerTest.java solo como indica D21: el campo `river` pasa a `new Team(1L, "river", "River", null, League.LA_LIGA)`, y las dos construcciones de `rechazaEquipoSinNombreOLiga` pasan a llevar un `externalId` y `crest` en `null`. Los mensajes y las aserciones no cambian
-- [ ] T020 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/player/PlayerRepositoryIT.java solo como indica D21: cada `teamRepository.findOrCreate(name, league)` pasa a `teamRepository.save(new Team(externalId, name, null, league))`, con un `externalId` distinto por equipo dentro de cada test (por ejemplo `"57"` para Arsenal, `"61"` para Chelsea y `"5"` para Bayern Munich). Nada más cambia
-- [ ] T021 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/player/PlayerCatalogServiceTest.java solo como indica D21: las dos construcciones `new Team(id, name, league)` pasan a `new Team(id, "57", name, null, league)`
-- [ ] T022 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/PlayerControllerIT.java solo como indica D21: las tres construcciones `new Team(2L, "Arsenal", League.PREMIER)` pasan a `new Team(2L, "57", "Arsenal", null, League.PREMIER)`
+- [X] T019 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/player/PlayerTest.java solo como indica D21: el campo `river` pasa a `new Team(1L, "river", "River", null, League.LA_LIGA)`, y las dos construcciones de `rechazaEquipoSinNombreOLiga` pasan a llevar un `externalId` y `crest` en `null`. Los mensajes y las aserciones no cambian
+- [X] T020 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/player/PlayerRepositoryIT.java solo como indica D21: cada `teamRepository.findOrCreate(name, league)` pasa a `teamRepository.save(new Team(externalId, name, null, league))`, con un `externalId` distinto por equipo dentro de cada test (por ejemplo `"57"` para Arsenal, `"61"` para Chelsea y `"5"` para Bayern Munich). Nada más cambia
+- [X] T021 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/player/PlayerCatalogServiceTest.java solo como indica D21: las dos construcciones `new Team(id, name, league)` pasan a `new Team(id, "57", name, null, league)`
+- [X] T022 [P] Modificar backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/PlayerControllerIT.java solo como indica D21: las tres construcciones `new Team(2L, "Arsenal", League.PREMIER)` pasan a `new Team(2L, "57", "Arsenal", null, League.PREMIER)`
 - [ ] T023 [P] Escribir `TeamTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/team/TeamTest.java con estos casos:
   - `Team` rechaza un `externalId` faltante o en blanco con su mensaje;
   - recorta el nombre y el `externalId`, y deja en `null` un escudo en blanco;

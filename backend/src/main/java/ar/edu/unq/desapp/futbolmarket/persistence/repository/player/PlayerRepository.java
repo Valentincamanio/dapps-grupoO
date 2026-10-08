@@ -11,6 +11,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -46,15 +48,38 @@ public class PlayerRepository {
         );
     }
 
-    @Transactional(readOnly = true)
-    public boolean existsByExternalId(String externalId) {
-        return playerDAO.findByExternalId(externalId).isPresent();
-    }
-
     @Transactional
     public Player save(Player player) {
         PlayerSQL savedPlayer = playerDAO.save(playerMapper.toSQL(player));
         return playerMapper.toDomain(savedPlayer);
+    }
+
+    @Transactional
+    public List<Player> saveAll(List<Player> players) {
+        List<PlayerSQL> savedPlayers = playerDAO.saveAll(players.stream().map(playerMapper::toSQL).toList());
+        return toPlayers(savedPlayers);
+    }
+
+    /**
+     * Carga en una sola consulta los jugadores guardados, con su equipo. Sin ids no hay nada que
+     * buscar, así que no se consulta la base.
+     */
+    @Transactional(readOnly = true)
+    public List<Player> findAllByExternalIds(Collection<String> externalIds) {
+        if (externalIds.isEmpty()) {
+            return List.of();
+        }
+        return toPlayers(playerDAO.findAllByExternalIdIn(externalIds));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Player> findAllActive() {
+        return toPlayers(playerDAO.findAllByActiveTrue());
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasPlayers() {
+        return playerDAO.count() > 0;
     }
 
     @Transactional(readOnly = true)
@@ -65,5 +90,9 @@ public class PlayerRepository {
     @Transactional(readOnly = true)
     public Optional<Player> findById(Long playerId) {
         return playerDAO.findById(playerId).map(playerMapper::toDomain);
+    }
+
+    private List<Player> toPlayers(List<PlayerSQL> players) {
+        return players.stream().map(playerMapper::toDomain).toList();
     }
 }
