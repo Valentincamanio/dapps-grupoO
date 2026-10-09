@@ -1,6 +1,12 @@
 package ar.edu.unq.desapp.futbolmarket.service.sync;
 
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.ALISSON_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.BAYERN_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.BAYERN_NAME;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CHELSEA_CREST;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CHELSEA_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CHELSEA_NAME;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CHIESA_ID;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CURRENT_MATCHDAY;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.FINISHED_KICK_OFF;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.LIVERPOOL_CREST;
@@ -10,14 +16,20 @@ import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.PREMIE
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.SEASON_END;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.SEASON_START;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.TIMED_KICK_OFF;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.TSIMIKAS_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.alisson;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.allSnapshots;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.chelsea;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.chiesa;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.finishedMatch;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.finishedMatchId;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.liverpool;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.match;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.player;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.snapshot;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.team;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.timedMatchId;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.withoutPlayer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.tuple;
@@ -44,6 +56,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.match.MatchSnapshot;
 import ar.edu.unq.desapp.futbolmarket.modelo.match.MatchStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.match.MatchWinner;
 import ar.edu.unq.desapp.futbolmarket.modelo.match.Score;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerSnapshot;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.season.Season;
@@ -54,6 +67,8 @@ import ar.edu.unq.desapp.futbolmarket.modelo.sync.LeagueSyncStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.MatchSkipReason;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SkippedMatch;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SquadAssignment;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.SyncOrigin;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.SyncRun;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.TeamSnapshot;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.match.MatchRepository;
@@ -312,6 +327,144 @@ class SyncWriteServiceIT {
         assertThat(playerDAO.count()).isEqualTo(playersBefore);
         assertThat(seasonDAO.count()).isEqualTo(seasonsBefore);
         assertThat(matchDAO.count()).isEqualTo(matchesBefore);
+    }
+
+    @Test
+    void unJugadorQueLlegaEnElPlantelDeUnEquipoDeOtraLigaEsLaMismaFilaConElEquipoYLaLigaNuevos() {
+        apply(snapshot(League.PREMIER));
+        Long rowId = playerRepository.findByExternalId(CHIESA_ID).orElseThrow().id();
+        long playersBefore = playerDAO.count();
+
+        apply(snapshot(League.BUNDESLIGA, team(BAYERN_ID, BAYERN_NAME, chiesa())));
+        Player transferred = playerRepository.findByExternalId(CHIESA_ID).orElseThrow();
+
+        assertThat(transferred.id()).isEqualTo(rowId);
+        assertThat(transferred.team().externalId()).isEqualTo(BAYERN_ID);
+        assertThat(transferred.team().name()).isEqualTo(BAYERN_NAME);
+        assertThat(transferred.league()).isEqualTo(League.BUNDESLIGA);
+        assertThat(playerDAO.count()).isEqualTo(playersBefore);
+    }
+
+    @Test
+    void unJugadorInactivoQueVuelveALlegarQuedaActivoEnElEquipoInformadoYFiguraEntreLosReactivados() {
+        apply(snapshot(League.PREMIER));
+        playerRepository.save(playerRepository.findByExternalId(ALISSON_ID).orElseThrow().deactivate());
+
+        LeagueSyncResult result = apply(snapshot(League.PREMIER, team(CHELSEA_ID, CHELSEA_NAME, alisson())));
+        Player reactivated = playerRepository.findByExternalId(ALISSON_ID).orElseThrow();
+
+        assertThat(reactivated.active()).isTrue();
+        assertThat(reactivated.team().externalId()).isEqualTo(CHELSEA_ID);
+        assertThat(result.reactivatedPlayers()).extracting(Player::externalId).containsExactly(ALISSON_ID);
+    }
+
+    @Test
+    void losDatosCorregidosDelJugadorYElNombreOficialYElEscudoDelEquipoSeActualizan() {
+        apply(snapshot(League.PREMIER));
+        String newCrest = "https://crests.football-data.org/64.svg";
+        PlayerSnapshot corrected = new PlayerSnapshot(TSIMIKAS_ID, "Konstantinos Tsimikas", Position.MIDFIELDER,
+                LocalDate.of(1996, 5, 13), "Grecia");
+        TeamSnapshot renamed = new TeamSnapshot(LIVERPOOL_ID, "Liverpool Football Club", newCrest, List.of(corrected));
+
+        apply(snapshot(League.PREMIER, renamed));
+        Player player = playerRepository.findByExternalId(TSIMIKAS_ID).orElseThrow();
+        List<Team> savedLiverpool = teamRepository.findAllByExternalIds(List.of(LIVERPOOL_ID));
+
+        assertThat(player.name()).isEqualTo("Konstantinos Tsimikas");
+        assertThat(player.position()).isEqualTo(Position.MIDFIELDER);
+        assertThat(player.dateOfBirth()).isEqualTo(LocalDate.of(1996, 5, 13));
+        assertThat(player.nationality()).isEqualTo("Grecia");
+        assertThat(savedLiverpool).singleElement().satisfies(liverpool -> {
+            assertThat(liverpool.name()).isEqualTo("Liverpool Football Club");
+            assertThat(liverpool.crest()).isEqualTo(newCrest);
+        });
+    }
+
+    @Test
+    void unJugadorGuardadoQueLlegaSinPosicionConservaLaSuya() {
+        apply(snapshot(League.PREMIER));
+
+        apply(snapshot(League.PREMIER, team(LIVERPOOL_ID, LIVERPOOL_NAME, player(ALISSON_ID, "Alisson Becker", null))));
+        Player alisson = playerRepository.findByExternalId(ALISSON_ID).orElseThrow();
+
+        assertThat(alisson.position()).isEqualTo(Position.GOALKEEPER);
+        assertThat(alisson.active()).isTrue();
+    }
+
+    @Test
+    void unEquipoQueNoLlegaPorqueDescendioQuedaIgualYConservaSuLiga() {
+        apply(snapshot(League.PREMIER));
+
+        apply(snapshot(League.PREMIER, liverpool()));
+        List<Team> savedChelsea = teamRepository.findAllByExternalIds(List.of(CHELSEA_ID));
+
+        assertThat(savedChelsea).singleElement().satisfies(team -> {
+            assertThat(team.name()).isEqualTo(CHELSEA_NAME);
+            assertThat(team.crest()).isEqualTo(CHELSEA_CREST);
+            assertThat(team.league()).isEqualTo(League.PREMIER);
+        });
+        assertThat(teamDAO.count()).isEqualTo(PREMIER_TEAMS);
+    }
+
+    @Test
+    void conUnaCompletaConLasCincoLigasEnExitoSeInactivaAlJugadorQueNoLlegoYConservaSuEquipo() {
+        apply(snapshot(League.PREMIER));
+        SyncRun run = fullRunWithout(ALISSON_ID, null);
+
+        List<Player> inactivated = writeService.deactivateMissing(run);
+        var alisson = playerRepository.findByExternalId(ALISSON_ID);
+
+        assertThat(inactivated).extracting(Player::externalId).containsExactly(ALISSON_ID);
+        assertThat(alisson).hasValueSatisfying(player -> {
+            assertThat(player.active()).isFalse();
+            assertThat(player.team().externalId()).isEqualTo(LIVERPOOL_ID);
+        });
+    }
+
+    @Test
+    void conUnaLigaFallidaNoSeInactivaANadie() {
+        apply(snapshot(League.PREMIER));
+        SyncRun run = fullRunWithout(ALISSON_ID, League.LIGUE_1);
+
+        List<Player> inactivated = writeService.deactivateMissing(run);
+        var alisson = playerRepository.findByExternalId(ALISSON_ID);
+
+        assertThat(inactivated).isEmpty();
+        assertThat(alisson).hasValueSatisfying(player -> assertThat(player.active()).isTrue());
+    }
+
+    @Test
+    void lasCantidadesNuncaBajanCuandoLaSegundaTraeMenosJugadoresYEquipos() {
+        apply(snapshot(League.PREMIER));
+        long teamsBefore = teamDAO.count();
+        long playersBefore = playerDAO.count();
+        long seasonsBefore = seasonDAO.count();
+        long matchesBefore = matchDAO.count();
+
+        apply(snapshot(League.PREMIER, team(LIVERPOOL_ID, LIVERPOOL_NAME, alisson())));
+
+        assertThat(teamDAO.count()).isGreaterThanOrEqualTo(teamsBefore);
+        assertThat(playerDAO.count()).isGreaterThanOrEqualTo(playersBefore);
+        assertThat(seasonDAO.count()).isGreaterThanOrEqualTo(seasonsBefore);
+        assertThat(matchDAO.count()).isGreaterThanOrEqualTo(matchesBefore);
+    }
+
+    /**
+     * Una completa que descargó las cinco ligas sin el jugador y las escribió todas, salvo la que
+     * falla, si se indica una.
+     */
+    private SyncRun fullRunWithout(String playerExternalId, League failedLeague) {
+        List<LeagueSnapshot> snapshots = allSnapshots().stream()
+                .filter(snapshot -> snapshot.league() != failedLeague)
+                .map(snapshot -> withoutPlayer(snapshot, playerExternalId))
+                .toList();
+        SyncRun run = SyncRun.full(SyncOrigin.WEEKLY, Instant.parse("2026-10-12T07:00:00Z"));
+        run.registerSnapshots(snapshots);
+        snapshots.forEach(snapshot -> run.recordSuccess(apply(snapshot)));
+        if (failedLeague != null) {
+            run.recordFailure(failedLeague, "La fuente no respondió a tiempo.");
+        }
+        return run;
     }
 
     private LeagueSyncResult apply(LeagueSnapshot snapshot) {

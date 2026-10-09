@@ -583,34 +583,34 @@ cada uno, en el listado y en el detalle (quickstart 3.4).
 
 ### Implementación de la Historia 4
 
-- [ ] T090 [US4] Aplicar el filtro de activos al listado (FR-049 y research D18). `findById` no cambia (FR-049a):
+- [X] T090 [US4] Aplicar el filtro de activos al listado (FR-049 y research D18). `findById` no cambia (FR-049a):
   - en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/sql/interfaces/player/PlayerSQLDAO.java, reemplazar `findAllByOrderByIdAsc` por `Page<PlayerSQL> findAllByActiveTrueOrderByIdAsc(Pageable)` y sumar `AND player.active = true` al JPQL de `findAllByFilters`;
   - en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/player/PlayerRepository.java, usar el método nuevo en `findPage(int, int)`. Los nombres y las firmas de `findPage` no cambian
 
 ### Tests de la Historia 4
 
-- [ ] T091 [US4] Agregar a `PlayerRepositoryIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/player/PlayerRepositoryIT.java (depende de T090):
+- [X] T091 [US4] Agregar a `PlayerRepositoryIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/player/PlayerRepositoryIT.java (depende de T090):
   - un jugador inactivo no aparece en `findPage` sin filtros ni filtrando por su último equipo, su liga o su posición;
   - `totalElements` cuenta solo a los activos.
 
   Que `findById` devuelve a un inactivo ya lo prueba T025
-- [ ] T092 [P] [US4] Agregar a `PlayerControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/PlayerControllerIT.java: el detalle de un jugador inactivo, con el servicio mockeado, responde 200 con `active: false` y su último equipo, no 404 (escenario 10 y FR-049a)
-- [ ] T093 [P] [US4] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java:
+- [X] T092 [P] [US4] Agregar a `PlayerControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/PlayerControllerIT.java: el detalle de un jugador inactivo, con el servicio mockeado, responde 200 con `active: false` y su último equipo, no 404 (escenario 10 y FR-049a)
+- [X] T093 [P] [US4] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java:
   - un jugador de un equipo de la Premier que llega en el plantel de un equipo de la Bundesliga es la misma fila, con el equipo y la liga nuevos (escenario 1 y FR-016);
   - un jugador inactivo que vuelve a llegar queda activo con el equipo informado y figura en `reactivatedPlayers` (escenario 4);
   - el nombre, la posición, la fecha de nacimiento y la nacionalidad corregidos del jugador, y el nombre oficial y el escudo del equipo, se actualizan (escenario 5);
   - un jugador guardado que llega sin posición conserva la suya (escenario 6);
   - un equipo que no llega, porque descendió, queda igual y conserva su liga (escenario 8)
-- [ ] T094 [US4] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java (depende de T093):
+- [X] T094 [US4] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java (depende de T093):
   - con un `SyncRun` completo que registró las cinco ligas en éxito, `deactivateMissing` inactiva al jugador guardado que no llegó, que conserva su equipo y sigue en la tabla, y lo devuelve (escenario 2);
   - con un `SyncRun` con una liga fallida, no inactiva a nadie;
   - las cantidades de las cuatro tablas nunca bajan entre dos sincronizaciones en las que la segunda trae menos jugadores y equipos (SC-006)
-- [ ] T095 [P] [US4] Agregar a `SyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncControllerIT.java (depende de T090):
+- [X] T095 [P] [US4] Agregar a `SyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncControllerIT.java (depende de T090):
   - una segunda completa en la que falta un jugador y falla `LIGUE_1` no lo inactiva (`inactivationApplied: false` y su detalle con `active: true`) (escenario 3);
   - una completa con las cinco ligas bien en la que falta un jugador lo lista en `inactivatedPlayers`. Su detalle responde `active: false` con su último equipo, y no aparece en `GET /players` ni filtrando por ese equipo (escenarios 2, 9 y 10);
   - una completa posterior que lo vuelve a informar lo lista en `reactivatedPlayers` y lo vuelve a mostrar en el listado (escenarios 4 y 11);
   - un jugador informado en dos planteles de ligas distintas figura en `duplicatedPlayers` con el equipo que queda y el ignorado, y aparece una sola vez en el catálogo (escenario 7 y FR-015)
-- [ ] T096 [US4] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T096 [US4] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 **Checkpoint**: las HU1 a HU4 funcionan. El catálogo se mantiene al día sin borrar nada.
 

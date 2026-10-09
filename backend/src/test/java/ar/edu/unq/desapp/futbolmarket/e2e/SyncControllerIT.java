@@ -1,19 +1,27 @@
 package ar.edu.unq.desapp.futbolmarket.e2e;
 
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.ALISSON_ID;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CHELSEA_NAME;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CHIESA_ID;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CURRENT_MATCHDAY;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.JUVENTUS_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.JUVENTUS_NAME;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.LIVERPOOL_CREST;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.LIVERPOOL_NAME;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.NO_POSITION_PLAYER_ID;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.NO_POSITION_PLAYER_NAME;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.SEASON_END;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.SEASON_START;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.chiesa;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.seasonId;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.snapshot;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.team;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.withoutPlayer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -348,6 +356,102 @@ class SyncControllerIT {
         assertThat(output.getAll())
                 .contains("Sincronización FULL (MANUAL) iniciada.")
                 .doesNotContain(SOURCE_TOKEN);
+    }
+
+    @Test
+    void unJugadorQueFaltaEnUnaCompletaConUnaLigaFallidaNoSeInactiva() throws Exception {
+        synchronizeAs(adminToken);
+        long alissonId = idOfLiverpoolPlayer("Alisson Becker");
+        willReturn(withoutPlayer(snapshot(League.PREMIER), ALISSON_ID)).given(adapter).fetchLeague(League.PREMIER);
+        willThrow(new ExternalSourceException(TIMEOUT_REASON)).given(adapter).fetchLeague(League.LIGUE_1);
+
+        JsonNode report = body(synchronizeAs(adminToken));
+        JsonNode alisson = playerDetail(alissonId);
+
+        assertThat(report.get("inactivationApplied").asBoolean()).isFalse();
+        assertThat(report.get("inactivatedPlayers").values()).isEmpty();
+        assertThat(alisson.get("active").asBoolean()).isTrue();
+    }
+
+    @Test
+    void unJugadorQueFaltaEnUnaCompletaConLasCincoLigasEnExitoQuedaInactivoConSuEquipoYSaleDelListado()
+            throws Exception {
+        synchronizeAs(adminToken);
+        long alissonId = idOfLiverpoolPlayer("Alisson Becker");
+        willReturn(withoutPlayer(snapshot(League.PREMIER), ALISSON_ID)).given(adapter).fetchLeague(League.PREMIER);
+
+        JsonNode report = body(synchronizeAs(adminToken));
+        JsonNode detail = playerDetail(alissonId);
+        JsonNode liverpoolPage = playersOf(LIVERPOOL_NAME);
+        JsonNode catalog = wholeCatalog();
+
+        assertThat(report.get("inactivationApplied").asBoolean()).isTrue();
+        assertThat(report.get("inactivatedPlayers").values()).singleElement().satisfies(inactivated -> {
+            assertThat(inactivated.get("id").asLong()).isEqualTo(alissonId);
+            assertThat(inactivated.get("externalId").asString()).isEqualTo(ALISSON_ID);
+            assertThat(inactivated.get("name").asString()).isEqualTo("Alisson Becker");
+            assertThat(inactivated.get("team").asString()).isEqualTo(LIVERPOOL_NAME);
+        });
+        assertThat(detail.get("active").asBoolean()).isFalse();
+        assertThat(detail.get("team").asString()).isEqualTo(LIVERPOOL_NAME);
+        assertThat(liverpoolPage.get("totalElements").asLong()).isEqualTo(LIVERPOOL_PLAYERS - 1L);
+        assertThat(liverpoolPage.get("content").values())
+                .extracting(player -> player.get("name").asString())
+                .doesNotContain("Alisson Becker");
+        assertThat(catalog.get("totalElements").asLong())
+                .isEqualTo((long) PLAYERS_PER_LEAGUE * League.values().length - 1);
+        assertThat(catalog.get("content").values())
+                .extracting(player -> player.get("name").asString())
+                .doesNotContain("Alisson Becker");
+    }
+
+    @Test
+    void unJugadorInactivoQueVuelveALlegarFiguraEntreLosReactivadosYVuelveAlListado() throws Exception {
+        synchronizeAs(adminToken);
+        willReturn(withoutPlayer(snapshot(League.PREMIER), ALISSON_ID)).given(adapter).fetchLeague(League.PREMIER);
+        synchronizeAs(adminToken);
+        willReturn(snapshot(League.PREMIER)).given(adapter).fetchLeague(League.PREMIER);
+
+        JsonNode report = body(synchronizeAs(adminToken));
+        JsonNode liverpoolPage = playersOf(LIVERPOOL_NAME);
+
+        assertThat(report.get("leagues").get(0).get("reactivatedPlayers").values()).singleElement()
+                .satisfies(reactivated -> {
+                    assertThat(reactivated.get("name").asString()).isEqualTo("Alisson Becker");
+                    assertThat(reactivated.get("team").asString()).isEqualTo(LIVERPOOL_NAME);
+                });
+        assertThat(liverpoolPage.get("totalElements").asLong()).isEqualTo(LIVERPOOL_PLAYERS);
+        assertThat(liverpoolPage.get("content").values())
+                .extracting(player -> player.get("name").asString())
+                .contains("Alisson Becker");
+    }
+
+    @Test
+    void unJugadorEnPlantelesDeDosLigasFiguraEntreLosDuplicadosYApareceUnaSolaVezEnElCatalogo() throws Exception {
+        willReturn(snapshot(League.SERIE_A, team(JUVENTUS_ID, JUVENTUS_NAME, chiesa())))
+                .given(adapter).fetchLeague(League.SERIE_A);
+
+        JsonNode report = body(synchronizeAs(adminToken));
+        JsonNode catalog = wholeCatalog();
+
+        assertThat(report.get("duplicatedPlayers").values()).singleElement().satisfies(duplicated -> {
+            assertThat(duplicated.get("externalId").asString()).isEqualTo(CHIESA_ID);
+            assertThat(duplicated.get("name").asString()).isEqualTo("Federico Chiesa");
+            assertThat(duplicated.get("keptTeam").asString()).isEqualTo(LIVERPOOL_NAME);
+            assertThat(duplicated.get("ignoredTeam").asString()).isEqualTo(JUVENTUS_NAME);
+        });
+        assertThat(catalog.get("content").values())
+                .filteredOn(player -> player.get("name").asString().equals("Federico Chiesa"))
+                .singleElement()
+                .satisfies(kept -> assertThat(kept.get("team").asString()).isEqualTo(LIVERPOOL_NAME));
+    }
+
+    private long idOfLiverpoolPlayer(String name) throws Exception {
+        return playerNamed(playersOf(LIVERPOOL_NAME), name).get("id").asLong();
+    }
+
+    private JsonNode playerDetail(long id) throws Exception {
+        return body(mvc.get().uri(PLAYERS_PATH + "/{id}", id).exchange());
     }
 
     private JsonNode playersOfLeague(League league) throws Exception {

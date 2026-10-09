@@ -25,10 +25,14 @@ public class PlayerRepository {
         this.playerMapper = playerMapper;
     }
 
+    /**
+     * El listado muestra solo a los jugadores activos, también al filtrar, y la paginación cuenta
+     * solo a ellos (FR-049). {@link #findById} no filtra: el detalle responde para cualquiera.
+     */
     @Transactional(readOnly = true)
     public PlayerPage findPage(int page, int size) {
         var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "id"));
-        var players = playerDAO.findAllByOrderByIdAsc(pageable);
+        var players = playerDAO.findAllByActiveTrueOrderByIdAsc(pageable);
         return toPlayerPage(players);
     }
 

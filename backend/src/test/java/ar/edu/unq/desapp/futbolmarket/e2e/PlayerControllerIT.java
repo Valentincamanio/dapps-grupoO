@@ -198,6 +198,18 @@ class PlayerControllerIT {
         verify(playerCatalogService).getPlayer(7L);
     }
 
+    @Test
+    void elDetalleDeUnJugadorInactivoRespondeConActiveFalseYSuUltimoEquipo() throws Exception {
+        given(playerCatalogService.getPlayer(1L)).willReturn(alisson().deactivate());
+
+        mockMvc.perform(get("/players/1").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false))
+                .andExpect(jsonPath("$.team").value("Liverpool FC"))
+                .andExpect(jsonPath("$.league").value("PREMIER"));
+        verify(playerCatalogService).getPlayer(1L);
+    }
+
     private static Player alisson() {
         var liverpool = new Team(2L, "64", "Liverpool FC", "https://crests.football-data.org/64.png", League.PREMIER);
         return new Player(1L, "1795", "Alisson Becker", Position.GOALKEEPER, liverpool, LocalDate.of(1992, 10, 2),

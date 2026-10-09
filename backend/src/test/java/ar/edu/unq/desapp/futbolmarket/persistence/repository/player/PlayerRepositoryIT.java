@@ -177,6 +177,33 @@ class PlayerRepositoryIT {
         assertThat(found).contains(inactive);
     }
 
+    @Test
+    void unJugadorInactivoNoApareceEnElListadoNiFiltrandoPorSuUltimoEquipoSuLigaOSuPosicion() {
+        Team liverpool = teamRepository.save(liverpool());
+        playerRepository.saveAll(List.of(alisson(liverpool), chiesa(liverpool, false)));
+
+        var withoutFilters = playerRepository.findPage(0, 10);
+        var byTeam = playerRepository.findPage(0, 10, new PlayerFilter(null, "Liverpool FC", null));
+        var byLeague = playerRepository.findPage(0, 10, new PlayerFilter(League.PREMIER, null, null));
+        var byPosition = playerRepository.findPage(0, 10, new PlayerFilter(null, null, Position.FORWARD));
+
+        assertThat(List.of(withoutFilters, byTeam, byLeague)).allSatisfy(page ->
+                assertThat(page.content()).extracting(Player::externalId).containsExactly("1795"));
+        assertThat(byPosition.content()).isEmpty();
+    }
+
+    @Test
+    void elTotalDeElementosCuentaSoloALosJugadoresActivos() {
+        Team liverpool = teamRepository.save(liverpool());
+        playerRepository.saveAll(List.of(alisson(liverpool), tsimikas(liverpool), chiesa(liverpool, false)));
+
+        var withoutFilters = playerRepository.findPage(0, 10);
+        var byTeam = playerRepository.findPage(0, 10, new PlayerFilter(null, "Liverpool FC", null));
+
+        assertThat(withoutFilters.totalElements()).isEqualTo(2);
+        assertThat(byTeam.totalElements()).isEqualTo(2);
+    }
+
     private static Team liverpool() {
         return new Team("64", "Liverpool FC", "https://crests.football-data.org/64.png", League.PREMIER);
     }

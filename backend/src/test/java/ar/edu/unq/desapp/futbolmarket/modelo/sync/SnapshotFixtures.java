@@ -96,6 +96,19 @@ public final class SnapshotFixtures {
         return snapshot(league, List.of(teams), List.of());
     }
 
+    /**
+     * La misma liga sin un jugador en ningún plantel, como si hubiera dejado la liga. La temporada
+     * y los partidos no cambian.
+     */
+    public static LeagueSnapshot withoutPlayer(LeagueSnapshot snapshot, String playerExternalId) {
+        List<TeamSnapshot> teams = snapshot.teams().stream()
+                .map(team -> new TeamSnapshot(team.externalId(), team.name(), team.crest(), team.squad().stream()
+                        .filter(player -> !player.externalId().equals(playerExternalId))
+                        .toList()))
+                .toList();
+        return new LeagueSnapshot(snapshot.league(), snapshot.season(), teams, snapshot.matches());
+    }
+
     public static String seasonId(League league) {
         return switch (league) {
             case PREMIER -> PREMIER_SEASON_ID;
