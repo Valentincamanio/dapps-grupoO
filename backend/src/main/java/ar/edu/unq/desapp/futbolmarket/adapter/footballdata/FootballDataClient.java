@@ -45,7 +45,7 @@ public class FootballDataClient {
     static final Duration DEFAULT_RESET_WAIT = Duration.ofSeconds(60);
     static final Duration MAX_RESET_WAIT = Duration.ofSeconds(120);
 
-    private static final Logger log = LoggerFactory.getLogger(FootballDataClient.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(FootballDataClient.class);
 
     private static final String TEAMS_PATH = "/competitions/{code}/teams";
     private static final String MATCHES_PATH = "/competitions/{code}/matches";
@@ -113,7 +113,7 @@ public class FootballDataClient {
         if (status.is2xxSuccessful()) {
             return new Reply<>(status, response.bodyTo(type), null);
         }
-        log.warn("Football-Data.org respondió {} para la competición {}: {}", status.value(), code,
+        LOGGER.warn("Football-Data.org respondió {} para la competición {}: {}", status.value(), code,
                 errorMessage(response));
         return new Reply<>(status, null, response.getHeaders().getFirst(COUNTER_RESET_HEADER));
     }

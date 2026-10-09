@@ -683,18 +683,18 @@ T105 (el mismo semáforo).
 **Propósito**: verificaciones transversales y la definición de terminado de la constitución
 (paso 10 del plan).
 
-- [ ] T107 [P] Verificar el árbol y las capas (principio I):
+- [X] T107 [P] Verificar el árbol y las capas (principio I):
   - ningún archivo de backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/ importa `org.springframework`, `jakarta.persistence`, `...adapter` ni `...controller`;
   - `...adapter.footballdata.dto` solo se importa dentro de `adapter/footballdata/`;
   - `SyncController` solo inyecta `SyncService`;
   - no hay `catch (Exception`, ni `Thread.sleep` en `src/test`, ni carpetas vacías o `.gitkeep`;
   - `git diff --stat origin/develop -- backend/src/test` muestra solo archivos nuevos, los cuatro modificados de D21 y el borrado de `PlayerCatalogDataSeederIT`. `FutbolMarketApplicationTests`, `AccessControlIT`, `GlobalExceptionHandlerIT`, `GlobalExceptionHandlerTest` y `JsonAccessDeniedHandlerTest` no cambiaron
-- [ ] T108 [P] Verificar los secretos y el dataset ficticio (FR-040, SC-002 y SC-011):
+- [X] T108 [P] Verificar los secretos y el dataset ficticio (FR-040, SC-002 y SC-011):
   - la única referencia al token en el repositorio es `${FOOTBALL_DATA_TOKEN:}` en backend/src/main/resources/application.yaml y `token: ""` en backend/src/test/resources/application-test.yml;
   - no queda `players.json` ni ninguna referencia a `PlayerCatalogDataSeeder` en `backend/`;
   - ningún log escribe headers ni `X-Authenticated-Client`
-- [ ] T109 [P] Hacer una revisión orientada a SonarCloud del código nuevo en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/ (`adapter/`, `modelo/sync/`, `modelo/season/`, `modelo/match/`, `service/sync/` y `controller/sync/`) (principio V): sin imports ni parámetros sin usar, sin números mágicos, sin código duplicado (los datos de los tests salen de `SnapshotFixtures`), métodos cortos y comentarios que explican el porqué
-- [ ] T110 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T109 [P] Hacer una revisión orientada a SonarCloud del código nuevo en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/ (`adapter/`, `modelo/sync/`, `modelo/season/`, `modelo/match/`, `service/sync/` y `controller/sync/`) (principio V): sin imports ni parámetros sin usar, sin números mágicos, sin código duplicado (los datos de los tests salen de `SnapshotFixtures`), métodos cortos y comentarios que explican el porqué
+- [X] T110 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 - [ ] T111 Borrar la base H2 local una sola vez, con la aplicación detenida, como indica quickstart.md 2.1 (research D20). **Avisarle antes a Lucas**: se pierden también los usuarios locales
 - [ ] T112 Seguir quickstart.md 2.2 (`./gradlew bootRun` sin token): la aplicación levanta, deja el WARN de `StartupSync`, no aparece ninguna línea del seeder y `GET /players` devuelve `totalElements: 0`
 - [ ] T113 Seguir quickstart.md 2.3 y 2.4 con el token que Lucas exporta en su terminal (nunca escrito en un archivo):
