@@ -215,7 +215,8 @@ Ninguna de las alternativas resuelve algo que el classpath no resuelva.
 |---|---|---|
 | Timeout de conexión o de lectura | `ResourceAccessException` con causa `HttpTimeoutException` | `La fuente no respondió a tiempo.` |
 | Otra falla de red | `ResourceAccessException` | `No se pudo conectar con la fuente.` |
-| 400 | `HttpClientErrorException` | `La fuente rechazó la consulta (400).` |
+| 400 con `message` `Your API token is invalid.` (token inválido; verificado con la API real el 2026-10-09) | Status y `message` del cuerpo de error | `La fuente rechazó la credencial: el token no es válido (400).` |
+| Otro 400 | `HttpClientErrorException` | `La fuente rechazó la consulta (400).` |
 | 403 | `HttpClientErrorException` | `La fuente rechazó la credencial o el recurso no está disponible en el plan contratado (403).` |
 | 404 | `HttpClientErrorException` | `La fuente no encontró la competición (404).` |
 | 429 después del reintento | `HttpClientErrorException` | `Se excedió el límite de consultas de la fuente (429).` |
@@ -230,7 +231,8 @@ Ninguna de las alternativas resuelve algo que el classpath no resuelva.
 
 - El campo `message` del cuerpo de error de la fuente no va al informe: está en inglés y no
   agrega nada. Se registra en WARN junto con la liga, porque ayuda a diagnosticar y no contiene
-  el token.
+  el token. Su único otro uso es distinguir el 400 de un token inválido de cualquier otro 400
+  (T117): elige el motivo constante, pero no va al informe.
 - **El token nunca aparece**:
   - Los motivos son constantes.
   - Las excepciones del `RestClient` se conservan solo como causa, para el stack trace del

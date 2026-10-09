@@ -540,7 +540,7 @@ responde igual y el token no aparece en ningún lado.
 
 **Cobertura de los escenarios**: 1 → T086 (el catálogo no usa el adapter) y quickstart 3.3;
 2 → T087 y T068; 3 → T063, T068 y T088; 4 y 5 → T063; 6 → T049 y T063; 7 → T086, T102 y T103
-(el WARN de arranque lo escribe `StartupSync`, de la HU5); 8 → T087; 9 → T087, T063 y T108.
+(el WARN de arranque lo escribe `StartupSync`, de la HU5); 8 → T087 y T117; 9 → T087, T063 y T108.
 
 ### Implementación de la Historia 3
 
@@ -695,23 +695,28 @@ T105 (el mismo semáforo).
   - ningún log escribe headers ni `X-Authenticated-Client`
 - [X] T109 [P] Hacer una revisión orientada a SonarCloud del código nuevo en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/ (`adapter/`, `modelo/sync/`, `modelo/season/`, `modelo/match/`, `service/sync/` y `controller/sync/`) (principio V): sin imports ni parámetros sin usar, sin números mágicos, sin código duplicado (los datos de los tests salen de `SnapshotFixtures`), métodos cortos y comentarios que explican el porqué
 - [X] T110 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
-- [ ] T111 Borrar la base H2 local una sola vez, con la aplicación detenida, como indica quickstart.md 2.1 (research D20). **Avisarle antes a Lucas**: se pierden también los usuarios locales
-- [ ] T112 Seguir quickstart.md 2.2 (`./gradlew bootRun` sin token): la aplicación levanta, deja el WARN de `StartupSync`, no aparece ninguna línea del seeder y `GET /players` devuelve `totalElements: 0`
-- [ ] T113 Seguir quickstart.md 2.3 y 2.4 con el token que Lucas exporta en su terminal (nunca escrito en un archivo):
+- [X] T111 Borrar la base H2 local una sola vez, con la aplicación detenida, como indica quickstart.md 2.1 (research D20). **Avisarle antes a Lucas**: se pierden también los usuarios locales
+- [X] T112 Seguir quickstart.md 2.2 (`./gradlew bootRun` sin token): la aplicación levanta, deja el WARN de `StartupSync`, no aparece ninguna línea del seeder y `GET /players` devuelve `totalElements: 0`
+- [X] T113 Seguir quickstart.md 2.3 y 2.4 con el token que Lucas exporta en su terminal (nunca escrito en un archivo):
   - la aplicación termina de arrancar antes que la sincronización de arranque;
   - el catálogo tiene unos 2.634 jugadores en menos de 2 minutos;
   - el token no aparece en el registro;
   - un segundo arranque no sincroniza
-- [ ] T114 Seguir los escenarios HTTP de quickstart.md 3.1 a 3.5 con el administrador configurado y verificar cada resultado esperado
-- [ ] T115 Seguir quickstart.md sección 4 en `http://localhost:8080/swagger-ui.html`:
+- [X] T114 Seguir los escenarios HTTP de quickstart.md 3.1 a 3.5 con el administrador configurado y verificar cada resultado esperado
+- [X] T115 Seguir quickstart.md sección 4 en `http://localhost:8080/swagger-ui.html`:
   - aparece la etiqueta Sincronización con candado, el parámetro `league` y las respuestas 200, 400, 401, 403, 409 y 503;
   - `PlayerResponse` muestra los cuatro campos nuevos;
   - `POST /players/sync?league=LIGUE_1` responde 200 con `bearerAuth` del administrador y 403 con `apiKeyAuth` de un usuario común
-- [ ] T116 Seguir quickstart.md sección 5 en `http://localhost:8080/h2-console`:
+- [X] T116 Seguir quickstart.md sección 5 en `http://localhost:8080/h2-console`:
   - 96 equipos, unos 2.634 jugadores activos, cinco temporadas y 380 partidos de la Premier;
   - ningún `EXTERNAL_ID` empieza con `premier-`;
   - `STATUS`, `WINNER` y `SEASONS.LEAGUE` son texto;
   - ninguna cantidad baja después de otra completa
+- [X] T117 Distinguir el token rechazado dentro del 400 de la fuente (HU3, escenario 8). Con un token inválido, la API real responde `400` con `{"message":"Your API token is invalid.","errorCode":400}`, no 403 como suponía el contrato (verificado el 2026-10-09 en T114):
+  - en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/footballdata/FootballDataClient.java, un 400 con ese `message` termina con el motivo `La fuente rechazó la credencial: el token no es válido (400).`. Cualquier otro 400 sigue con `La fuente rechazó la consulta (400).`, y el `message` sigue sin ir al informe;
+  - agregar la fixture backend/src/test/resources/footballdata/error-400-invalid-token.json con el cuerpo real. En `FootballDataAdapterTest`, agregar dos métodos: el 400 del token inválido da el motivo de la credencial, y un 400 con otro `message` da el genérico. Los métodos existentes no se tocan;
+  - actualizar research.md D5, contracts/football-data-api.md (tabla de errores y ejemplo real) y quickstart.md 3.3 (fila de la credencial rechazada);
+  - correr `./gradlew build` en backend/ y repetir la credencial rechazada de quickstart.md 3.3 con `token-invalido`
 
 ---
 

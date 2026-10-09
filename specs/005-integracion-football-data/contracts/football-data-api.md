@@ -192,12 +192,18 @@ la liga y no va al informe. En el informe va el motivo en español de
 
 | Status | Significado en la fuente | Efecto |
 |---|---|---|
-| 400 | Filtro inválido | La liga queda fallida. No debería ocurrir: no se mandan filtros. |
-| 403 | Recurso restringido, plan insuficiente, token inválido o falta de token | La liga queda fallida. Con un token inválido fallan las cinco ligas con el mismo motivo (HU3, escenario 8). |
+| 400 | Token inválido (`message`: `Your API token is invalid.`) o filtro inválido | La liga queda fallida. Con un token inválido fallan las cinco ligas con el motivo de la credencial rechazada (HU3, escenario 8). Cualquier otro 400 lleva el motivo genérico; no debería ocurrir, porque no se mandan filtros. |
+| 403 | Recurso restringido, plan insuficiente o falta de token | La liga queda fallida. |
 | 404 | El recurso no existe | La liga queda fallida. |
 | 429 | Se excedió el límite (10 por minuto en el plan gratis) | Se espera `X-RequestCounter-Reset` y se reintenta una vez. Si vuelve a fallar, la liga queda fallida (FR-038). |
 | 5xx | Error de la fuente | La liga queda fallida, sin reintento. |
 | Sin respuesta en 30 s | — | La liga queda fallida, sin reintento (FR-037). |
+
+Ejemplo real de un 400 con un token inválido (verificado el 2026-10-09):
+
+```json
+{"message":"Your API token is invalid.","errorCode":400}
+```
 
 Ejemplo real de un 403:
 

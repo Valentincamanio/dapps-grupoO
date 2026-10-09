@@ -53,6 +53,8 @@ public class FootballDataClient {
     private static final String TIMEOUT_REASON = "La fuente no respondió a tiempo.";
     private static final String NETWORK_REASON = "No se pudo conectar con la fuente.";
     private static final String BAD_REQUEST_REASON = "La fuente rechazó la consulta (400).";
+    private static final String INVALID_TOKEN_REASON = "La fuente rechazó la credencial: el token no es válido (400).";
+    private static final String INVALID_TOKEN_MESSAGE = "Your API token is invalid.";
     private static final String FORBIDDEN_REASON =
             "La fuente rechazó la credencial o el recurso no está disponible en el plan contratado (403).";
     private static final String NOT_FOUND_REASON = "La fuente no encontró la competición (404).";
@@ -90,7 +92,7 @@ public class FootballDataClient {
             reply = send(path, code, type);
         }
         if (!reply.status().is2xxSuccessful()) {
-            throw new ExternalSourceException(reasonFor(reply.status()));
+            throw new ExternalSourceException(reasonFor(reply.status(), reply.errorMessage()));
         }
         return reply.body();
     }
@@ -111,11 +113,11 @@ public class FootballDataClient {
         HttpStatusCode status = response.getStatusCode();
         recordCounter(response.getHeaders());
         if (status.is2xxSuccessful()) {
-            return new Reply<>(status, response.bodyTo(type), null);
+            return new Reply<>(status, response.bodyTo(type), null, null);
         }
-        LOGGER.warn("Football-Data.org respondió {} para la competición {}: {}", status.value(), code,
-                errorMessage(response));
-        return new Reply<>(status, null, response.getHeaders().getFirst(COUNTER_RESET_HEADER));
+        String errorMessage = errorMessage(response);
+        LOGGER.warn("Football-Data.org respondió {} para la competición {}: {}", status.value(), code, errorMessage);
+        return new Reply<>(status, null, response.getHeaders().getFirst(COUNTER_RESET_HEADER), errorMessage);
     }
 
     /**
@@ -169,17 +171,25 @@ public class FootballDataClient {
         }
     }
 
-    private static String reasonFor(HttpStatusCode status) {
+    private static String reasonFor(HttpStatusCode status, String errorMessage) {
         if (status.is5xxServerError()) {
             return SERVER_ERROR_REASON;
         }
         return switch (HttpStatus.resolve(status.value())) {
-            case BAD_REQUEST -> BAD_REQUEST_REASON;
+            case BAD_REQUEST -> badRequestReason(errorMessage);
             case FORBIDDEN -> FORBIDDEN_REASON;
             case NOT_FOUND -> NOT_FOUND_REASON;
             case TOO_MANY_REQUESTS -> TOO_MANY_REQUESTS_REASON;
             case null, default -> UNEXPECTED_STATUS_REASON;
         };
+    }
+
+    /**
+     * Con un token inválido la fuente no responde 403 sino 400, y solo el {@code message} lo distingue
+     * de otro 400. El {@code message} decide el motivo, pero no va al informe (research D5).
+     */
+    private static String badRequestReason(String errorMessage) {
+        return INVALID_TOKEN_MESSAGE.equals(errorMessage) ? INVALID_TOKEN_REASON : BAD_REQUEST_REASON;
     }
 
     /**
@@ -218,6 +228,6 @@ public class FootballDataClient {
         }
     }
 
-    private record Reply<T>(HttpStatusCode status, T body, String counterReset) {
+    private record Reply<T>(HttpStatusCode status, T body, String counterReset, String errorMessage) {
     }
 }

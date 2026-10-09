@@ -229,7 +229,7 @@ No tienen endpoints en esta feature: se validan en la consola de H2 (sección 5)
 | Escenario | Cómo se prueba | Resultado esperado |
 |---|---|---|
 | Sin credencial | Arrancar sin `FOOTBALL_DATA_TOKEN` y disparar como admin | `503`, con el mensaje de sincronización deshabilitada. El catálogo responde con lo guardado (HU3, escenario 7; SC-012). |
-| Credencial rechazada | Arrancar con `FOOTBALL_DATA_TOKEN=token-invalido` y disparar | `200`. Las cinco ligas en `FAILED` con el motivo del 403 y `inactivationApplied: false`. `GET /players` muestra lo mismo que antes (HU3, escenario 8). El registro no contiene `token-invalido` (escenario 9). |
+| Credencial rechazada | Arrancar con `FOOTBALL_DATA_TOKEN=token-invalido` y disparar | `200`. Las cinco ligas en `FAILED` con `La fuente rechazó la credencial: el token no es válido (400).` (la fuente responde 400, no 403) y `inactivationApplied: false`. `GET /players` muestra lo mismo que antes (HU3, escenario 8). El registro no contiene `token-invalido` (escenario 9). |
 | Fuente caída | Cortar la conexión a internet y disparar | Las cinco ligas en `FAILED` con `No se pudo conectar con la fuente.` o `La fuente no respondió a tiempo.`. Las consultas del catálogo responden igual (HU3, escenarios 1 y 4; SC-007). |
 | Falla de una sola liga, partidos fallidos después de equipos bien, 429 con reintento, liga sin equipos | Automatizados | Los cubren `FootballDataAdapterTest`, `SyncServiceTest` y `SyncWriteServiceIT` (HU3, escenarios 2, 3, 5 y 6; SC-008). |
 

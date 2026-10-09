@@ -75,6 +75,8 @@ class FootballDataAdapterTest {
     private static final Resource MATCHES_PL = new ClassPathResource("footballdata/matches-pl.json");
     private static final Resource TEAMS_EMPTY = new ClassPathResource("footballdata/teams-empty.json");
     private static final Resource ERROR_403 = new ClassPathResource("footballdata/error-403.json");
+    private static final Resource ERROR_400_INVALID_TOKEN =
+            new ClassPathResource("footballdata/error-400-invalid-token.json");
 
     private static final String TOO_MANY_REQUESTS_REASON = "Se excedió el límite de consultas de la fuente (429).";
     private static final String SERVER_ERROR_REASON = "La fuente respondió con un error (5xx).";
@@ -155,6 +157,31 @@ class FootballDataAdapterTest {
                 .hasMessage(reason)
                 .message()
                 .doesNotContain(TOKEN);
+        server.verify();
+    }
+
+    @Test
+    void unTokenInvalidoQueLaFuenteRechazaCon400FallaConElMotivoDeLaCredencial() {
+        expect(PL_TEAMS_URL).andRespond(
+                withBadRequest().body(ERROR_400_INVALID_TOKEN).contentType(MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> adapter.fetchLeague(League.PREMIER))
+                .isInstanceOf(ExternalSourceException.class)
+                .hasMessage("La fuente rechazó la credencial: el token no es válido (400).")
+                .message()
+                .doesNotContain(TOKEN);
+        server.verify();
+    }
+
+    @Test
+    void unBadRequestConOtroMensajeDeLaFuenteFallaConElMotivoGenericoDel400() {
+        expect(PL_TEAMS_URL).andRespond(withBadRequest()
+                .body("{\"message\":\"Invalid filter value.\",\"errorCode\":400}")
+                .contentType(MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> adapter.fetchLeague(League.PREMIER))
+                .isInstanceOf(ExternalSourceException.class)
+                .hasMessage("La fuente rechazó la consulta (400).");
         server.verify();
     }
 
