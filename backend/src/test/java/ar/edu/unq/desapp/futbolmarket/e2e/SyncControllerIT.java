@@ -1,15 +1,20 @@
 package ar.edu.unq.desapp.futbolmarket.e2e;
 
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CHELSEA_NAME;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CURRENT_MATCHDAY;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.LIVERPOOL_CREST;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.LIVERPOOL_NAME;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.NO_POSITION_PLAYER_ID;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.NO_POSITION_PLAYER_NAME;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.SEASON_END;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.SEASON_START;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.seasonId;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.List;
@@ -20,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
@@ -33,6 +39,7 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ar.edu.unq.desapp.futbolmarket.adapter.footballdata.FootballDataAdapter;
 import ar.edu.unq.desapp.futbolmarket.e2e.AuthTestHelper.TestUser;
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.ExternalSourceException;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.match.MatchSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.player.PlayerSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.season.SeasonSQLDAO;
@@ -68,6 +75,9 @@ class SyncControllerIT {
     private static final String FORBIDDEN_MESSAGE = "No tiene permisos para acceder a este recurso.";
     private static final String MISSING_CREDENTIAL_MESSAGE =
             "Se requiere una credencial: un token de sesión (Authorization: Bearer) o una clave de API (X-API-Key).";
+    private static final String TIMEOUT_REASON = "La fuente no respondió a tiempo.";
+    private static final String FORBIDDEN_REASON =
+            "La fuente rechazó la credencial o el recurso no está disponible en el plan contratado (403).";
 
     private static final int TEAMS_PER_LEAGUE = 2;
     private static final int PLAYERS_PER_LEAGUE = 8;
@@ -256,5 +266,98 @@ class SyncControllerIT {
 
     private JsonNode body(MvcTestResult result) throws Exception {
         return jsonMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    @Test
+    void cadaLigaDelInformeTraeSuTemporadaYSusPartidosCreados() throws Exception {
+        JsonNode report = body(synchronizeAs(adminToken));
+
+        assertThat(report.get("leagues").values())
+                .extracting(league -> league.get("league").asString(),
+                        league -> league.get("season").get("externalId").asString())
+                .containsExactly(
+                        tuple("PREMIER", seasonId(League.PREMIER)),
+                        tuple("BUNDESLIGA", seasonId(League.BUNDESLIGA)),
+                        tuple("LA_LIGA", seasonId(League.LA_LIGA)),
+                        tuple("SERIE_A", seasonId(League.SERIE_A)),
+                        tuple("LIGUE_1", seasonId(League.LIGUE_1)));
+        assertThat(report.get("leagues").values()).allSatisfy(league -> {
+            assertThat(league.get("season").get("startDate").asString()).isEqualTo(SEASON_START.toString());
+            assertThat(league.get("season").get("endDate").asString()).isEqualTo(SEASON_END.toString());
+            assertThat(league.get("season").get("currentMatchday").asInt()).isEqualTo(CURRENT_MATCHDAY);
+            assertThat(league.get("matches").get("created").asInt()).isEqualTo(MATCHES_PER_LEAGUE);
+        });
+    }
+
+    @Test
+    void unaLigaQueFallaQuedaFallidaConSuMotivoLasDemasSeProcesanYConservaLoQueTenia() throws Exception {
+        synchronizeAs(adminToken);
+        JsonNode bundesligaBefore = playersOfLeague(League.BUNDESLIGA);
+        willThrow(new ExternalSourceException(TIMEOUT_REASON)).given(adapter).fetchLeague(League.BUNDESLIGA);
+
+        MvcTestResult result = synchronizeAs(adminToken);
+        JsonNode report = body(result);
+        JsonNode bundesligaAfter = playersOfLeague(League.BUNDESLIGA);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(report.get("leagues").values())
+                .extracting(league -> league.get("league").asString(), league -> league.get("status").asString())
+                .containsExactly(
+                        tuple("PREMIER", "SUCCEEDED"),
+                        tuple("BUNDESLIGA", "FAILED"),
+                        tuple("LA_LIGA", "SUCCEEDED"),
+                        tuple("SERIE_A", "SUCCEEDED"),
+                        tuple("LIGUE_1", "SUCCEEDED"));
+        assertThat(report.get("leagues").get(1).get("failureReason").asString()).isEqualTo(TIMEOUT_REASON);
+        assertThat(report.get("inactivationApplied").asBoolean()).isFalse();
+        assertThat(bundesligaBefore.get("totalElements").asLong()).isEqualTo(PLAYERS_PER_LEAGUE);
+        assertThat(bundesligaAfter).isEqualTo(bundesligaBefore);
+    }
+
+    @Test
+    void conLasCincoLigasFallidasRespondeIgualElInformeYElCatalogoNoCambia() throws Exception {
+        synchronizeAs(adminToken);
+        JsonNode catalogBefore = wholeCatalog();
+        willThrow(new ExternalSourceException(FORBIDDEN_REASON)).given(adapter).fetchLeague(any());
+
+        MvcTestResult result = synchronizeAs(adminToken);
+        JsonNode report = body(result);
+        JsonNode catalogAfter = wholeCatalog();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(report.get("leagues").values()).hasSize(League.values().length).allSatisfy(league -> {
+            assertThat(league.get("status").asString()).isEqualTo("FAILED");
+            assertThat(league.get("failureReason").asString()).isEqualTo(FORBIDDEN_REASON);
+        });
+        assertThat(report.get("inactivationApplied").asBoolean()).isFalse();
+        assertThat(catalogBefore.get("totalElements").asLong())
+                .isEqualTo((long) PLAYERS_PER_LEAGUE * League.values().length);
+        assertThat(catalogAfter).isEqualTo(catalogBefore);
+    }
+
+    @Test
+    void elTokenDeLaFuenteNoApareceEnLaRespuestaNiEnElRegistro(CapturedOutput output) throws Exception {
+        MvcTestResult succeeded = synchronizeAs(adminToken);
+        willThrow(new ExternalSourceException(FORBIDDEN_REASON)).given(adapter).fetchLeague(any());
+        MvcTestResult failed = synchronizeAs(adminToken);
+
+        assertThat(succeeded.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(failed.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(succeeded.getResponse().getContentAsString()).doesNotContain(SOURCE_TOKEN);
+        assertThat(failed.getResponse().getContentAsString()).doesNotContain(SOURCE_TOKEN);
+        assertThat(output.getAll())
+                .contains("Sincronización FULL (MANUAL) iniciada.")
+                .doesNotContain(SOURCE_TOKEN);
+    }
+
+    private JsonNode playersOfLeague(League league) throws Exception {
+        return body(mvc.get().uri(PLAYERS_PATH).param("league", league.name()).exchange());
+    }
+
+    /**
+     * Todos los jugadores del catálogo en una sola página: entran los de las cinco ligas.
+     */
+    private JsonNode wholeCatalog() throws Exception {
+        return body(mvc.get().uri(PLAYERS_PATH).param("size", "50").exchange());
     }
 }

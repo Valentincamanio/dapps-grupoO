@@ -511,18 +511,18 @@ temporada en el informe → T082. Además, T051, T062 y T063.
 
 ### Tests de la Historia 2
 
-- [ ] T079 [US2] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java:
+- [X] T079 [US2] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java:
   - la temporada queda guardada con su liga, su inicio, su fin y su jornada actual (escenario 1);
   - todos los partidos del snapshot quedan con fecha y hora, jornada, estado, local y visitante (escenario 2);
   - el partido `FINISHED` tiene su resultado final, su resultado del primer tiempo y su ganador (escenario 3)
-- [ ] T080 [US2] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java (depende de T079):
+- [X] T080 [US2] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java (depende de T079):
   - un partido guardado como `TIMED` que el snapshot siguiente informa `FINISHED` es la misma fila, con su resultado, y la cantidad de partidos no cambia. También un postergado que cambia de fecha (escenario 4);
   - partidos `POSTPONED`, `SUSPENDED`, `CANCELLED` y `AWARDED` se guardan con ese estado (escenario 5)
-- [ ] T081 [US2] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java (depende de T080):
+- [X] T081 [US2] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java (depende de T080):
   - un partido con un equipo fuera del catálogo no se guarda, figura en `skippedMatches` con `UNKNOWN_TEAM` y la liga queda `SUCCEEDED` (escenario 6 y FR-024);
   - un snapshot con otra temporada en curso crea la temporada nueva con sus partidos y conserva la anterior y los suyos (escenario 7 y FR-025)
-- [ ] T082 [P] [US2] Agregar a `SyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncControllerIT.java: después de una completa, cada liga del informe trae su `season` (`externalId`, `startDate`, `endDate` y `currentMatchday`) y los partidos en `matches.created`
-- [ ] T083 [US2] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T082 [P] [US2] Agregar a `SyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncControllerIT.java: después de una completa, cada liga del informe trae su `season` (`externalId`, `startDate`, `endDate` y `currentMatchday`) y los partidos en `matches.created`
+- [X] T083 [US2] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 **Checkpoint**: las HU1 y HU2 funcionan. Lo que necesita la cotización de la Entrega 2 ya se
 guarda.
@@ -544,26 +544,26 @@ responde igual y el token no aparece en ningún lado.
 
 ### Implementación de la Historia 3
 
-- [ ] T084 [US3] Agregar a backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared/GlobalExceptionHandler.java el handler `@ExceptionHandler(ServiceUnavailableException.class)`, que responde 503 con `ApiError` y el mensaje de la excepción, con el mismo patrón que el de `ConflictException` (research D15). El resto del advice no cambia
-- [ ] T085 [P] [US3] Agregar a `SyncController` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/SyncController.java el `@ApiResponse` del 503 con el esquema `ApiError`
+- [X] T084 [US3] Agregar a backend/src/main/java/ar/edu/unq/desapp/futbolmarket/shared/GlobalExceptionHandler.java el handler `@ExceptionHandler(ServiceUnavailableException.class)`, que responde 503 con `ApiError` y el mensaje de la excepción, con el mismo patrón que el de `ConflictException` (research D15). El resto del advice no cambia
+- [X] T085 [P] [US3] Agregar a `SyncController` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/SyncController.java el `@ApiResponse` del 503 con el esquema `ApiError`
 
 ### Tests de la Historia 3
 
-- [ ] T086 [P] [US3] Escribir `SyncDisabledIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncDisabledIT.java (depende de T084):
+- [X] T086 [P] [US3] Escribir `SyncDisabledIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncDisabledIT.java (depende de T084):
   - configuración: `@SpringBootTest`, `@AutoConfigureMockMvc` y `@ActiveProfiles("test")`, con el administrador por `@DynamicPropertySource`, sin token (el del perfil test) y con una H2 propia;
   - `@MockitoBean FootballDataAdapter`;
   - el disparo del administrador responde 503 con el mensaje exacto de `SyncDisabledException`, y `verifyNoInteractions(adapter)` (escenario 7, FR-041 y SC-012);
   - `GET /players` responde 200 con el catálogo vacío: la aplicación arrancó y no hay datos ficticios (HU1, escenario 7, y SC-002)
-- [ ] T087 [US3] Agregar a `SyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncControllerIT.java:
+- [X] T087 [US3] Agregar a `SyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncControllerIT.java:
   - después de una completa, una segunda en la que el adapter lanza `ExternalSourceException` para `BUNDESLIGA` responde 200, con `BUNDESLIGA` `FAILED` y su motivo, las otras cuatro `SUCCEEDED` e `inactivationApplied: false`. `GET /players?league=BUNDESLIGA` da lo mismo que antes (escenario 2 y SC-008);
   - las cinco fallidas con el motivo del 403 de research D5 responden 200, con cinco `FAILED` y el catálogo igual que antes (escenario 8 y FR-032);
   - con un `CapturedOutput`, ni el cuerpo de la respuesta ni la salida capturada contienen el token configurado, en una sincronización exitosa y en una fallida (escenario 9 y SC-011)
-- [ ] T088 [P] [US3] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java el caso de rollback (FR-034 y SC-008):
+- [X] T088 [P] [US3] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java el caso de rollback (FR-034 y SC-008):
   - se aplica un snapshot válido;
   - después, uno con el equipo renombrado, un jugador nuevo y un partido nuevo con un `externalId` de 33 caracteres, que la columna `VARCHAR(32)` rechaza;
   - `applyLeague` lanza `DataAccessException`;
   - el equipo conserva su nombre, el jugador nuevo no existe y las cantidades de las cuatro tablas son las de antes
-- [ ] T089 [US3] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T089 [US3] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 **Checkpoint**: las HU1 a HU3 funcionan. El sistema tolera las fallas de la fuente.
 

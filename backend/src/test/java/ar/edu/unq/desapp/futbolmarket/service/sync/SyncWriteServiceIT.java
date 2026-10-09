@@ -1,23 +1,65 @@
 package ar.edu.unq.desapp.futbolmarket.service.sync;
 
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CHELSEA_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CURRENT_MATCHDAY;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.FINISHED_KICK_OFF;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.LIVERPOOL_CREST;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.LIVERPOOL_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.LIVERPOOL_NAME;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.PREMIER_SEASON_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.SEASON_END;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.SEASON_START;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.TIMED_KICK_OFF;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.chelsea;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.finishedMatch;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.finishedMatchId;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.liverpool;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.match;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.player;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.snapshot;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.timedMatchId;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.assertj.core.api.Assertions.tuple;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.match.Match;
+import ar.edu.unq.desapp.futbolmarket.modelo.match.MatchSnapshot;
+import ar.edu.unq.desapp.futbolmarket.modelo.match.MatchStatus;
+import ar.edu.unq.desapp.futbolmarket.modelo.match.MatchWinner;
+import ar.edu.unq.desapp.futbolmarket.modelo.match.Score;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerSnapshot;
+import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.season.Season;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.EntityCounts;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.LeagueSnapshot;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.LeagueSyncResult;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.LeagueSyncStatus;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.MatchSkipReason;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.SkippedMatch;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SquadAssignment;
+import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
+import ar.edu.unq.desapp.futbolmarket.modelo.team.TeamSnapshot;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.match.MatchRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.season.SeasonRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.team.TeamRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.match.MatchSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.player.PlayerSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.season.SeasonSQLDAO;
@@ -49,6 +91,18 @@ class SyncWriteServiceIT {
 
     @Autowired
     private TeamSQLDAO teamDAO;
+
+    @Autowired
+    private SeasonRepository seasonRepository;
+
+    @Autowired
+    private MatchRepository matchRepository;
+
+    @Autowired
+    private TeamRepository teamRepository;
+
+    @Autowired
+    private PlayerRepository playerRepository;
 
     @BeforeEach
     void cleanDatabase() {
@@ -94,5 +148,180 @@ class SyncWriteServiceIT {
         assertThat(second.teams()).isEqualTo(new EntityCounts(0, 2, 0));
         assertThat(second.players()).isEqualTo(new EntityCounts(0, 8, 1));
         assertThat(second.matches()).isEqualTo(new EntityCounts(0, 2, 0));
+    }
+
+    @Test
+    void laTemporadaQuedaGuardadaConSuLigaSuInicioSuFinYSuJornadaActual() {
+        LeagueSnapshot premier = snapshot(League.PREMIER);
+
+        apply(premier);
+        var saved = seasonRepository.findByExternalId(PREMIER_SEASON_ID);
+
+        assertThat(saved).hasValueSatisfying(season -> {
+            assertThat(season.league()).isEqualTo(League.PREMIER);
+            assertThat(season.startDate()).isEqualTo(SEASON_START);
+            assertThat(season.endDate()).isEqualTo(SEASON_END);
+            assertThat(season.currentMatchday()).isEqualTo(CURRENT_MATCHDAY);
+        });
+    }
+
+    @Test
+    void todosLosPartidosQuedanGuardadosConFechaJornadaEstadoLocalYVisitante() {
+        LeagueSnapshot premier = snapshot(League.PREMIER);
+
+        apply(premier);
+        List<Match> saved = matchRepository.findAllByExternalIds(premier.matchExternalIds());
+
+        assertThat(saved)
+                .extracting(Match::externalId, Match::utcDate, Match::matchday, Match::status,
+                        match -> match.homeTeam().externalId(), match -> match.awayTeam().externalId())
+                .containsExactlyInAnyOrder(
+                        tuple(finishedMatchId(League.PREMIER), FINISHED_KICK_OFF, 1, MatchStatus.FINISHED,
+                                LIVERPOOL_ID, CHELSEA_ID),
+                        tuple(timedMatchId(League.PREMIER), TIMED_KICK_OFF, CURRENT_MATCHDAY + 1, MatchStatus.TIMED,
+                                CHELSEA_ID, LIVERPOOL_ID));
+        assertThat(saved).allSatisfy(match ->
+                assertThat(match.season().externalId()).isEqualTo(PREMIER_SEASON_ID));
+    }
+
+    @Test
+    void elPartidoTerminadoTieneSuResultadoFinalElDelPrimerTiempoYSuGanador() {
+        LeagueSnapshot premier = snapshot(League.PREMIER);
+
+        apply(premier);
+        List<Match> saved = matchRepository.findAllByExternalIds(List.of(finishedMatchId(League.PREMIER)));
+
+        assertThat(saved).singleElement().satisfies(match -> {
+            assertThat(match.fullTime()).isEqualTo(new Score(2, 1));
+            assertThat(match.halfTime()).isEqualTo(new Score(1, 0));
+            assertThat(match.winner()).isEqualTo(MatchWinner.HOME_TEAM);
+        });
+    }
+
+    @Test
+    void unPartidoProgramadoQueLaFuenteInformaTerminadoEsLaMismaFilaConSuResultado() {
+        String matchId = timedMatchId(League.PREMIER);
+        apply(premierWith(match(matchId, PREMIER_SEASON_ID, MatchStatus.TIMED, LIVERPOOL_ID, CHELSEA_ID)));
+        Long rowId = matchRepository.findAllByExternalIds(List.of(matchId)).getFirst().id();
+
+        apply(premierWith(finishedMatch(matchId, PREMIER_SEASON_ID, LIVERPOOL_ID, CHELSEA_ID)));
+        Match updated = matchRepository.findAllByExternalIds(List.of(matchId)).getFirst();
+
+        assertThat(updated.id()).isEqualTo(rowId);
+        assertThat(updated.status()).isEqualTo(MatchStatus.FINISHED);
+        assertThat(updated.fullTime()).isEqualTo(new Score(2, 1));
+        assertThat(updated.winner()).isEqualTo(MatchWinner.HOME_TEAM);
+        assertThat(matchDAO.count()).isEqualTo(1);
+    }
+
+    @Test
+    void unPartidoPostergadoQueCambiaDeFechaEsLaMismaFilaConLaFechaNueva() {
+        String matchId = timedMatchId(League.PREMIER);
+        Instant newDate = TIMED_KICK_OFF.plus(Duration.ofDays(21));
+        apply(premierWith(match(matchId, PREMIER_SEASON_ID, MatchStatus.POSTPONED, LIVERPOOL_ID, CHELSEA_ID)));
+        Long rowId = matchRepository.findAllByExternalIds(List.of(matchId)).getFirst().id();
+
+        apply(premierWith(new MatchSnapshot(matchId, PREMIER_SEASON_ID, newDate, CURRENT_MATCHDAY + 1,
+                MatchStatus.TIMED, LIVERPOOL_ID, CHELSEA_ID, null, null, null)));
+        Match updated = matchRepository.findAllByExternalIds(List.of(matchId)).getFirst();
+
+        assertThat(updated.id()).isEqualTo(rowId);
+        assertThat(updated.utcDate()).isEqualTo(newDate);
+        assertThat(updated.status()).isEqualTo(MatchStatus.TIMED);
+        assertThat(matchDAO.count()).isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = MatchStatus.class, names = {"POSTPONED", "SUSPENDED", "CANCELLED", "AWARDED"})
+    void unPartidoQueNoSeJugoNormalmenteSeGuardaConSuEstado(MatchStatus status) {
+        String matchId = timedMatchId(League.PREMIER);
+
+        apply(premierWith(match(matchId, PREMIER_SEASON_ID, status, LIVERPOOL_ID, CHELSEA_ID)));
+        List<Match> saved = matchRepository.findAllByExternalIds(List.of(matchId));
+
+        assertThat(saved).singleElement().satisfies(match -> assertThat(match.status()).isEqualTo(status));
+    }
+
+    @Test
+    void unPartidoConUnEquipoFueraDelCatalogoNoSeGuardaYLaLigaNoFalla() {
+        MatchSnapshot withUnknownTeam = match("250299", PREMIER_SEASON_ID, MatchStatus.TIMED, LIVERPOOL_ID, "1076");
+        LeagueSnapshot premier = premierWith(
+                finishedMatch(finishedMatchId(League.PREMIER), PREMIER_SEASON_ID, LIVERPOOL_ID, CHELSEA_ID),
+                withUnknownTeam);
+
+        LeagueSyncResult result = apply(premier);
+
+        assertThat(result.status()).isEqualTo(LeagueSyncStatus.SUCCEEDED);
+        assertThat(result.skippedMatches()).containsExactly(
+                new SkippedMatch("250299", LIVERPOOL_ID, "1076", TIMED_KICK_OFF, MatchSkipReason.UNKNOWN_TEAM));
+        assertThat(matchRepository.findAllByExternalIds(List.of("250299"))).isEmpty();
+        assertThat(matchDAO.count()).isEqualTo(1);
+    }
+
+    @Test
+    void otraTemporadaEnCursoSeCreaConSusPartidosYLaAnteriorSeConservaConLosSuyos() {
+        LeagueSnapshot current = snapshot(League.PREMIER);
+        apply(current);
+        Season next = new Season(null, "2602", League.PREMIER, LocalDate.of(2027, 8, 20), LocalDate.of(2028, 5, 28), 1);
+        MatchSnapshot nextMatch = new MatchSnapshot("260201", "2602", Instant.parse("2027-08-21T14:00:00Z"), 1,
+                MatchStatus.TIMED, LIVERPOOL_ID, CHELSEA_ID, null, null, null);
+        LeagueSnapshot nextSeason = new LeagueSnapshot(League.PREMIER, next, List.of(liverpool(), chelsea()),
+                List.of(nextMatch));
+
+        apply(nextSeason);
+        var previousSeason = seasonRepository.findByExternalId(PREMIER_SEASON_ID);
+        List<Match> previousMatches = matchRepository.findAllByExternalIds(current.matchExternalIds());
+        List<Match> nextMatches = matchRepository.findAllByExternalIds(List.of("260201"));
+
+        assertThat(seasonDAO.count()).isEqualTo(2);
+        assertThat(previousSeason).isPresent();
+        assertThat(previousMatches).hasSize(2).allSatisfy(match ->
+                assertThat(match.season().externalId()).isEqualTo(PREMIER_SEASON_ID));
+        assertThat(nextMatches).singleElement().satisfies(match ->
+                assertThat(match.season().externalId()).isEqualTo("2602"));
+        assertThat(matchDAO.count()).isEqualTo(3);
+    }
+
+    /**
+     * El partido nuevo tiene un {@code externalId} de 33 caracteres, que la columna
+     * {@code VARCHAR(32)} rechaza: es el último paso de la escritura, así que antes ya se renombró el
+     * equipo y se insertó el jugador nuevo, y todo eso tiene que revertirse (FR-034 y SC-008).
+     */
+    @Test
+    void unaLigaQueFallaAlEscribirSeRevierteEnteraYConservaLoQueTenia() {
+        apply(snapshot(League.PREMIER));
+        long teamsBefore = teamDAO.count();
+        long playersBefore = playerDAO.count();
+        long seasonsBefore = seasonDAO.count();
+        long matchesBefore = matchDAO.count();
+        List<PlayerSnapshot> squadWithNewPlayer = new ArrayList<>(liverpool().squad());
+        squadWithNewPlayer.add(player("64098", "Jugador Nuevo", Position.MIDFIELDER));
+        TeamSnapshot renamedLiverpool = new TeamSnapshot(LIVERPOOL_ID, "Liverpool Football Club", LIVERPOOL_CREST,
+                squadWithNewPlayer);
+        MatchSnapshot tooLongId = match("9".repeat(33), PREMIER_SEASON_ID, MatchStatus.TIMED, LIVERPOOL_ID, CHELSEA_ID);
+        LeagueSnapshot broken = snapshot(League.PREMIER, List.of(renamedLiverpool, chelsea()), List.of(tooLongId));
+
+        Throwable failure = catchThrowable(() -> apply(broken));
+        List<Team> savedLiverpool = teamRepository.findAllByExternalIds(List.of(LIVERPOOL_ID));
+        var newPlayer = playerRepository.findByExternalId("64098");
+
+        assertThat(failure).isInstanceOf(DataAccessException.class);
+        assertThat(savedLiverpool).singleElement().satisfies(team -> assertThat(team.name()).isEqualTo(LIVERPOOL_NAME));
+        assertThat(newPlayer).isEmpty();
+        assertThat(teamDAO.count()).isEqualTo(teamsBefore);
+        assertThat(playerDAO.count()).isEqualTo(playersBefore);
+        assertThat(seasonDAO.count()).isEqualTo(seasonsBefore);
+        assertThat(matchDAO.count()).isEqualTo(matchesBefore);
+    }
+
+    private LeagueSyncResult apply(LeagueSnapshot snapshot) {
+        return writeService.applyLeague(snapshot, SquadAssignment.of(List.of(snapshot)).resolve(List.of()));
+    }
+
+    /**
+     * La Premier de las fixtures, con sus dos equipos y solo los partidos recibidos.
+     */
+    private static LeagueSnapshot premierWith(MatchSnapshot... matches) {
+        return snapshot(League.PREMIER, List.of(liverpool(), chelsea()), List.of(matches));
     }
 }

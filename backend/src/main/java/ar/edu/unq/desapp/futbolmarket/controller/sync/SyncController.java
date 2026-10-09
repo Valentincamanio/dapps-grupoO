@@ -51,6 +51,9 @@ public class SyncController {
     @ApiResponse(responseCode = "403",
             description = "La credencial es válida pero no es de un administrador. No se consulta la fuente.",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "503",
+            description = "La sincronización está deshabilitada porque falta la credencial de la fuente.",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping
     public SyncReportResponse synchronize() {
         return SyncReportResponse.from(syncService.synchronizeAll(SyncOrigin.MANUAL));
