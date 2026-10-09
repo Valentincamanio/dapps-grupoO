@@ -632,47 +632,47 @@ T105 (el mismo semáforo).
 
 ### Implementación de la Historia 5
 
-- [ ] T097 [P] [US5] Agregar `static League fromName(String value)` al enum de backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/league/League.java y crear `UnsupportedLeagueException extends BadRequestException` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/league/exception/UnsupportedLeagueException.java:
+- [X] T097 [P] [US5] Agregar `static League fromName(String value)` al enum de backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/league/League.java y crear `UnsupportedLeagueException extends BadRequestException` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/league/exception/UnsupportedLeagueException.java:
   - `fromName` recorta los espacios de los extremos y distingue mayúsculas, igual que el enlace de enums de Spring (data-model.md y research D15);
   - un valor `null`, en blanco o no admitido lanza la excepción con `La liga '<valor>' no es una de las admitidas: PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1.`;
   - la lista de ligas del mensaje se arma desde `values()` (FR-030 y research D15)
-- [ ] T098 [US5] Escribir `LeagueTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/league/LeagueTest.java con estos casos (depende de T097):
+- [X] T098 [US5] Escribir `LeagueTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/league/LeagueTest.java con estos casos (depende de T097):
   - devuelve cada una de las cinco ligas por su nombre, y `" PREMIER "` devuelve `PREMIER`;
   - rechaza `MLS`, `premier` (minúsculas), `""` y `null` con `UnsupportedLeagueException`;
   - el mensaje repite el valor recibido
-- [ ] T099 [US5] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/SyncController.java sumar el parámetro opcional `@RequestParam(required = false) String league` (depende de T097):
+- [X] T099 [US5] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/SyncController.java sumar el parámetro opcional `@RequestParam(required = false) String league` (depende de T097):
   - si es `null`, sincroniza las cinco como hasta ahora;
   - si no, llama a `syncService.synchronizeLeague(League.fromName(league))`. Un `?league=` vacío también da 400;
   - Swagger: `@Parameter` con los cinco valores admitidos y los `@ApiResponse` del 400 y del 409, con el esquema `ApiError`
-- [ ] T100 [P] [US5] Crear `SyncScheduler` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncScheduler.java (research D12):
+- [X] T100 [P] [US5] Crear `SyncScheduler` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncScheduler.java (research D12):
   - `runWeeklySync()` con `@Scheduled(cron = "${futbolmarket.football-data.sync.cron}", zone = "${futbolmarket.football-data.sync.zone}")`;
   - sin token, registra un INFO y no hace nada;
   - si no, llama a `synchronizeAll(SyncOrigin.WEEKLY)` y, ante `SyncInProgressException`, registra un WARN con el motivo y omite la corrida (FR-031)
-- [ ] T101 [P] [US5] Crear `StartupSync` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StartupSync.java, con un método `@Async` y `@EventListener(ApplicationReadyEvent.class)` que sigue el flujo de research D13:
+- [X] T101 [P] [US5] Crear `StartupSync` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StartupSync.java, con un método `@Async` y `@EventListener(ApplicationReadyEvent.class)` que sigue el flujo de research D13:
   - sin token, registra el WARN exacto de contracts/configuration.md y termina (FR-041);
   - con `sync.on-startup` en `false`, termina;
   - con jugadores (`playerRepository.hasPlayers()`), registra en INFO `El catálogo ya tiene jugadores: no se sincroniza al arrancar.`;
   - si no, registra en INFO `El catálogo está vacío: se dispara una sincronización completa en segundo plano.` y llama a `synchronizeAll(SyncOrigin.STARTUP)`. Ante `SyncInProgressException`, registra un WARN
-- [ ] T102 [P] [US5] Escribir `SyncSchedulerTest` (unitario, `SyncService` mockeado y `OutputCaptureExtension`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncSchedulerTest.java con estos casos (depende de T100):
+- [X] T102 [P] [US5] Escribir `SyncSchedulerTest` (unitario, `SyncService` mockeado y `OutputCaptureExtension`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncSchedulerTest.java con estos casos (depende de T100):
   - con token, dispara una completa `WEEKLY`;
   - sin token, no llama al servicio y deja el INFO;
   - con otra en curso, no propaga la excepción y deja el WARN (escenarios 1 y 5)
-- [ ] T103 [P] [US5] Escribir `StartupSyncTest` (unitario, `PlayerRepository` y `SyncService` mockeados, `FootballDataProperties` real y `OutputCaptureExtension`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StartupSyncTest.java con estos casos (depende de T101):
+- [X] T103 [P] [US5] Escribir `StartupSyncTest` (unitario, `PlayerRepository` y `SyncService` mockeados, `FootballDataProperties` real y `OutputCaptureExtension`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StartupSyncTest.java con estos casos (depende de T101):
   - con el catálogo vacío y token, dispara una completa `STARTUP` (escenario 7);
   - con datos, no dispara y deja el INFO (escenario 8);
   - sin token, deja el WARN exacto y no consulta el catálogo (HU3, escenario 7);
   - con `on-startup` en `false`, no hace nada;
   - con otra en curso, deja el WARN sin propagar
-- [ ] T104 [P] [US5] Agregar a `FootballDataPropertiesTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/FootballDataPropertiesTest.java los casos del cron (research D12 y SC-013):
+- [X] T104 [P] [US5] Agregar a `FootballDataPropertiesTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/FootballDataPropertiesTest.java los casos del cron (research D12 y SC-013):
   - leer `futbolmarket.football-data.sync.cron` y `.zone` de `application.yaml` con `YamlPropertySourceLoader`;
   - con `CronExpression`, desde el domingo 2026-10-11 a las 10:00 de Argentina la próxima ejecución es el lunes 2026-10-12 a las 04:00 de Argentina (07:00 UTC);
   - desde ese lunes a las 04:00, la próxima es el lunes siguiente
-- [ ] T105 [US5] Agregar a `SyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncControllerIT.java (depende de T099):
+- [X] T105 [US5] Agregar a `SyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncControllerIT.java (depende de T099):
   - después de una completa, `?league=SERIE_A` responde 200 con `type: SINGLE_LEAGUE`, una sola liga e `inactivationApplied: false`. El adapter se invoca solo para `SERIE_A`, y `GET /players?league=PREMIER` da lo mismo que antes (escenario 2);
   - `?league=MLS` responde 400 con el mensaje exacto y `verifyNoInteractions(adapter)` (escenario 3);
   - `?league=` y `?league=premier` responden 400;
   - el 409 determinístico de research D21 (escenarios 4 y 9): el adapter mockeado avisa con un latch que entró y espera un segundo latch. El primer disparo corre en otro hilo, con `CompletableFuture`. El test espera la entrada, manda el segundo, que responde 409 con `Ya hay una sincronización en curso.`, libera el latch y verifica que el primero respondió 200. Todas las esperas tienen timeout
-- [ ] T106 [US5] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T106 [US5] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 **Checkpoint**: las cinco historias funcionan.
 

@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -17,6 +20,7 @@ import org.springframework.boot.context.properties.source.ConfigurationPropertyS
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.scheduling.support.CronExpression;
 
 import ar.edu.unq.desapp.futbolmarket.config.FootballDataProperties.Sync;
 
@@ -114,6 +118,41 @@ class FootballDataPropertiesTest {
 
         assertThat(connectTimeout).isEqualTo(CONNECT_TIMEOUT);
         assertThat(readTimeout).isEqualTo(READ_TIMEOUT);
+    }
+
+    @Test
+    void desdeElDomingoALasDiezLaProximaCorridaEsElLunesALasCuatroDeArgentina() throws IOException {
+        ZoneId zone = syncZone();
+        ZonedDateTime sunday = ZonedDateTime.of(2026, 10, 11, 10, 0, 0, 0, zone);
+
+        ZonedDateTime next = weeklyCron().next(sunday);
+
+        assertThat(next).isEqualTo(ZonedDateTime.of(2026, 10, 12, 4, 0, 0, 0, zone));
+        assertThat(next.toInstant()).isEqualTo(Instant.parse("2026-10-12T07:00:00Z"));
+    }
+
+    @Test
+    void desdeElLunesALasCuatroLaProximaCorridaEsElLunesSiguiente() throws IOException {
+        ZoneId zone = syncZone();
+        ZonedDateTime monday = ZonedDateTime.of(2026, 10, 12, 4, 0, 0, 0, zone);
+
+        ZonedDateTime next = weeklyCron().next(monday);
+
+        assertThat(next).isEqualTo(ZonedDateTime.of(2026, 10, 19, 4, 0, 0, 0, zone));
+    }
+
+    /**
+     * El cron de la corrida semanal, tal como está en {@code application.yaml}.
+     */
+    private static CronExpression weeklyCron() throws IOException {
+        return CronExpression.parse(applicationYaml().bind("futbolmarket.football-data.sync.cron", String.class).get());
+    }
+
+    /**
+     * La zona en la que se interpreta el cron, tal como está en {@code application.yaml}.
+     */
+    private static ZoneId syncZone() throws IOException {
+        return ZoneId.of(applicationYaml().bind("futbolmarket.football-data.sync.zone", String.class).get());
     }
 
     private static Sync sync() {

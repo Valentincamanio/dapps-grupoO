@@ -21,16 +21,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -86,6 +95,7 @@ class SyncControllerIT {
     private static final String TIMEOUT_REASON = "La fuente no respondió a tiempo.";
     private static final String FORBIDDEN_REASON =
             "La fuente rechazó la credencial o el recurso no está disponible en el plan contratado (403).";
+    private static final long LATCH_TIMEOUT_SECONDS = 10;
 
     private static final int TEAMS_PER_LEAGUE = 2;
     private static final int PLAYERS_PER_LEAGUE = 8;
@@ -444,6 +454,85 @@ class SyncControllerIT {
                 .filteredOn(player -> player.get("name").asString().equals("Federico Chiesa"))
                 .singleElement()
                 .satisfies(kept -> assertThat(kept.get("team").asString()).isEqualTo(LIVERPOOL_NAME));
+    }
+
+    @Test
+    void unaSolaLigaSincronizaSoloEsaYNoTocaLasDemas() throws Exception {
+        synchronizeAs(adminToken);
+        JsonNode premierBefore = playersOfLeague(League.PREMIER);
+        clearInvocations(adapter);
+
+        MvcTestResult result = synchronizeLeagueAs(adminToken, "SERIE_A");
+        JsonNode report = body(result);
+        JsonNode premierAfter = playersOfLeague(League.PREMIER);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(report.get("type").asString()).isEqualTo("SINGLE_LEAGUE");
+        assertThat(report.get("origin").asString()).isEqualTo("MANUAL");
+        assertThat(report.get("leagues").values())
+                .extracting(league -> league.get("league").asString())
+                .containsExactly("SERIE_A");
+        assertThat(report.get("inactivationApplied").asBoolean()).isFalse();
+        verify(adapter).fetchLeague(League.SERIE_A);
+        verifyNoMoreInteractions(adapter);
+        assertThat(premierAfter).isEqualTo(premierBefore);
+    }
+
+    @Test
+    void unaLigaQueNoEsUnaDeLasCincoResponde400ConElValorRecibidoSinConsultarLaFuente() throws Exception {
+        MvcTestResult result = synchronizeLeagueAs(adminToken, "MLS");
+        JsonNode body = body(result);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(body.get("message").asString())
+                .isEqualTo("La liga 'MLS' no es una de las admitidas: PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1.");
+        assertThat(body.get("path").asString()).isEqualTo(SYNC_PATH);
+        verifyNoInteractions(adapter);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "premier"})
+    void unaLigaVaciaOEnMinusculasResponde400SinConsultarLaFuente(String league) throws Exception {
+        MvcTestResult result = synchronizeLeagueAs(adminToken, league);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        verifyNoInteractions(adapter);
+    }
+
+    /**
+     * El adapter avisa que la primera sincronización entró y la retiene hasta que el test la libera.
+     * Así el segundo disparo llega con la primera en curso, sin depender del tiempo. Todas las esperas
+     * tienen timeout, para que un error no deje el test colgado.
+     */
+    @Test
+    void unSegundoDisparoConOtroEnCursoResponde409YElPrimeroTerminaBien() throws Exception {
+        CountDownLatch firstEntered = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        willAnswer(invocation -> {
+            firstEntered.countDown();
+            if (!releaseFirst.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("El test no liberó la primera sincronización a tiempo.");
+            }
+            return snapshot(invocation.<League>getArgument(0));
+        }).given(adapter).fetchLeague(any());
+
+        CompletableFuture<MvcTestResult> first = CompletableFuture.supplyAsync(() -> synchronizeAs(adminToken));
+        boolean entered = firstEntered.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        MvcTestResult second = synchronizeAs(adminToken);
+        releaseFirst.countDown();
+        MvcTestResult firstResult = first.get(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        assertThat(entered).isTrue();
+        assertThat(second.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(body(second).get("message").asString()).isEqualTo("Ya hay una sincronización en curso.");
+        assertThat(firstResult.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+    }
+
+    private MvcTestResult synchronizeLeagueAs(String sessionToken, String league) {
+        return mvc.post().uri(SYNC_PATH)
+                .param("league", league)
+                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionToken)
+                .exchange();
     }
 
     private long idOfLiverpoolPlayer(String name) throws Exception {

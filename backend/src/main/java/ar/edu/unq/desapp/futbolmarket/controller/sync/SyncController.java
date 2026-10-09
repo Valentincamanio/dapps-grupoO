@@ -2,14 +2,18 @@ package ar.edu.unq.desapp.futbolmarket.controller.sync;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import ar.edu.unq.desapp.futbolmarket.config.OpenApiConfig;
 import ar.edu.unq.desapp.futbolmarket.controller.sync.dto.SyncReportResponse;
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SyncOrigin;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.SyncReport;
 import ar.edu.unq.desapp.futbolmarket.service.sync.SyncService;
 import ar.edu.unq.desapp.futbolmarket.shared.ApiError;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -37,7 +41,8 @@ public class SyncController {
 
     @Operation(
             summary = "Sincroniza el catálogo con Football-Data.org",
-            description = "Sincroniza las cinco ligas. El request espera a que la sincronización termine y "
+            description = "Sin league, sincroniza las cinco ligas. Con league, sincroniza solo esa liga. "
+                    + "El request espera a que la sincronización termine y "
                     + "devuelve su informe con 200, aunque alguna liga, o todas, haya fallado. Una liga que "
                     + "falla conserva exactamente lo que tenía. Solo una sincronización completa con las cinco "
                     + "ligas en éxito inactiva a los jugadores que no aparecieron en ningún plantel: "
@@ -45,17 +50,30 @@ public class SyncController {
                     + "semanal o de arranque. La respuesta de la fuente puede demorar el request hasta un "
                     + "minuto por el límite de consultas del plan gratis.")
     @ApiResponse(responseCode = "200", description = "Sincronización terminada. Devuelve el informe.")
+    @ApiResponse(responseCode = "400",
+            description = "La liga pedida no es una de las cinco. No se consulta la fuente.",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "401",
             description = "Falta la credencial, o es inválida o está vencida. No se consulta la fuente.",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "403",
             description = "La credencial es válida pero no es de un administrador. No se consulta la fuente.",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409",
+            description = "Ya hay una sincronización en curso (manual, semanal o de arranque).",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "503",
             description = "La sincronización está deshabilitada porque falta la credencial de la fuente.",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PostMapping
-    public SyncReportResponse synchronize() {
-        return SyncReportResponse.from(syncService.synchronizeAll(SyncOrigin.MANUAL));
+    public SyncReportResponse synchronize(
+            @Parameter(description = "Liga a sincronizar. Sin este parámetro se sincronizan las cinco. Un valor "
+                    + "que no es una de las cinco se rechaza con 400 indicando el valor recibido, sin consultar "
+                    + "la fuente.", schema = @Schema(implementation = League.class))
+            @RequestParam(required = false) String league) {
+        SyncReport report = league == null
+                ? syncService.synchronizeAll(SyncOrigin.MANUAL)
+                : syncService.synchronizeLeague(League.fromName(league));
+        return SyncReportResponse.from(report);
     }
 }
