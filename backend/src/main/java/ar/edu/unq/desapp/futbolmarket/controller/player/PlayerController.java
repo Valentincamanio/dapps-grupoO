@@ -63,6 +63,7 @@ public class PlayerController {
     }
 
     private PlayerResponse toResponse(Player player) {
-        return new PlayerResponse(player.id(), player.name(), player.position(), player.team().name(), player.league());
+        return new PlayerResponse(player.id(), player.name(), player.position(), player.team().name(), player.league(),
+                player.dateOfBirth(), player.nationality(), player.team().crest(), player.active());
     }
 }

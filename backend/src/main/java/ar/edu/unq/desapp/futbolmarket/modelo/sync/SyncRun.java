@@ -44,6 +44,14 @@ public class SyncRun {
         return new SyncRun(SyncType.SINGLE_LEAGUE, SyncOrigin.MANUAL, startedAt, List.of(league));
     }
 
+    public SyncType type() {
+        return type;
+    }
+
+    public SyncOrigin origin() {
+        return origin;
+    }
+
     public List<League> leagues() {
         return leagues;
     }

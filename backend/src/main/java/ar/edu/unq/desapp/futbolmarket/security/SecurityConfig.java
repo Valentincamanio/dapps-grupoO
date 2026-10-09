@@ -20,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.service.auth.AuthService;
 import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +64,10 @@ public class SecurityConfig {
      * Se permite el dispatch {@code ERROR} para que Boot pueda renderizar los errores: sin eso, un
      * 400 o un 404 en una ruta pública sale disfrazado de 401. Pedir {@code /error} directamente
      * sigue exigiendo credencial, porque no es una ruta pública.
+     *
+     * <p>La sincronización manual es la primera regla por rol: sin credencial responde 401 y un
+     * {@code USER} recibe 403, los dos antes del controller (research D15). La regla es por método,
+     * así que {@code GET /players/**} sigue público.</p>
      */
     @Bean
     public SecurityFilterChain apiFilterChain(HttpSecurity http, RequestMatcher publicEndpoints,
@@ -79,6 +84,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(requests -> requests
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(publicEndpoints).permitAll()
+                        .requestMatchers(pathPattern(HttpMethod.POST, "/players/sync")).hasRole(Role.ADMIN.name())
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(jsonAuthenticationEntryPoint)

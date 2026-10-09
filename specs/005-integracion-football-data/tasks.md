@@ -395,17 +395,17 @@ cambia uno solo, el resto deja de compilar.
 
 ### 2E. Servicios de la sincronización (paso 6 del plan)
 
-- [ ] T065 [P] Crear `SyncReportLogger` (`@Component`, SLF4J) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncReportLogger.java con `void log(SyncReport)`, según research D19 y los ejemplos de quickstart.md 2.3, y su test `SyncReportLoggerTest` (unitario, con `OutputCaptureExtension`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncReportLoggerTest.java (depende de T043 y T048):
+- [X] T065 [P] Crear `SyncReportLogger` (`@Component`, SLF4J) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncReportLogger.java con `void log(SyncReport)`, según research D19 y los ejemplos de quickstart.md 2.3, y su test `SyncReportLoggerTest` (unitario, con `OutputCaptureExtension`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncReportLoggerTest.java (depende de T043 y T048):
   - una línea por liga: en INFO con los conteos (creados/actualizados/omitidos) y la temporada, o en WARN con el motivo;
   - líneas de detalle en INFO solo si hay algo para listar: jugadores omitidos con nombre y equipo, partidos omitidos, duplicados, reactivados e inactivados;
   - una línea final en INFO con la duración en segundos y los totales. Si no se inactivó a nadie, dice por qué, traduciendo a texto `report.inactivationSkipReason()`: el logger no decide el motivo (Principio II);
   - la línea de inicio no es de este componente: la escribe `SyncService` (T067), como se ve en quickstart.md 2.3;
   - casos del test: una liga procesada y una fallida con su motivo; los omitidos aparecen con nombre y equipo; sin nada para listar, no hay líneas de detalle; la línea final dice el motivo de cada `InactivationSkipReason` y no lo dice si se inactivó (FR-044 y FR-045)
-- [ ] T066 [P] Crear `SyncWriteService` (`@Service`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteService.java con los repositories de equipos, jugadores, temporadas y partidos (research D8 y D10):
+- [X] T066 [P] Crear `SyncWriteService` (`@Service`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteService.java con los repositories de equipos, jugadores, temporadas y partidos (research D8 y D10):
   - `@Transactional LeagueSyncResult applyLeague(LeagueSnapshot, SquadAssignment)`: arma un `LeagueSync` y sigue los cinco pasos de D8. Cada paso es una carga por `externalId`, la decisión del modelo y un `saveAll` o `save`. Los equipos que referencian los partidos se cargan después de guardar los de la liga;
   - `@Transactional List<Player> deactivateMissing(SyncRun run)`: `run.playersToDeactivate(playerRepository.findAllActive())`, `deactivate()` sobre cada uno y `saveAll` solo de esos;
   - sin `if` de negocio
-- [ ] T067 Crear `SyncService` (`@Service`, no transaccional) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncService.java con el flujo de research D8 y D11 (depende de T059, T065 y T066):
+- [X] T067 Crear `SyncService` (`@Service`, no transaccional) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncService.java con el flujo de research D8 y D11 (depende de T059, T065 y T066):
   - dependencias: `FootballDataProperties`, `FootballDataAdapter`, `SyncWriteService`, `PlayerRepository`, `SyncReportLogger` y `Clock`;
   - `SyncReport synchronizeAll(SyncOrigin origin)` y `SyncReport synchronizeLeague(League league)`;
   - primero, sin token, lanza `SyncDisabledException`. Después, si `semaphore.tryAcquire()` falla (`Semaphore(1)`), lanza `SyncInProgressException`. Todo lo demás va en un `try` con `release()` en el `finally`;
@@ -416,7 +416,7 @@ cambia uno solo, el resto deja de compilar.
   - si `run.canDeactivate()`, llama a `deactivateMissing`;
   - cierra con `run.finish(clock.instant(), inactivados)` y `SyncReportLogger.log`;
   - sin `catch (Exception e)`
-- [ ] T068 Escribir `SyncServiceTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncServiceTest.java (depende de T048 y T067):
+- [X] T068 Escribir `SyncServiceTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncServiceTest.java (depende de T048 y T067):
   - armado: Mockito para el adapter, `SyncWriteService`, `PlayerRepository` y `SyncReportLogger`; un `FootballDataProperties` real con token y un `Clock` fijo;
   - sin token lanza `SyncDisabledException` con su mensaje y no toca el adapter;
   - una segunda sincronización pedida desde la respuesta del adapter mockeado lanza `SyncInProgressException`. Es determinístico, sin hilos;
@@ -428,12 +428,12 @@ cambia uno solo, el resto deja de compilar.
   - una sola liga descarga solo esa, es `SINGLE_LEAGUE` y `MANUAL`, y no inactiva;
   - consulta los jugadores actuales por los ids duplicados;
   - `startedAt` y `finishedAt` salen del reloj
-- [ ] T069 Escribir `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java (depende de T048 y T066):
+- [X] T069 Escribir `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java (depende de T048 y T066):
   - configuración y limpieza: las de T037 (H2 `sync-it` y contexto compartido);
   - caso base: `applyLeague` con `SnapshotFixtures.snapshot(PREMIER)` y un `SquadAssignment` resuelto guarda equipos, jugadores, temporada y partidos (cantidades por DAO) y devuelve los conteos de creados.
 
   Las historias le suman métodos
-- [ ] T070 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T070 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 **Checkpoint**: el motor está listo y probado. Las historias pueden empezar.
 
@@ -456,22 +456,22 @@ sin consultar la fuente.
 
 ### Implementación de la Historia 1
 
-- [ ] T071 [P] [US1] Crear el record `SyncReportResponse` con records anidados y `static SyncReportResponse from(SyncReport)`, como `ProfileResponse.from`, en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/dto/SyncReportResponse.java:
+- [X] T071 [P] [US1] Crear el record `SyncReportResponse` con records anidados y `static SyncReportResponse from(SyncReport)`, como `ProfileResponse.from`, en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/dto/SyncReportResponse.java:
   - los campos y los nombres son exactamente los del esquema `SyncReportResponse` de contracts/players-api.yaml;
   - el modelo se traduce a esos nombres: por ejemplo, `teamName` pasa a `team`, `keptTeamName` a `keptTeam` y `ignoredTeamName` a `ignoredTeam`. Los jugadores van como `PlayerSummary(id, externalId, name, team)` y la temporada como `SeasonSummary`, o `null` si la liga falló
-- [ ] T072 [US1] Crear `SyncController` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/SyncController.java (depende de T071):
+- [X] T072 [US1] Crear `SyncController` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/SyncController.java (depende de T071):
   - `@RestController` y `@RequestMapping("/players/sync")`;
   - `@Tag(name = "Sincronización")` y dos `@SecurityRequirement` a nivel de clase (`OpenApiConfig.BEARER_AUTH` y `OpenApiConfig.API_KEY_AUTH`), igual que `AccountController`;
   - `@PostMapping` sin parámetros, que llama a `syncService.synchronizeAll(SyncOrigin.MANUAL)` y responde 200 con `SyncReportResponse.from(report)`;
   - `@Operation` en español, tomado de contracts/players-api.yaml;
   - `@ApiResponse` para 200, 401 y 403, con el esquema `ApiError` en los errores. El 503 se agrega en T085 y el 400 y el 409 en T099;
   - solo habla con `SyncService`
-- [ ] T073 [P] [US1] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/security/SecurityConfig.java agregar `.requestMatchers(pathPattern(HttpMethod.POST, "/players/sync")).hasRole(Role.ADMIN.name())` después del matcher de rutas públicas y antes de `anyRequest().authenticated()` (research D15). Es la primera regla por rol. No tocar la línea TEMPORAL de `GET /players`
-- [ ] T074 [P] [US1] Agregar al final de `PlayerResponse` los campos `LocalDate dateOfBirth`, `String nationality`, `String teamCrest` y `boolean active` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/player/dto/PlayerResponse.java, y pasarlos desde `toResponse(Player)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/player/PlayerController.java (FR-046 y research D18). El resto del controller no cambia
+- [X] T073 [P] [US1] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/security/SecurityConfig.java agregar `.requestMatchers(pathPattern(HttpMethod.POST, "/players/sync")).hasRole(Role.ADMIN.name())` después del matcher de rutas públicas y antes de `anyRequest().authenticated()` (research D15). Es la primera regla por rol. No tocar la línea TEMPORAL de `GET /players`
+- [X] T074 [P] [US1] Agregar al final de `PlayerResponse` los campos `LocalDate dateOfBirth`, `String nationality`, `String teamCrest` y `boolean active` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/player/dto/PlayerResponse.java, y pasarlos desde `toResponse(Player)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/player/PlayerController.java (FR-046 y research D18). El resto del controller no cambia
 
 ### Tests de la Historia 1
 
-- [ ] T075 [US1] Escribir `SyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncControllerIT.java, siguiendo el patrón de `AdminAccountIT` (research D21) (depende de T072 a T074):
+- [X] T075 [US1] Escribir `SyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/SyncControllerIT.java, siguiendo el patrón de `AdminAccountIT` (research D21) (depende de T072 a T074):
   - anotaciones: `@SpringBootTest`, `@AutoConfigureMockMvc`, `@ActiveProfiles("test")` y, desde ahora, `@ExtendWith(OutputCaptureExtension.class)`, porque la usa la HU3;
   - `@DynamicPropertySource` con un administrador al azar, `futbolmarket.football-data.token` al azar y una H2 propia (`jdbc:h2:mem:sync-e2e-<sufijo>;DB_CLOSE_DELAY=-1`);
   - `@MockitoBean FootballDataAdapter`, cuyo `fetchLeague` devuelve `SnapshotFixtures.snapshot(liga)`;
@@ -483,11 +483,11 @@ sin consultar la fuente.
   - un usuario común, con su clave de `AuthTestHelper`, recibe 403 con el mensaje de falta de permiso, y `verifyNoInteractions(adapter)` (escenario 8 y SC-010);
   - sin credencial responde 401 sin tocar el adapter (escenario 9);
   - una segunda completa idéntica da `created` 0 y `updated` igual a los creados en la primera, con el mismo `totalElements` (escenario 10)
-- [ ] T076 [P] [US1] Agregar métodos a `PlayerControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/PlayerControllerIT.java, con el servicio mockeado como los existentes:
+- [X] T076 [P] [US1] Agregar métodos a `PlayerControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/PlayerControllerIT.java, con el servicio mockeado como los existentes:
   - el listado y el detalle devuelven `dateOfBirth` en `yyyy-MM-dd`, `nationality`, `teamCrest` y `active`;
   - una fecha de nacimiento y una nacionalidad ausentes salen como `null` (FR-014 y FR-046)
-- [ ] T077 [P] [US1] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java: aplicar dos veces el mismo snapshot deja las mismas cantidades de equipos, jugadores, temporadas y partidos, y la segunda vez los conteos dan `created` 0 y todo en `updated` (SC-005)
-- [ ] T078 [US1] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T077 [P] [US1] Agregar a `SyncWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncWriteServiceIT.java: aplicar dos veces el mismo snapshot deja las mismas cantidades de equipos, jugadores, temporadas y partidos, y la segunda vez los conteos dan `created` 0 y todo en `updated` (SC-005)
+- [X] T078 [US1] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 **Checkpoint**: la HU1 funciona sola. El catálogo se construye desde la fuente con un disparo
 manual. Es el MVP.
