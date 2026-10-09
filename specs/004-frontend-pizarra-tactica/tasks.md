@@ -103,7 +103,7 @@ router y la infraestructura de pruebas con MSW. Ninguna historia empieza antes d
 ### Integración continua
 
 - [ ] T034 Crear `.github/workflows/frontend-ci.yml` siguiendo el estilo de `.github/workflows/backend-ci.yml` (plan, "Integración continua"): `on.push` y `on.pull_request` a `main` y `develop` con `paths: ['frontend/**', '.github/workflows/frontend-ci.yml']`; `concurrency` por workflow y ref con `cancel-in-progress: true`; `permissions: contents: read`; job `test` en `ubuntu-latest` con `defaults.run.working-directory: frontend`; pasos `actions/checkout` (misma mayor que backend-ci), `actions/setup-node` (Node 20, `cache: npm`, `cache-dependency-path: frontend/package-lock.json`), `npm ci`, `npm run lint`, `npm test`, `npm run build` y `actions/upload-artifact` (misma mayor que backend-ci) con `if: always()`, `name: frontend-test-results`, `path: frontend/test-results`, `retention-days: 7`. No tocar `backend-ci.yml`
-- [ ] T035 Verificar desde `frontend/` que `npm run lint`, `npm test` y `npm run build` terminan con código 0 y que `frontend/test-results/junit.xml` se genera
+- [X] T035 Verificar desde `frontend/` que `npm run lint`, `npm test` y `npm run build` terminan con código 0 y que `frontend/test-results/junit.xml` se genera
 
 **Checkpoint**: base lista. Las historias pueden empezar (en orden de prioridad o en paralelo).
 
@@ -121,7 +121,7 @@ el aviso, y al entrar volver a `/vestuario`.
 
 ### Implementación de la historia 1
 
-- [ ] T036 [US1] Agregar `register(req: RegisterRequest): Promise<RegisterResponse>` -> `POST /auth/register` en `frontend/src/services/authService.ts`
+- [X] T036 [US1] Agregar `register(req: RegisterRequest): Promise<RegisterResponse>` -> `POST /auth/register` en `frontend/src/services/authService.ts`
 - [ ] T037 [P] [US1] Crear `frontend/src/utils/formErrors.ts` con `toFormErrors(apiError, fields)` según data-model §1 "Reparto de errores": cada `violation.field` va a su campo; `message` sin `violations` va como nota general; en los 409 del registro, si el mensaje menciona "usuario" se asocia también a `username` y si menciona "correo" a `email`
 - [ ] T038 [P] [US1] Crear `frontend/src/components/ApiKeyReveal.tsx` y `frontend/src/components/ApiKeyReveal.module.css` (research R-10): clave en un campo de solo lectura seleccionable, advertencia fija "esta clave no se vuelve a mostrar", botón "copiar" que usa `navigator.clipboard.writeText` y confirma con `ChalkNote` "clave copiada"; si falla, avisa que la copia automática no funcionó y selecciona el texto; botón "continuar" vía callback `onContinue`. No guarda la clave en ningún lado
 - [ ] T039 [P] [US1] Crear `frontend/src/hooks/useLeaveGuard.ts` (research R-10): con `active = true` usa `useBlocker` de React Router para pedir confirmación al navegar dentro de la app y un listener de `beforeunload` para recargar o cerrar; expone el estado del bloqueo para que la página muestre una `ChalkNote` de confirmación ("la clave no se vuelve a mostrar, ¿salir igual?" con "salir" y "quedarme")
