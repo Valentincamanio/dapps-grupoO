@@ -1,6 +1,7 @@
 // Rutas de la app; cada historia agrega las suyas como hijas del layout.
-import { createBrowserRouter, type RouteObject } from 'react-router';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { AppLayout } from '../pages/AppLayout';
+import { BoardPage } from '../pages/BoardPage';
 import { LockerRoomPage } from '../pages/LockerRoomPage';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
@@ -12,6 +13,8 @@ export const appRoutes: RouteObject[] = [
     path: '/',
     element: <AppLayout />,
     children: [
+      { index: true, element: <Navigate to="/pizarra" replace /> },
+      { path: 'pizarra', element: <BoardPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       {
@@ -22,6 +25,7 @@ export const appRoutes: RouteObject[] = [
           </RequireSession>
         ),
       },
+      { path: '*', element: <Navigate to="/pizarra" replace /> },
     ],
   },
 ];
