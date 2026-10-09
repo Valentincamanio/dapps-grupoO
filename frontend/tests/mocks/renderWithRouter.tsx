@@ -1,6 +1,11 @@
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router';
+import {
+  createMemoryRouter,
+  RouterProvider,
+  type InitialEntry,
+  type RouteObject,
+} from 'react-router';
 import { SessionProvider } from '../../src/context/SessionContext';
 import { appRoutes } from '../../src/router/routes';
 import { writeSession } from '../../src/services/sessionStorage';
@@ -9,7 +14,7 @@ import { SEED_TOKEN } from './handlers';
 interface RenderWithRouterOptions {
   // Por defecto, las rutas reales de la app
   routes?: RouteObject[];
-  initialEntries?: string[];
+  initialEntries?: InitialEntry[];
   // 'valid': token que el backend simulado acepta.
   // 'expired': vigente según su fecha pero rechazado con 401 por el backend (token vencido).
   session?: 'valid' | 'expired';
