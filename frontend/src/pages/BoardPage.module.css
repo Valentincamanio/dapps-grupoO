@@ -1,6 +1,48 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.filters {
+  display: flex;
+  justify-content: center;
+}
+
 .content {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.team {
+  display: flex;
+}
+
+/* Cancha a la izquierda desde pantallas medianas; en celular va arriba */
+@media (min-width: 900px) {
+  .layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .filters {
+    flex: 0 0 320px;
+    position: sticky;
+    top: 16px;
+  }
+
+  .content {
+    flex: 1 1 auto;
+  }
 }
 
 .grid {

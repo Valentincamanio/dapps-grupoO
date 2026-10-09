@@ -54,13 +54,16 @@ async function loadAll(): Promise<void> {
   }
 }
 
-function ensureLoaded(): Promise<void> {
-  if (cache.status === 'success') return Promise.resolve();
-  if (pending) return pending;
-  pending = loadAll().finally(() => {
-    pending = null;
-  });
-  return pending;
+// Resuelve con el catálogo completo, o con null si no se pudo cargar
+function ensureLoaded(): Promise<Player[] | null> {
+  if (!pending && cache.status !== 'success') {
+    pending = loadAll().finally(() => {
+      pending = null;
+    });
+  }
+  return (pending ?? Promise.resolve()).then(() =>
+    cache.status === 'success' ? cache.players : null,
+  );
 }
 
 // Solo para los tests: vuelve la caché al estado inicial

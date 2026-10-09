@@ -1,0 +1,72 @@
+.pitch {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.field {
+  position: relative;
+}
+
+.lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  stroke: var(--chalk-dim);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.zones {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: 200px;
+}
+
+.zone {
+  background: transparent;
+  border: 0;
+  color: var(--chalk);
+  font-family: var(--font-script);
+  font-size: 22px;
+  font-weight: 700;
+  text-shadow: var(--shadow-chalk-text);
+  transition: background 0.15s;
+}
+
+.zone:hover {
+  background: rgba(244, 241, 230, 0.1);
+}
+
+.all {
+  align-self: center;
+  background: transparent;
+  border: 2px solid var(--chalk-dim);
+  border-radius: 50% 45% 55% 40% / 60% 50% 50% 45%;
+  padding: 0 18px;
+  font-family: var(--font-script);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--chalk);
+}
+
+.active {
+  background: rgba(255, 232, 115, 0.25);
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+/* Versión compacta en celular */
+@media (max-width: 559px) {
+  .zones {
+    height: 100px;
+  }
+
+  .zone {
+    font-size: 16px;
+  }
+}

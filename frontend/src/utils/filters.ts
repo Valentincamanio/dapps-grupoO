@@ -2,6 +2,7 @@
 import { LEAGUES, POSITIONS } from '../types/api';
 import type { League, PlayerQuery, Position } from '../types/api';
 import type { BoardFilters } from '../types/board';
+import { leagueLabel, positionPlural } from './positions';
 
 export const SHEET_SIZE = 12;
 
@@ -38,4 +39,13 @@ export function toPlayerQuery(filters: BoardFilters): PlayerQuery {
     page: filters.page - 1,
     size: SHEET_SIZE,
   };
+}
+
+// Texto de la nota cuando la combinación de filtros no tiene jugadores
+export function describeEmptyCombination(filters: BoardFilters): string {
+  const parts = ['no hay', positionPlural(filters.position)];
+  if (filters.league) parts.push(`de ${leagueLabel(filters.league)}`);
+  if (filters.team) parts.push('de ese equipo');
+  parts.push('en la pizarra');
+  return parts.join(' ');
 }
