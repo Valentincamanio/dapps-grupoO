@@ -717,6 +717,14 @@ T105 (el mismo semáforo).
   - agregar la fixture backend/src/test/resources/footballdata/error-400-invalid-token.json con el cuerpo real. En `FootballDataAdapterTest`, agregar dos métodos: el 400 del token inválido da el motivo de la credencial, y un 400 con otro `message` da el genérico. Los métodos existentes no se tocan;
   - actualizar research.md D5, contracts/football-data-api.md (tabla de errores y ejemplo real) y quickstart.md 3.3 (fila de la credencial rechazada);
   - correr `./gradlew build` en backend/ y repetir la credencial rechazada de quickstart.md 3.3 con `token-invalido`
+- [X] T118 Actualizar README.md en la raíz del repositorio. Ninguna tarea lo cubría y se detectó al preparar la PR:
+  - en "Cómo levantarlo":
+    - el token propio en `FOOTBALL_DATA_TOKEN`, y que sin token el catálogo queda vacío;
+    - la sincronización de arranque, la semanal y el disparo manual con el administrador (`FUTBOLMARKET_AUTH_ADMIN_*`);
+    - Swagger;
+    - los enlaces a contracts/configuration.md y quickstart.md;
+  - el borrado único de la base local que tiene el dataset ficticio (quickstart.md 2.1, research D20);
+  - en "Estructura", los contextos `season`, `match` y `sync`, y la capa `adapter/<proveedor>/` (constitución 2.2.0). En "Tests", que la suite no necesita token ni conexión
 
 ---
 
