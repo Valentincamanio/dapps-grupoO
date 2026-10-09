@@ -1,0 +1,64 @@
+.header {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  flex-wrap: wrap;
+  border-bottom: 2px dashed var(--chalk-dim);
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+}
+
+.logo {
+  font-family: var(--font-marker);
+  font-size: 42px;
+  line-height: 1;
+  transform: rotate(-2deg);
+  text-shadow: 0 0 1px var(--chalk);
+}
+
+.logo small {
+  display: block;
+  font-family: var(--font-script);
+  font-size: 22px;
+  color: var(--yellow);
+  transform: rotate(1deg);
+}
+
+.search {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.right {
+  margin-left: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.balance {
+  font-family: var(--font-script);
+  font-size: 26px;
+  text-align: right;
+}
+
+.balance b {
+  font-family: var(--font-marker);
+  color: var(--green);
+  font-size: 30px;
+  display: inline-block;
+  border: 2px solid var(--chalk-dim);
+  border-radius: 50% 45% 55% 40%;
+  padding: 0 14px;
+  transform: rotate(-3deg);
+}
+
+.account {
+  font-family: var(--font-script);
+  font-size: 26px;
+}
+
+.account a {
+  color: var(--chalk);
+}
