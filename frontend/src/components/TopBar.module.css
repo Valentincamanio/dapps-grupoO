@@ -9,6 +9,8 @@
 }
 
 .logo {
+  color: inherit;
+  text-decoration: none;
   font-family: var(--font-marker);
   font-size: 42px;
   line-height: 1;

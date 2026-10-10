@@ -79,13 +79,13 @@ describe('Pitch', () => {
     render(<Pitch activeZone={null} onZoneSelect={onZoneSelect} />);
 
     await user.tab();
-    expect(screen.getByRole('button', { name: 'Filtrar por arqueros' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Filtrar por delanteros' })).toHaveFocus();
     await user.keyboard('{Enter}');
     await user.tab();
     await user.keyboard(' ');
 
-    expect(onZoneSelect).toHaveBeenNthCalledWith(1, 'GOAL');
-    expect(onZoneSelect).toHaveBeenNthCalledWith(2, 'DEFENSE');
+    expect(onZoneSelect).toHaveBeenNthCalledWith(1, 'ATTACK');
+    expect(onZoneSelect).toHaveBeenNthCalledWith(2, 'MIDFIELD');
   });
 
   it('no dibuja ningún jugador: solo botones de zona y "todos"', () => {

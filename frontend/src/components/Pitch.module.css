@@ -9,6 +9,7 @@
 
 .field {
   position: relative;
+  aspect-ratio: 68 / 100;
 }
 
 .lines {
@@ -17,14 +18,16 @@
   width: 100%;
   height: 100%;
   stroke: var(--chalk-dim);
-  stroke-width: 2;
+  stroke-width: 0.6;
+  stroke-linecap: round;
   pointer-events: none;
 }
 
 .zones {
+  position: absolute;
+  inset: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  height: 200px;
+  grid-template-rows: 30fr 30fr 28fr 12fr;
 }
 
 .zone {
@@ -62,8 +65,9 @@
 
 /* Versión compacta en celular */
 @media (max-width: 559px) {
-  .zones {
-    height: 100px;
+  .pitch {
+    max-width: 280px;
+    align-self: center;
   }
 
   .zone {

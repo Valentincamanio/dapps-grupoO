@@ -8,17 +8,26 @@ interface PitchProps {
   onZoneSelect: (zone: PitchZone | null) => void;
 }
 
-const ZONES: PitchZone[] = ['GOAL', 'DEFENSE', 'MIDFIELD', 'ATTACK'];
+// De arriba (ataque) a abajo (arco), como en el mockup
+const ZONES: PitchZone[] = ['ATTACK', 'MIDFIELD', 'DEFENSE', 'GOAL'];
 
 // Líneas de la cancha, decorativas
 function PitchLines() {
   return (
-    <svg className={styles.lines} viewBox="0 0 400 200" aria-hidden="true" focusable="false">
-      <rect x="4" y="4" width="392" height="192" fill="none" />
-      <line x1="200" y1="4" x2="200" y2="196" />
-      <circle cx="200" cy="100" r="28" fill="none" />
-      <rect x="4" y="60" width="44" height="80" fill="none" />
-      <rect x="352" y="60" width="44" height="80" fill="none" />
+    <svg
+      className={styles.lines}
+      viewBox="0 0 68 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="2" y="2" width="64" height="96" fill="none" />
+      <line x1="2" y1="50" x2="66" y2="50" />
+      <circle cx="34" cy="50" r="9" fill="none" />
+      <rect x="14" y="2" width="40" height="16" fill="none" />
+      <rect x="24" y="2" width="20" height="6" fill="none" />
+      <rect x="14" y="82" width="40" height="16" fill="none" />
+      <rect x="24" y="92" width="20" height="6" fill="none" />
     </svg>
   );
 }
