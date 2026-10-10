@@ -236,14 +236,14 @@ volver.
 
 ### Implementación de la historia 5
 
-- [ ] T076 [P] [US5] Crear `frontend/src/hooks/usePlayer.ts`: valida que `id` sea un entero positivo (si no, estado "no encontrado" sin pedir nada); sobre `useAsync` llama a `getPlayer(id, signal)`; mapea 404 y 400 a `notFound: true`; expone `{ status, player, notFound, error, retry }`
-- [ ] T077 [P] [US5] Crear `frontend/src/components/ScoutSheet.tsx` y `frontend/src/components/ScoutSheet.module.css`: hoja de scout clavada al pizarrón con nombre, posición (`positionLabel`), equipo y liga (`leagueLabel`); recibe el link de vuelta como `backLink: ReactNode`; sin acciones, precio, valor ni puntaje
-- [ ] T078 [US5] Crear `frontend/src/pages/PlayerPage.tsx` y `frontend/src/pages/PlayerPage.module.css`: lee `:id` con `useParams` y `location.state?.boardSearch`; arma "volver a la pizarra" como `Link` a `/pizarra${boardSearch ?? ''}` (research R-10); carga -> "el DT está pensando..."; `notFound` -> `ChalkNote` "jugador no encontrado" con el mismo link; error de red -> nota con "reintentar"; éxito -> `ScoutSheet` dentro de `Board`
-- [ ] T079 [US5] Registrar en `frontend/src/router/routes.tsx` la ruta `/jugadores/:id` -> `PlayerPage`
+- [X] T076 [P] [US5] Crear `frontend/src/hooks/usePlayer.ts`: valida que `id` sea un entero positivo (si no, estado "no encontrado" sin pedir nada); sobre `useAsync` llama a `getPlayer(id, signal)`; mapea 404 y 400 a `notFound: true`; expone `{ status, player, notFound, error, retry }`
+- [X] T077 [P] [US5] Crear `frontend/src/components/ScoutSheet.tsx` y `frontend/src/components/ScoutSheet.module.css`: hoja de scout clavada al pizarrón con nombre, posición (`positionLabel`), equipo y liga (`leagueLabel`); recibe el link de vuelta como `backLink: ReactNode`; sin acciones, precio, valor ni puntaje
+- [X] T078 [US5] Crear `frontend/src/pages/PlayerPage.tsx` y `frontend/src/pages/PlayerPage.module.css`: lee `:id` con `useParams` y `location.state?.boardSearch`; arma "volver a la pizarra" como `Link` a `/pizarra${boardSearch ?? ''}` (research R-10); carga -> "el DT está pensando..."; `notFound` -> `ChalkNote` "jugador no encontrado" con el mismo link; error de red -> nota con "reintentar"; éxito -> `ScoutSheet` dentro de `Board`
+- [X] T079 [US5] Registrar en `frontend/src/router/routes.tsx` la ruta `/jugadores/:id` -> `PlayerPage`
 
 ### Tests de la historia 5
 
-- [ ] T080 [US5] Escribir `frontend/tests/pages/PlayerPage.test.tsx`: abrir `/jugadores/<id>` sin sesión muestra nombre, posición, equipo y liga legibles; abrir la ficha desde un post-it de `/pizarra?position=DEFENDER&page=2` y elegir "volver a la pizarra" vuelve a esa misma dirección; abrirla directamente y volver lleva a `/pizarra` sin parámetros; `/jugadores/999999` y `/jugadores/abc` muestran "jugador no encontrado" con la opción de volver; la ficha no tiene botones de compra, venta ni similares; error de red muestra "reintentar"
+- [X] T080 [US5] Escribir `frontend/tests/pages/PlayerPage.test.tsx`: abrir `/jugadores/<id>` sin sesión muestra nombre, posición, equipo y liga legibles; abrir la ficha desde un post-it de `/pizarra?position=DEFENDER&page=2` y elegir "volver a la pizarra" vuelve a esa misma dirección; abrirla directamente y volver lleva a `/pizarra` sin parámetros; `/jugadores/999999` y `/jugadores/abc` muestran "jugador no encontrado" con la opción de volver; la ficha no tiene botones de compra, venta ni similares; error de red muestra "reintentar"
 
 **Checkpoint**: historias 1 a 5 funcionan cada una por separado.
 
