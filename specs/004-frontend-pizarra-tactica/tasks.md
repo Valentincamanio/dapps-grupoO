@@ -1,4 +1,4 @@
----
+﻿---
 
 description: "Lista de tareas para implementar el frontend Pizarra táctica (catálogo de solo lectura)"
 ---
@@ -276,12 +276,14 @@ cerrar sesión y ver la pizarra sin sesión funcionando.
 
 **Propósito**: verificaciones que cruzan todas las historias y la definición de terminado.
 
-- [ ] T085 [P] Escribir `frontend/tests/pages/NoPurchaseActions.test.tsx` (research R-4, CE-009): recorre `/pizarra` (con filtros y desplegable abierto), `/jugadores/<id>`, `/login`, `/register` y `/vestuario` (con sesión) y verifica que no hay botones ni links cuyo nombre accesible coincida con `/comprar|vender|sumar|plantel|precio|valor|presupuesto|puntaje|portfolio|orden/i` y que no hay texto de precio ni estrellas
-- [ ] T086 [P] Revisar que `fetch` aparece solo en `frontend/src/services/httpClient.ts`, que `frontend/src/components/` no importa `react-router` ni `services/`, que no hay `localStorage` ni `console.*` en `frontend/src/` y que no se creó ningún tipo, hook, servicio ni componente de compra, venta, plantel u órdenes; corregir lo que aparezca
-- [ ] T087 [P] Revisar la presentación a 360 px y en escritorio en todas las pantallas (`frontend/src/**/*.module.css`): cancha compacta arriba, post-its en una columna, barra superior con buscador sin desbordar, sin desplazamiento horizontal; foco visible en cada elemento accionable; contrastes de tiza legibles; fidelidad visual al mockup sin reproducir presupuesto, estrellas, imanes ni "+ al equipo"
-- [ ] T088 [P] Actualizar `frontend/README.md` con los requisitos (Node 20), los comandos `npm ci`, `npm run dev`, `npm run lint`, `npm test` y `npm run build`, el proxy `/api` -> `:8080` y un enlace a `specs/004-frontend-pizarra-tactica/quickstart.md`
-- [ ] T089 Correr desde `frontend/` `npm ci`, `npm run lint`, `npm test` y `npm run build` y confirmar que los cuatro terminan con código 0 y que se genera `frontend/test-results/junit.xml` (definición de terminado)
-- [ ] T090 Validar a mano los recorridos de `specs/004-frontend-pizarra-tactica/quickstart.md` (secciones 1 a 3) con `npm run dev` contra `./gradlew bootRun`, incluida la sesión vencida editando `futbolmarket.session` y el error de red con el backend detenido; registrar cualquier desvío como tarea nueva
+- [X] T085 [P] Escribir `frontend/tests/pages/NoPurchaseActions.test.tsx` (research R-4, CE-009): recorre `/pizarra` (con filtros y desplegable abierto), `/jugadores/<id>`, `/login`, `/register` y `/vestuario` (con sesión) y verifica que no hay botones ni links cuyo nombre accesible coincida con `/comprar|vender|sumar|plantel|precio|valor|presupuesto|puntaje|portfolio|orden/i` y que no hay texto de precio ni estrellas
+- [X] T086 [P] Revisar que `fetch` aparece solo en `frontend/src/services/httpClient.ts`, que `frontend/src/components/` no importa `react-router` ni `services/`, que no hay `localStorage` ni `console.*` en `frontend/src/` y que no se creó ningún tipo, hook, servicio ni componente de compra, venta, plantel u órdenes; corregir lo que aparezca
+- [X] T087 [P] Revisar la presentación a 360 px y en escritorio en todas las pantallas (`frontend/src/**/*.module.css`): cancha compacta arriba, post-its en una columna, barra superior con buscador sin desbordar, sin desplazamiento horizontal; foco visible en cada elemento accionable; contrastes de tiza legibles; fidelidad visual al mockup sin reproducir presupuesto, estrellas, imanes ni "+ al equipo"
+- [X] T088 [P] Actualizar `frontend/README.md` con los requisitos (Node 20), los comandos `npm ci`, `npm run dev`, `npm run lint`, `npm test` y `npm run build`, el proxy `/api` -> `:8080` y un enlace a `specs/004-frontend-pizarra-tactica/quickstart.md`
+- [X] T089 Correr desde `frontend/` `npm ci`, `npm run lint`, `npm test` y `npm run build` y confirmar que los cuatro terminan con código 0 y que se genera `frontend/test-results/junit.xml` (definición de terminado)
+- [X] T090 Validar a mano los recorridos de `specs/004-frontend-pizarra-tactica/quickstart.md` (secciones 1 a 3) con `npm run dev` contra `./gradlew bootRun`, incluida la sesión vencida editando `futbolmarket.session` y el error de red con el backend detenido; registrar cualquier desvío como tarea nueva
+- [ ] T091 [US6] Desvío de T090 (quickstart 3, paso 7): si la sesión guardada ya venció al cargar la página, eadSession() en rontend/src/services/sessionStorage.ts la borra sin dejar motivo y /vestuario lleva a /login con "para entrar al vestuario tenés que iniciar sesión" en vez de "tu sesión venció, volvé a entrar". Hacer que SessionProvider arranque con endReason = 'expired' cuando se descarta una sesión vencida, y cubrirlo en rontend/tests/pages/LockerRoomPage.test.tsx
+- [ ] T092 [US6] Desvío de T090 (quickstart 3, paso 6): en el navegador real, "cerrar sesión" en rontend/src/pages/LockerRoomPage.tsx (wait navigate('/pizarra'); logout();) termina en /login con el aviso de acceso requerido y no en /pizarra, porque logout() se aplica antes de que React renderice la nueva ruta y RequireSession redirige. Corregir el orden (p. ej. hacer el logout y la navegación en el mismo paso, o que RequireSession ignore endReason === 'logout') y agregar un test que lo reproduzca
 
 ---
 
