@@ -1,0 +1,63 @@
+.sheet {
+  position: relative;
+  max-width: 480px;
+  margin: 12px auto;
+  padding: 32px 24px 24px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-family: var(--font-hand);
+  box-shadow: var(--shadow-note);
+  transform: rotate(-0.8deg);
+}
+
+.pin {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  border-radius: 50%;
+  background: var(--pin);
+  box-shadow: var(--shadow-pin);
+}
+
+.name {
+  margin: 0 0 16px;
+  font-family: var(--font-marker);
+  font-size: 1.8rem;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.data {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.data dt {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.data dd {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.back {
+  margin-top: 20px;
+}
+
+.back a {
+  color: var(--ink);
+  font-size: 1.1rem;
+  text-decoration: underline;
+}
+
+.back a:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}

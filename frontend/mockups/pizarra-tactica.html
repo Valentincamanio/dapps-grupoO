@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pizarra Táctica</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Permanent+Marker&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --board:#1f3b2d; --board2:#173024; --chalk:#f4f1e6; --chalk-dim:rgba(244,241,230,.55);
+    --wood:#7a4b25; --wood2:#5b3519;
+    --yellow:#ffe873; --pink:#ff9ec4; --blue:#9fd8ff; --green:#b9f5a0;
+    --magnet-red:#e23b3b; --magnet-blue:#2f6fdc;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    min-height:100vh;color:var(--chalk);font-family:'Patrick Hand',cursive;font-size:18px;
+    background:var(--wood2) repeating-linear-gradient(90deg,var(--wood) 0 6px,var(--wood2) 6px 9px);
+    padding:18px;
+  }
+  button{font:inherit;cursor:pointer}
+
+  /* El pizarrón con marco de madera */
+  .board{
+    max-width:1400px;margin:0 auto;border-radius:10px;padding:24px;
+    border:14px solid #8a5a2b;box-shadow:inset 0 0 60px rgba(0,0,0,.6),0 12px 40px rgba(0,0,0,.5);
+    background:
+      radial-gradient(ellipse at 20% 10%,rgba(255,255,255,.06),transparent 40%),
+      radial-gradient(ellipse at 80% 70%,rgba(255,255,255,.05),transparent 45%),
+      repeating-radial-gradient(circle at 30% 40%,rgba(255,255,255,.012) 0 2px,transparent 2px 5px),
+      linear-gradient(var(--board),var(--board2));
+  }
+  @media (max-width:700px){body{padding:6px}.board{border-width:8px;padding:16px}}
+
+  header{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;border-bottom:2px dashed var(--chalk-dim);padding-bottom:12px;margin-bottom:20px}
+  h1{font-family:'Permanent Marker',cursive;font-size:42px;line-height:1;transform:rotate(-2deg);text-shadow:0 0 1px var(--chalk)}
+  h1 small{display:block;font-family:Caveat;font-size:22px;color:var(--yellow);transform:rotate(1deg)}
+  .saldo{margin-left:auto;font-family:Caveat;font-size:26px;text-align:right}
+  .saldo b{font-family:'Permanent Marker';color:var(--green);font-size:30px;display:inline-block;border:2px solid var(--chalk-dim);border-radius:50% 45% 55% 40%;padding:0 14px;transform:rotate(-3deg)}
+
+  .layout{display:grid;grid-template-columns:minmax(300px,440px) 1fr;gap:30px}
+  @media (max-width:900px){.layout{grid-template-columns:1fr}}
+
+  /* Cancha */
+  .pitch-wrap{position:relative}
+  .pitch-wrap h2,.list h2{font-family:Caveat;font-size:30px;margin-bottom:6px}
+  .hint{font-family:Caveat;color:var(--yellow);font-size:20px;margin-bottom:8px}
+  .pitch{position:relative;width:100%;aspect-ratio:68/100}
+  .pitch svg{position:absolute;inset:0;width:100%;height:100%}
+  .chalk{fill:none;stroke:var(--chalk);stroke-width:.6;stroke-linecap:round;opacity:.85;filter:url(#rough)}
+  .zone{fill:transparent;cursor:pointer;transition:fill .2s}
+  .zone:hover{fill:rgba(255,232,115,.08)}
+  .zone.on{fill:rgba(255,232,115,.16)}
+  .zlabel{font-family:Caveat;font-size:4px;fill:var(--chalk-dim);pointer-events:none}
+
+  /* Imanes */
+  .magnet{
+    position:absolute;transform:translate(-50%,-50%);width:54px;text-align:center;pointer-events:none;
+  }
+  .magnet .dot{
+    width:38px;height:38px;margin:0 auto;border-radius:50%;display:grid;place-items:center;
+    font-family:'Permanent Marker';font-size:14px;color:#fff;
+    background:radial-gradient(circle at 35% 30%,#ff8a8a,var(--magnet-red) 55%,#8d1515);
+    box-shadow:0 4px 6px rgba(0,0,0,.5),inset 0 -3px 4px rgba(0,0,0,.3);
+  }
+  .magnet.empty .dot{background:transparent;border:2px dashed var(--chalk-dim);box-shadow:none;color:var(--chalk-dim)}
+  .magnet.new .dot{animation:drop .4s cubic-bezier(.2,1.8,.4,1)}
+  @keyframes drop{from{transform:scale(2.2) translateY(-30px);opacity:0}}
+  .magnet span{display:block;font-family:Caveat;font-size:16px;line-height:1;margin-top:2px;white-space:nowrap;text-shadow:0 1px 2px #000}
+
+  /* Lista de jugadores: post-its */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+  .tape{
+    background:rgba(244,241,230,.85);color:#333;border:0;padding:4px 14px;font-family:Caveat;font-size:20px;font-weight:700;
+    clip-path:polygon(3% 0,97% 4%,100% 50%,96% 100%,2% 96%,0 50%);transform:rotate(-1deg);opacity:.6
+  }
+  .tape:nth-child(even){transform:rotate(1.5deg)}
+  .tape.on{opacity:1;background:var(--yellow)}
+  .filter-note{font-family:Caveat;font-size:22px;margin-bottom:12px}
+  .filter-note u{color:var(--yellow);text-decoration-style:wavy}
+  .filter-note button{background:none;border:0;color:var(--pink);font-family:Caveat;font-size:20px;text-decoration:underline}
+
+  .notes{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:22px}
+  .note{
+    position:relative;color:#2b2b2b;padding:22px 16px 14px;min-height:180px;
+    box-shadow:2px 6px 12px rgba(0,0,0,.45);transition:transform .15s;
+    background:linear-gradient(180deg,rgba(0,0,0,.04),transparent 20%),var(--c);
+  }
+  .note:nth-child(3n+1){transform:rotate(-2deg)}
+  .note:nth-child(3n+2){transform:rotate(1.5deg)}
+  .note:nth-child(3n){transform:rotate(-.5deg)}
+  .note:hover{transform:rotate(0) scale(1.04);z-index:2}
+  .note::before{ /* chinche */
+    content:"";position:absolute;top:-8px;left:50%;width:16px;height:16px;margin-left:-8px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff 0,#e33 40%,#800 100%);box-shadow:0 3px 3px rgba(0,0,0,.4)
+  }
+  .note .pos{font-family:'Permanent Marker';font-size:13px;border:2px solid #2b2b2b;border-radius:40% 50% 45% 55%;padding:0 6px;display:inline-block;transform:rotate(-4deg)}
+  .note h3{font-family:'Permanent Marker';font-size:21px;line-height:1.05;margin:8px 0 4px}
+  .note p{font-size:16px;line-height:1.15;color:#4a4a4a}
+  .note .stars{color:#c0392b;letter-spacing:2px;font-size:15px;margin-top:4px}
+  .note .row{display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px}
+  .note .val{font-family:Caveat;font-size:26px;font-weight:700;line-height:1}
+  .note .add{background:#2b2b2b;color:var(--chalk);border:0;border-radius:4px;padding:3px 10px;font-family:Caveat;font-size:20px;font-weight:700}
+  .note .add:disabled{opacity:.35;cursor:not-allowed}
+  .note.signed::after{
+    content:"✔ EN EL EQUIPO";position:absolute;inset:auto 10px 50% 10px;text-align:center;
+    font-family:'Permanent Marker';color:#c0392b;font-size:20px;border:3px solid #c0392b;transform:rotate(-12deg);background:rgba(255,255,255,.5)
+  }
+  .empty{font-family:Caveat;font-size:24px;color:var(--chalk-dim)}
+
+  /* Notita de tiza al pie */
+  .scribble{margin-top:26px;font-family:Caveat;font-size:24px;color:var(--chalk-dim);transform:rotate(-1deg)}
+  .scribble b{color:var(--pink)}
+</style>
+</head>
+<body>
+<div class="board">
+  <header>
+    <h1>La Pizarra<small>mercado de jugadores · temporada 26/27</small></h1>
+    <div class="saldo">Presupuesto: <b id="saldo">0</b></div>
+  </header>
+
+  <div class="layout">
+    <section class="pitch-wrap">
+      <h2>Mi once (4-3-3)</h2>
+      <div class="hint">👉 tocá una zona de la cancha para filtrar por posición</div>
+      <div class="pitch" id="pitch">
+        <svg viewBox="0 0 68 100" preserveAspectRatio="none">
+          <defs>
+            <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="1.2" numOctaves="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale=".8"/></filter>
+          </defs>
+          <!-- zonas clickeables por línea -->
+          <rect class="zone" data-pos="DEL" x="0" y="0" width="68" height="30"/>
+          <rect class="zone" data-pos="MED" x="0" y="30" width="68" height="30"/>
+          <rect class="zone" data-pos="DEF" x="0" y="60" width="68" height="28"/>
+          <rect class="zone" data-pos="ARQ" x="0" y="88" width="68" height="12"/>
+          <text class="zlabel" x="2" y="5">DELANTEROS</text>
+          <text class="zlabel" x="2" y="35">MEDIOCAMPO</text>
+          <text class="zlabel" x="2" y="65">DEFENSA</text>
+          <text class="zlabel" x="2" y="92">ARCO</text>
+          <!-- líneas de la cancha en tiza -->
+          <rect class="chalk" x="2" y="2" width="64" height="96"/>
+          <line class="chalk" x1="2" y1="50" x2="66" y2="50"/>
+          <circle class="chalk" cx="34" cy="50" r="9"/>
+          <rect class="chalk" x="14" y="2" width="40" height="16"/>
+          <rect class="chalk" x="24" y="2" width="20" height="6"/>
+          <rect class="chalk" x="14" y="82" width="40" height="16"/>
+          <rect class="chalk" x="24" y="92" width="20" height="6"/>
+          <path class="chalk" d="M27 18 Q34 23 41 18"/>
+          <path class="chalk" d="M27 82 Q34 77 41 82"/>
+          <!-- flechas tácticas -->
+          <path class="chalk" d="M12 58 Q8 40 14 26" stroke-dasharray="2 1.5"/>
+          <path class="chalk" d="M12.5 28 L14 26 L15.5 28.5"/>
+          <path class="chalk" d="M56 58 Q60 40 54 26" stroke-dasharray="2 1.5"/>
+          <path class="chalk" d="M52.5 28.5 L54 26 L55.5 28"/>
+        </svg>
+        <div id="magnets"></div>
+      </div>
+    </section>
+
+    <section class="list">
+      <h2>Ojeados</h2>
+      <div class="tabs" id="leagues"></div>
+      <div class="filter-note" id="fnote"></div>
+      <div class="notes" id="notes"></div>
+      <p class="scribble">Ojo: <b>no pasarse del presupuesto</b> — el DT 😤</p>
+    </section>
+  </div>
+</div>
+
+<script>
+const players = [
+  {n:"Kylian Mbappé", c:"Real Madrid", l:"LaLiga", p:"DEL", v:180, s:5},
+  {n:"Erling Haaland", c:"Man. City", l:"Premier League", p:"DEL", v:180, s:5},
+  {n:"Lamine Yamal", c:"Barcelona", l:"LaLiga", p:"DEL", v:200, s:5},
+  {n:"Lautaro Martínez", c:"Inter", l:"Serie A", p:"DEL", v:95, s:4},
+  {n:"Harry Kane", c:"Bayern", l:"Bundesliga", p:"DEL", v:85, s:4},
+  {n:"Jude Bellingham", c:"Real Madrid", l:"LaLiga", p:"MED", v:160, s:5},
+  {n:"Jamal Musiala", c:"Bayern", l:"Bundesliga", p:"MED", v:140, s:5},
+  {n:"Pedri", c:"Barcelona", l:"LaLiga", p:"MED", v:120, s:4},
+  {n:"Nicolò Barella", c:"Inter", l:"Serie A", p:"MED", v:70, s:4},
+  {n:"William Saliba", c:"Arsenal", l:"Premier League", p:"DEF", v:80, s:4},
+  {n:"Achraf Hakimi", c:"PSG", l:"Ligue 1", p:"DEF", v:75, s:4},
+  {n:"Alessandro Bastoni", c:"Inter", l:"Serie A", p:"DEF", v:70, s:4},
+  {n:"Nuno Mendes", c:"PSG", l:"Ligue 1", p:"DEF", v:65, s:4},
+  {n:"Emiliano Martínez", c:"Aston Villa", l:"Premier League", p:"ARQ", v:28, s:4},
+  {n:"Gregor Kobel", c:"Dortmund", l:"Bundesliga", p:"ARQ", v:40, s:3},
+];
+const posName = {ARQ:"arqueros",DEF:"defensores",MED:"mediocampistas",DEL:"delanteros"};
+const colors = ["var(--yellow)","var(--pink)","var(--blue)","var(--green)"];
+// coordenadas (% de la cancha) de cada puesto en un 4-3-3
+const slots = {
+  ARQ:[[50,92]],
+  DEF:[[15,72],[38,76],[62,76],[85,72]],
+  MED:[[25,48],[50,54],[75,48]],
+  DEL:[[18,20],[50,14],[82,20]],
+};
+let saldo = 600, liga = "Todas", pos = null, squad = [], lastAdded = null;
+const $ = id => document.getElementById(id);
+const short = n => n.split(" ").pop();
+const initials = n => n.split(" ").map(w => w[0]).slice(0,2).join("");
+
+function render(){
+  $("saldo").textContent = saldo + " cr";
+
+  // pestañas de liga (cinta adhesiva)
+  const ligas = ["Todas","Premier League","LaLiga","Serie A","Bundesliga","Ligue 1"];
+  $("leagues").innerHTML = ligas.map(l => `<button class="tape ${l===liga?'on':''}">${l}</button>`).join("");
+  $("leagues").querySelectorAll("button").forEach((b,i) => b.onclick = () => { liga = ligas[i]; render(); });
+
+  // zonas de la cancha
+  document.querySelectorAll(".zone").forEach(z => {
+    z.classList.toggle("on", z.dataset.pos === pos);
+    z.onclick = () => { pos = pos === z.dataset.pos ? null : z.dataset.pos; render(); };
+  });
+  $("fnote").innerHTML = pos
+    ? `Mostrando <u>${posName[pos]}</u> <button id="clear">(borrar)</button>`
+    : `Mostrando <u>todos</u>`;
+  if (pos) $("clear").onclick = () => { pos = null; render(); };
+
+  // imanes en la cancha
+  let html = "";
+  for (const [p, coords] of Object.entries(slots)) {
+    const mine = squad.filter(x => x.p === p);
+    coords.forEach(([x,y], i) => {
+      const pl = mine[i];
+      html += pl
+        ? `<div class="magnet ${pl===lastAdded?'new':''}" style="left:${x}%;top:${y}%"><div class="dot">${initials(pl.n)}</div><span>${short(pl.n)}</span></div>`
+        : `<div class="magnet empty" style="left:${x}%;top:${y}%"><div class="dot">${p}</div></div>`;
+    });
+  }
+  $("magnets").innerHTML = html;
+
+  // post-its
+  const list = players.filter(p => (liga==="Todas"||p.l===liga) && (!pos||p.p===pos));
+  $("notes").innerHTML = list.map(p => {
+    const i = players.indexOf(p), signed = squad.includes(p);
+    const full = squad.filter(x => x.p === p.p).length >= slots[p.p].length;
+    const reason = signed ? "" : p.v > saldo ? "sin plata" : full ? "puesto lleno" : "";
+    return `<div class="note ${signed?'signed':''}" style="--c:${colors[i%4]}">
+      <span class="pos">${p.p}</span>
+      <h3>${p.n}</h3>
+      <p>${p.c} · ${p.l}</p>
+      <div class="stars">${"★".repeat(p.s)}${"☆".repeat(5-p.s)}</div>
+      <div class="row">
+        <div class="val">${p.v} cr</div>
+        <button class="add" data-i="${i}" ${signed||reason?'disabled':''}>${reason || (signed?'listo':'+ al equipo')}</button>
+      </div>
+    </div>`;
+  }).join("") || `<p class="empty">Nada por acá... probá otra liga.</p>`;
+  document.querySelectorAll(".add").forEach(b => b.onclick = () => {
+    const p = players[b.dataset.i];
+    saldo -= p.v; squad.push(p); lastAdded = p; render();
+  });
+}
+render();
+</script>
+</body>
+</html>

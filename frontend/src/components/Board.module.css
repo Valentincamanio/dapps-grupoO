@@ -1,0 +1,24 @@
+.board {
+  max-width: 1400px;
+  margin: 0 auto;
+  border-radius: 10px;
+  padding: 24px;
+  border: 14px solid var(--wood-frame);
+  box-shadow: var(--shadow-board);
+  background:
+    radial-gradient(ellipse at 20% 10%, rgba(255, 255, 255, 0.06), transparent 40%),
+    radial-gradient(ellipse at 80% 70%, rgba(255, 255, 255, 0.05), transparent 45%),
+    repeating-radial-gradient(
+      circle at 30% 40%,
+      rgba(255, 255, 255, 0.012) 0 2px,
+      transparent 2px 5px
+    ),
+    linear-gradient(var(--board), var(--board2));
+}
+
+@media (max-width: 700px) {
+  .board {
+    border-width: 8px;
+    padding: 16px;
+  }
+}

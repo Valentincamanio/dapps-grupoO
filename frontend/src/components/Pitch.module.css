@@ -1,0 +1,76 @@
+.pitch {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.field {
+  position: relative;
+  aspect-ratio: 68 / 100;
+}
+
+.lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  stroke: var(--chalk-dim);
+  stroke-width: 0.6;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.zones {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 30fr 30fr 28fr 12fr;
+}
+
+.zone {
+  background: transparent;
+  border: 0;
+  color: var(--chalk);
+  font-family: var(--font-script);
+  font-size: 22px;
+  font-weight: 700;
+  text-shadow: var(--shadow-chalk-text);
+  transition: background 0.15s;
+}
+
+.zone:hover {
+  background: rgba(244, 241, 230, 0.1);
+}
+
+.all {
+  align-self: center;
+  background: transparent;
+  border: 2px solid var(--chalk-dim);
+  border-radius: 50% 45% 55% 40% / 60% 50% 50% 45%;
+  padding: 0 18px;
+  font-family: var(--font-script);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--chalk);
+}
+
+.active {
+  background: rgba(255, 232, 115, 0.25);
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+/* Versión compacta en celular */
+@media (max-width: 559px) {
+  .pitch {
+    max-width: 280px;
+    align-self: center;
+  }
+
+  .zone {
+    font-size: 16px;
+  }
+}
