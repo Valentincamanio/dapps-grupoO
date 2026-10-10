@@ -54,6 +54,17 @@ columnas nuevas. Hay que borrarla una sola vez, con la aplicación detenida:
 Con eso también se pierden los usuarios locales. El administrador se recrea en el próximo
 arranque con sus variables, y los usuarios comunes se registran de nuevo.
 
+### Frontend
+
+Requisitos: Node 20 o superior. Con el backend corriendo en `http://localhost:8080` (y con
+`FOOTBALL_DATA_TOKEN`, si no el catálogo se ve vacío):
+
+    cd frontend
+    npm ci
+    npm run dev
+
+La app queda en http://localhost:5173. Más detalle en [frontend/README.md](frontend/README.md).
+
 ## Tests
 
     cd backend
@@ -64,7 +75,7 @@ La suite no necesita token ni conexión a internet: nunca llama a la API real.
 ## Estructura
 
     backend/   Spring Boot 4.1.1 + Java 21 + Gradle
-    frontend/  React + Vite (entrega 2)
+    frontend/  React + Vite + TypeScript (pizarra táctica)
 
 El backend es un monolito organizado primero por capa y, dentro de cada capa, por contexto
 (`auth`, `user`, `player`, `team`, `league`, `position`, `season`, `match`, `sync`). Las APIs

@@ -5,7 +5,8 @@ Pizarra táctica de FutbolMarket: React 18 + Vite + TypeScript.
 ## Requisitos
 
 - Node 20 o superior
-- Backend corriendo en `http://localhost:8080` (`./gradlew bootRun` desde la raíz del repo)
+- Backend corriendo en `http://localhost:8080` (`./gradlew bootRun` desde `backend/`)
+- `FOOTBALL_DATA_TOKEN` definido al arrancar el backend: el catálogo de jugadores se carga desde Football-Data.org y, sin token, la pizarra se ve vacía. Ver el [README de la raíz](../README.md)
 
 ## Comandos
 
