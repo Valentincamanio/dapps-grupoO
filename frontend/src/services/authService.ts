@@ -1,5 +1,7 @@
 // Autenticación y cuenta (specs/001-auth-usuarios)
 import type {
+  ApiKeyResponse,
+  ChangePasswordRequest,
   LoginRequest,
   LoginResponse,
   Profile,
@@ -18,4 +20,12 @@ export function login(req: LoginRequest): Promise<LoginResponse> {
 
 export function getProfile(): Promise<Profile> {
   return request<Profile>('GET', '/auth/me');
+}
+
+export function changePassword(req: ChangePasswordRequest): Promise<void> {
+  return request<void>('PUT', '/auth/me/password', { body: req });
+}
+
+export function regenerateApiKey(): Promise<ApiKeyResponse> {
+  return request<ApiKeyResponse>('POST', '/auth/me/api-key');
 }

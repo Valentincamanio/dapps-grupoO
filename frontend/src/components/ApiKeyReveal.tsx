@@ -8,11 +8,12 @@ import styles from './ApiKeyReveal.module.css';
 interface ApiKeyRevealProps {
   apiKey: string;
   onContinue: () => void;
+  continueLabel?: string;
 }
 
 type CopyState = 'idle' | 'copied' | 'failed';
 
-export function ApiKeyReveal({ apiKey, onContinue }: ApiKeyRevealProps) {
+export function ApiKeyReveal({ apiKey, onContinue, continueLabel = 'continuar' }: ApiKeyRevealProps) {
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -43,7 +44,7 @@ export function ApiKeyReveal({ apiKey, onContinue }: ApiKeyRevealProps) {
       />
       <div className={styles.actions}>
         <ChalkButton onClick={copy}>copiar</ChalkButton>
-        <ChalkButton onClick={onContinue}>continuar</ChalkButton>
+        <ChalkButton onClick={onContinue}>{continueLabel}</ChalkButton>
       </div>
       {copyState === 'copied' ? <ChalkNote variant="success">clave copiada</ChalkNote> : null}
       {copyState === 'failed' ? (

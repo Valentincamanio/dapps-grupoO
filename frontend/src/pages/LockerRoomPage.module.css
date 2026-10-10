@@ -5,3 +5,32 @@
   max-width: 600px;
   margin: 0 auto;
 }
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.profile div {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.profile dt {
+  opacity: 0.7;
+  min-width: 80px;
+}
+
+.profile dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
