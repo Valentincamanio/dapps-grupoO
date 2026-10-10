@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   SHEET_SIZE,
+  describeEmptyCombination,
   parseBoardFilters,
   toPlayerQuery,
   toSearchParams,
@@ -86,5 +87,39 @@ describe('filters', () => {
       size: SHEET_SIZE,
     });
     expect(SHEET_SIZE).toBe(12);
+  });
+});
+
+describe('describeEmptyCombination', () => {
+  const none = { position: null, league: null, team: null, page: 1 };
+
+  it('solo posición', () => {
+    expect(describeEmptyCombination({ ...none, position: 'DEFENDER' })).toBe(
+      'no hay defensores en la pizarra',
+    );
+  });
+
+  it('posición + equipo', () => {
+    expect(describeEmptyCombination({ ...none, position: 'GOALKEEPER', team: 'Fulham' })).toBe(
+      'no hay arqueros de ese equipo en la pizarra',
+    );
+  });
+
+  it('posición + liga', () => {
+    expect(describeEmptyCombination({ ...none, position: 'DEFENDER', league: 'LA_LIGA' })).toBe(
+      'no hay defensores de La Liga en la pizarra',
+    );
+  });
+
+  it('solo equipo', () => {
+    expect(describeEmptyCombination({ ...none, team: 'Fulham' })).toBe(
+      'no hay jugadores de ese equipo en la pizarra',
+    );
+  });
+
+  it('solo liga', () => {
+    expect(describeEmptyCombination({ ...none, league: 'SERIE_A' })).toBe(
+      'no hay jugadores de Serie A en la pizarra',
+    );
   });
 });
