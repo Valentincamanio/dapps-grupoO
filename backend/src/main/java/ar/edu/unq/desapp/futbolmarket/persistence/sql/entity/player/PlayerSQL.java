@@ -1,5 +1,7 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.player;
 
+import java.time.LocalDate;
+
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.team.TeamSQL;
 import jakarta.persistence.Column;
@@ -22,6 +24,8 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PlayerSQL {
+    private static final int NATIONALITY_LENGTH = 100;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -40,11 +44,24 @@ public class PlayerSQL {
     @JoinColumn(name = "team_id", nullable = false)
     private TeamSQL team;
 
-    public PlayerSQL(Long id, String externalId, String name, Position position, TeamSQL team) {
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Column(length = NATIONALITY_LENGTH)
+    private String nationality;
+
+    @Column(nullable = false)
+    private boolean active;
+
+    public PlayerSQL(Long id, String externalId, String name, Position position, TeamSQL team,
+                     LocalDate dateOfBirth, String nationality, boolean active) {
         this.id = id;
         this.externalId = externalId;
         this.name = name;
         this.position = position;
         this.team = team;
+        this.dateOfBirth = dateOfBirth;
+        this.nationality = nationality;
+        this.active = active;
     }
 }

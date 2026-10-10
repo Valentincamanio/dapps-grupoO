@@ -19,7 +19,10 @@ public class PlayerMapper {
                 player.getExternalId(),
                 player.getName(),
                 player.getPosition(),
-                teamMapper.toDomain(player.getTeam())
+                teamMapper.toDomain(player.getTeam()),
+                player.getDateOfBirth(),
+                player.getNationality(),
+                player.isActive()
         );
     }
 
@@ -29,7 +32,10 @@ public class PlayerMapper {
                 player.externalId(),
                 player.name(),
                 player.position(),
-                teamMapper.toSQL(player.team())
+                teamMapper.toSQL(player.team()),
+                player.dateOfBirth(),
+                player.nationality(),
+                player.active()
         );
     }
 }

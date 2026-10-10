@@ -33,7 +33,7 @@ class PlayerCatalogServiceTest {
     @Test
     void delegaLaConsultaPaginadaEnElRepositorio() {
         var expectedPage = new PlayerPage(
-                List.of(new Player(1L, "premier-01", "Bukayo Saka", Position.FORWARD, new Team(1L, "Arsenal", League.PREMIER))),
+                List.of(new Player(1L, "premier-01", "Bukayo Saka", Position.FORWARD, new Team(1L, "57", "Arsenal", null, League.PREMIER))),
                 0,
                 10,
                 1
@@ -73,7 +73,7 @@ class PlayerCatalogServiceTest {
 
     @Test
     void devuelveElJugadorCuandoElRepositorioLoEncuentra() {
-        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "Arsenal", League.PREMIER));
+        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "57", "Arsenal", null, League.PREMIER));
         given(playerRepository.findById(7L)).willReturn(Optional.of(player));
 
         var result = playerCatalogService.getPlayer(7L);

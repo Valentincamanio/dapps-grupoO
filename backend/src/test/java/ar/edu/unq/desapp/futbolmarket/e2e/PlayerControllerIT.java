@@ -19,8 +19,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.LocalDate;
 import java.util.List;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -45,7 +47,7 @@ class PlayerControllerIT {
 
     @Test
     void devuelveLaRespuestaPaginadaYLosMetadatosDeNavegacion() throws Exception {
-        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "Arsenal", League.PREMIER));
+        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "57", "Arsenal", null, League.PREMIER));
         given(playerCatalogService.getPlayers(1, 1)).willReturn(new PlayerPage(List.of(player), 1, 1, 2));
 
         mockMvc.perform(get("/players?page=1&size=1").accept(MediaType.APPLICATION_JSON))
@@ -88,7 +90,7 @@ class PlayerControllerIT {
 
     @Test
     void aplicaFiltrosCombinadosAlListado() throws Exception {
-        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "Arsenal", League.PREMIER));
+        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "57", "Arsenal", null, League.PREMIER));
         var filter = new PlayerFilter(League.PREMIER, "Arsenal", Position.FORWARD);
         given(playerCatalogService.getPlayers(0, 10, filter)).willReturn(new PlayerPage(List.of(player), 0, 10, 1));
 
@@ -119,7 +121,7 @@ class PlayerControllerIT {
 
     @Test
     void devuelveElDetalleDelJugadorExistente() throws Exception {
-        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "Arsenal", League.PREMIER));
+        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "57", "Arsenal", null, League.PREMIER));
         given(playerCatalogService.getPlayer(7L)).willReturn(player);
 
         mockMvc.perform(get("/players/7").accept(MediaType.APPLICATION_JSON))
@@ -154,5 +156,63 @@ class PlayerControllerIT {
                 .andExpect(jsonPath("$.name").doesNotExist())
                 .andExpect(jsonPath("$.team").doesNotExist());
         verify(playerCatalogService).getPlayer(99L);
+    }
+
+    @Test
+    void elListadoDevuelveLaFechaDeNacimientoLaNacionalidadElEscudoYElEstado() throws Exception {
+        given(playerCatalogService.getPlayers(0, 10)).willReturn(new PlayerPage(List.of(alisson()), 0, 10, 1));
+
+        mockMvc.perform(get("/players").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].dateOfBirth").value("1992-10-02"))
+                .andExpect(jsonPath("$.content[0].nationality").value("Brazil"))
+                .andExpect(jsonPath("$.content[0].teamCrest").value("https://crests.football-data.org/64.png"))
+                .andExpect(jsonPath("$.content[0].active").value(true));
+        verify(playerCatalogService).getPlayers(0, 10);
+    }
+
+    @Test
+    void elDetalleDevuelveLaFechaDeNacimientoLaNacionalidadElEscudoYElEstado() throws Exception {
+        given(playerCatalogService.getPlayer(1L)).willReturn(alisson());
+
+        mockMvc.perform(get("/players/1").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dateOfBirth").value("1992-10-02"))
+                .andExpect(jsonPath("$.nationality").value("Brazil"))
+                .andExpect(jsonPath("$.teamCrest").value("https://crests.football-data.org/64.png"))
+                .andExpect(jsonPath("$.active").value(true));
+        verify(playerCatalogService).getPlayer(1L);
+    }
+
+    @Test
+    void unaFechaDeNacimientoYUnaNacionalidadAusentesSalenComoNull() throws Exception {
+        var player = new Player(7L, "premier-07", "Bukayo Saka", Position.FORWARD, new Team(2L, "57", "Arsenal", null, League.PREMIER));
+        given(playerCatalogService.getPlayer(7L)).willReturn(player);
+
+        mockMvc.perform(get("/players/7").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dateOfBirth").value(nullValue()))
+                .andExpect(jsonPath("$.nationality").value(nullValue()))
+                .andExpect(jsonPath("$.teamCrest").value(nullValue()))
+                .andExpect(jsonPath("$.active").value(true));
+        verify(playerCatalogService).getPlayer(7L);
+    }
+
+    @Test
+    void elDetalleDeUnJugadorInactivoRespondeConActiveFalseYSuUltimoEquipo() throws Exception {
+        given(playerCatalogService.getPlayer(1L)).willReturn(alisson().deactivate());
+
+        mockMvc.perform(get("/players/1").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false))
+                .andExpect(jsonPath("$.team").value("Liverpool FC"))
+                .andExpect(jsonPath("$.league").value("PREMIER"));
+        verify(playerCatalogService).getPlayer(1L);
+    }
+
+    private static Player alisson() {
+        var liverpool = new Team(2L, "64", "Liverpool FC", "https://crests.football-data.org/64.png", League.PREMIER);
+        return new Player(1L, "1795", "Alisson Becker", Position.GOALKEEPER, liverpool, LocalDate.of(1992, 10, 2),
+                "Brazil", true);
     }
 }
