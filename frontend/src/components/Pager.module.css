@@ -1,0 +1,15 @@
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.label {
+  font-family: var(--font-script);
+  font-size: 24px;
+  color: var(--chalk);
+  text-shadow: var(--shadow-chalk-text);
+}
