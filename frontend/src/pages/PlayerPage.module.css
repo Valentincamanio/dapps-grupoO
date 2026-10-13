@@ -1,0 +1,21 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.back {
+  margin: 0;
+}
+
+.back a {
+  color: var(--chalk);
+  font-family: var(--font-hand);
+  font-size: 1.1rem;
+}
+
+.back a:focus-visible {
+  outline: 3px solid var(--chalk);
+  outline-offset: 3px;
+}

@@ -1,0 +1,30 @@
+.note {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-family: var(--font-script);
+  font-size: 24px;
+  color: var(--chalk-dim);
+}
+
+.error {
+  color: var(--pink);
+}
+
+.success {
+  color: var(--green);
+}
+
+.loading {
+  color: var(--yellow);
+}
+
+.action {
+  background: none;
+  border: 0;
+  color: var(--pink);
+  font-family: var(--font-script);
+  font-size: 22px;
+  text-decoration: underline;
+}

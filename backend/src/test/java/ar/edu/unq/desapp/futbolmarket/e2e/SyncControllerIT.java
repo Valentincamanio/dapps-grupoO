@@ -1,0 +1,556 @@
+package ar.edu.unq.desapp.futbolmarket.e2e;
+
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.ALISSON_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CHELSEA_NAME;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CHIESA_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.CURRENT_MATCHDAY;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.JUVENTUS_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.JUVENTUS_NAME;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.LIVERPOOL_CREST;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.LIVERPOOL_NAME;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.NO_POSITION_PLAYER_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.NO_POSITION_PLAYER_NAME;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.SEASON_END;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.SEASON_START;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.chiesa;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.seasonId;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.snapshot;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.team;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.withoutPlayer;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willAnswer;
+import static org.mockito.BDDMockito.willReturn;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.assertj.MvcTestResult;
+
+import ar.edu.unq.desapp.futbolmarket.adapter.footballdata.FootballDataAdapter;
+import ar.edu.unq.desapp.futbolmarket.e2e.AuthTestHelper.TestUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.ExternalSourceException;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.match.MatchSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.player.PlayerSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.season.SeasonSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.team.TeamSQLDAO;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
+/**
+ * La sincronización manual de punta a punta (HU1). El adapter está mockeado y devuelve los
+ * snapshots de {@code SnapshotFixtures}: ningún test llama a la API real (research D21).
+ *
+ * <p>Usa un administrador y un token de la fuente al azar y una H2 propia, igual que
+ * {@code AdminAccountIT}. La captura de la salida queda declarada para los escenarios de la HU3,
+ * que verifican que el token no aparezca en el registro.</p>
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension.class)
+class SyncControllerIT {
+
+    private static final String SUFFIX = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    private static final String ADMIN_USERNAME = "admin_" + SUFFIX;
+    private static final String ADMIN_EMAIL = "admin_" + SUFFIX + "@correo.com";
+    private static final String ADMIN_PASSWORD = "Admin_" + UUID.randomUUID();
+    private static final String SOURCE_TOKEN = "fd_" + UUID.randomUUID().toString().replace("-", "");
+
+    private static final String SYNC_PATH = "/players/sync";
+    private static final String PLAYERS_PATH = "/players";
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String API_KEY_HEADER = "X-API-Key";
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String FORBIDDEN_MESSAGE = "No tiene permisos para acceder a este recurso.";
+    private static final String MISSING_CREDENTIAL_MESSAGE =
+            "Se requiere una credencial: un token de sesión (Authorization: Bearer) o una clave de API (X-API-Key).";
+    private static final String TIMEOUT_REASON = "La fuente no respondió a tiempo.";
+    private static final String FORBIDDEN_REASON =
+            "La fuente rechazó la credencial o el recurso no está disponible en el plan contratado (403).";
+    private static final long LATCH_TIMEOUT_SECONDS = 10;
+
+    private static final int TEAMS_PER_LEAGUE = 2;
+    private static final int PLAYERS_PER_LEAGUE = 8;
+    private static final int MATCHES_PER_LEAGUE = 2;
+    private static final int LIVERPOOL_PLAYERS = 4;
+    private static final int CHELSEA_SAVED_PLAYERS = 4;
+
+    @DynamicPropertySource
+    static void configuration(DynamicPropertyRegistry registry) {
+        registry.add("futbolmarket.auth.admin.username", () -> ADMIN_USERNAME);
+        registry.add("futbolmarket.auth.admin.email", () -> ADMIN_EMAIL);
+        registry.add("futbolmarket.auth.admin.password", () -> ADMIN_PASSWORD);
+        registry.add("futbolmarket.football-data.token", () -> SOURCE_TOKEN);
+        registry.add("spring.datasource.url", () -> "jdbc:h2:mem:sync-e2e-" + SUFFIX + ";DB_CLOSE_DELAY=-1");
+    }
+
+    @Autowired
+    private MockMvcTester mvc;
+
+    @MockitoBean
+    private FootballDataAdapter adapter;
+
+    @Autowired
+    private MatchSQLDAO matchDAO;
+
+    @Autowired
+    private SeasonSQLDAO seasonDAO;
+
+    @Autowired
+    private PlayerSQLDAO playerDAO;
+
+    @Autowired
+    private TeamSQLDAO teamDAO;
+
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
+
+    private AuthTestHelper helper;
+    private String adminToken;
+
+    /**
+     * Los usuarios quedan entre tests: cada uno se registra con datos únicos.
+     */
+    @BeforeEach
+    void setUp() throws Exception {
+        matchDAO.deleteAll();
+        seasonDAO.deleteAll();
+        playerDAO.deleteAll();
+        teamDAO.deleteAll();
+        given(adapter.fetchLeague(any())).willAnswer(invocation -> snapshot(invocation.<League>getArgument(0)));
+        helper = new AuthTestHelper(mvc);
+        adminToken = helper.login(new TestUser(null, ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD, null));
+    }
+
+    @Test
+    void unaCompletaRespondeElInformeConLasCincoLigasProcesadasEnOrdenYSusCreados() throws Exception {
+        MvcTestResult result = synchronizeAs(adminToken);
+        JsonNode report = body(result);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(report.get("type").asString()).isEqualTo("FULL");
+        assertThat(report.get("origin").asString()).isEqualTo("MANUAL");
+        assertThat(report.get("inactivationApplied").asBoolean()).isTrue();
+        assertThat(report.get("leagues").values())
+                .extracting(league -> league.get("league").asString(), league -> league.get("status").asString())
+                .containsExactly(
+                        tuple("PREMIER", "SUCCEEDED"),
+                        tuple("BUNDESLIGA", "SUCCEEDED"),
+                        tuple("LA_LIGA", "SUCCEEDED"),
+                        tuple("SERIE_A", "SUCCEEDED"),
+                        tuple("LIGUE_1", "SUCCEEDED"));
+        assertThat(report.get("leagues").values()).allSatisfy(league -> {
+            assertThat(league.get("teams").get("created").asInt()).isEqualTo(TEAMS_PER_LEAGUE);
+            assertThat(league.get("players").get("created").asInt()).isEqualTo(PLAYERS_PER_LEAGUE);
+            assertThat(league.get("matches").get("created").asInt()).isEqualTo(MATCHES_PER_LEAGUE);
+        });
+    }
+
+    @Test
+    void despuesDeSincronizarElListadoYElDetalleMuestranLosDatosNuevosDelJugador() throws Exception {
+        synchronizeAs(adminToken);
+        JsonNode alissonInPage = playerNamed(playersOf(LIVERPOOL_NAME), "Alisson Becker");
+        JsonNode alissonDetail = body(mvc.get().uri(PLAYERS_PATH + "/{id}", alissonInPage.get("id").asLong()).exchange());
+
+        assertThat(List.of(alissonInPage, alissonDetail)).allSatisfy(alisson -> {
+            assertThat(alisson.get("team").asString()).isEqualTo(LIVERPOOL_NAME);
+            assertThat(alisson.get("league").asString()).isEqualTo("PREMIER");
+            assertThat(alisson.get("position").asString()).isEqualTo("GOALKEEPER");
+            assertThat(alisson.get("dateOfBirth").asString()).isEqualTo("1992-10-02");
+            assertThat(alisson.get("nationality").asString()).isEqualTo("Brazil");
+            assertThat(alisson.get("teamCrest").asString()).isEqualTo(LIVERPOOL_CREST);
+            assertThat(alisson.get("active").asBoolean()).isTrue();
+        });
+    }
+
+    @Test
+    void unJugadorNuevoSinPosicionFiguraEntreLosOmitidosYNoEstaEnElCatalogo() throws Exception {
+        JsonNode premier = body(synchronizeAs(adminToken)).get("leagues").get(0);
+        JsonNode chelseaPage = playersOf(CHELSEA_NAME);
+
+        assertThat(premier.get("players").get("skipped").asInt()).isEqualTo(1);
+        assertThat(premier.get("skippedPlayers").values()).singleElement().satisfies(skipped -> {
+            assertThat(skipped.get("externalId").asString()).isEqualTo(NO_POSITION_PLAYER_ID);
+            assertThat(skipped.get("name").asString()).isEqualTo(NO_POSITION_PLAYER_NAME);
+            assertThat(skipped.get("team").asString()).isEqualTo(CHELSEA_NAME);
+            assertThat(skipped.get("reason").asString()).isEqualTo("MISSING_POSITION");
+        });
+        assertThat(chelseaPage.get("content").values())
+                .hasSize(CHELSEA_SAVED_PLAYERS)
+                .extracting(player -> player.get("name").asString())
+                .doesNotContain(NO_POSITION_PLAYER_NAME);
+    }
+
+    @Test
+    void elFiltroPorEquipoComparaContraElNombreOficialYNoContraElCorto() throws Exception {
+        synchronizeAs(adminToken);
+
+        JsonNode officialName = playersOf(LIVERPOOL_NAME);
+        JsonNode shortName = playersOf("Liverpool");
+
+        assertThat(officialName.get("totalElements").asLong()).isEqualTo(LIVERPOOL_PLAYERS);
+        assertThat(officialName.get("content").values())
+                .extracting(player -> player.get("team").asString())
+                .containsOnly(LIVERPOOL_NAME);
+        assertThat(shortName.get("totalElements").asLong()).isZero();
+        assertThat(shortName.get("content").values()).isEmpty();
+    }
+
+    @Test
+    void unUsuarioComunRecibe403SinQueSeConsulteLaFuente() throws Exception {
+        TestUser user = helper.registerUser();
+
+        MvcTestResult result = mvc.post().uri(SYNC_PATH).header(API_KEY_HEADER, user.apiKey()).exchange();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(body(result).get("message").asString()).isEqualTo(FORBIDDEN_MESSAGE);
+        verifyNoInteractions(adapter);
+    }
+
+    @Test
+    void sinCredencialResponde401SinQueSeConsulteLaFuente() throws Exception {
+        MvcTestResult result = mvc.post().uri(SYNC_PATH).exchange();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+        assertThat(body(result).get("message").asString()).isEqualTo(MISSING_CREDENTIAL_MESSAGE);
+        verifyNoInteractions(adapter);
+    }
+
+    @Test
+    void unaSegundaCompletaIdenticaNoCreaNadaYCuentaTodoComoActualizado() throws Exception {
+        synchronizeAs(adminToken);
+        long totalAfterFirst = totalPlayers();
+        JsonNode second = body(synchronizeAs(adminToken));
+        long totalAfterSecond = totalPlayers();
+
+        assertThat(second.get("leagues").values()).hasSize(League.values().length).allSatisfy(league -> {
+            assertThat(league.get("teams").get("created").asInt()).isZero();
+            assertThat(league.get("teams").get("updated").asInt()).isEqualTo(TEAMS_PER_LEAGUE);
+            assertThat(league.get("players").get("created").asInt()).isZero();
+            assertThat(league.get("players").get("updated").asInt()).isEqualTo(PLAYERS_PER_LEAGUE);
+            assertThat(league.get("matches").get("created").asInt()).isZero();
+            assertThat(league.get("matches").get("updated").asInt()).isEqualTo(MATCHES_PER_LEAGUE);
+        });
+        assertThat(totalAfterSecond)
+                .isEqualTo(totalAfterFirst)
+                .isEqualTo((long) PLAYERS_PER_LEAGUE * League.values().length);
+    }
+
+    private MvcTestResult synchronizeAs(String sessionToken) {
+        return mvc.post().uri(SYNC_PATH).header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionToken).exchange();
+    }
+
+    private JsonNode playersOf(String teamName) throws Exception {
+        return body(mvc.get().uri(PLAYERS_PATH).param("team", teamName).exchange());
+    }
+
+    private long totalPlayers() throws Exception {
+        return body(mvc.get().uri(PLAYERS_PATH).exchange()).get("totalElements").asLong();
+    }
+
+    private static JsonNode playerNamed(JsonNode page, String name) {
+        return page.get("content").valueStream()
+                .filter(player -> player.get("name").asString().equals(name))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private JsonNode body(MvcTestResult result) throws Exception {
+        return jsonMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    @Test
+    void cadaLigaDelInformeTraeSuTemporadaYSusPartidosCreados() throws Exception {
+        JsonNode report = body(synchronizeAs(adminToken));
+
+        assertThat(report.get("leagues").values())
+                .extracting(league -> league.get("league").asString(),
+                        league -> league.get("season").get("externalId").asString())
+                .containsExactly(
+                        tuple("PREMIER", seasonId(League.PREMIER)),
+                        tuple("BUNDESLIGA", seasonId(League.BUNDESLIGA)),
+                        tuple("LA_LIGA", seasonId(League.LA_LIGA)),
+                        tuple("SERIE_A", seasonId(League.SERIE_A)),
+                        tuple("LIGUE_1", seasonId(League.LIGUE_1)));
+        assertThat(report.get("leagues").values()).allSatisfy(league -> {
+            assertThat(league.get("season").get("startDate").asString()).isEqualTo(SEASON_START.toString());
+            assertThat(league.get("season").get("endDate").asString()).isEqualTo(SEASON_END.toString());
+            assertThat(league.get("season").get("currentMatchday").asInt()).isEqualTo(CURRENT_MATCHDAY);
+            assertThat(league.get("matches").get("created").asInt()).isEqualTo(MATCHES_PER_LEAGUE);
+        });
+    }
+
+    @Test
+    void unaLigaQueFallaQuedaFallidaConSuMotivoLasDemasSeProcesanYConservaLoQueTenia() throws Exception {
+        synchronizeAs(adminToken);
+        JsonNode bundesligaBefore = playersOfLeague(League.BUNDESLIGA);
+        willThrow(new ExternalSourceException(TIMEOUT_REASON)).given(adapter).fetchLeague(League.BUNDESLIGA);
+
+        MvcTestResult result = synchronizeAs(adminToken);
+        JsonNode report = body(result);
+        JsonNode bundesligaAfter = playersOfLeague(League.BUNDESLIGA);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(report.get("leagues").values())
+                .extracting(league -> league.get("league").asString(), league -> league.get("status").asString())
+                .containsExactly(
+                        tuple("PREMIER", "SUCCEEDED"),
+                        tuple("BUNDESLIGA", "FAILED"),
+                        tuple("LA_LIGA", "SUCCEEDED"),
+                        tuple("SERIE_A", "SUCCEEDED"),
+                        tuple("LIGUE_1", "SUCCEEDED"));
+        assertThat(report.get("leagues").get(1).get("failureReason").asString()).isEqualTo(TIMEOUT_REASON);
+        assertThat(report.get("inactivationApplied").asBoolean()).isFalse();
+        assertThat(bundesligaBefore.get("totalElements").asLong()).isEqualTo(PLAYERS_PER_LEAGUE);
+        assertThat(bundesligaAfter).isEqualTo(bundesligaBefore);
+    }
+
+    @Test
+    void conLasCincoLigasFallidasRespondeIgualElInformeYElCatalogoNoCambia() throws Exception {
+        synchronizeAs(adminToken);
+        JsonNode catalogBefore = wholeCatalog();
+        willThrow(new ExternalSourceException(FORBIDDEN_REASON)).given(adapter).fetchLeague(any());
+
+        MvcTestResult result = synchronizeAs(adminToken);
+        JsonNode report = body(result);
+        JsonNode catalogAfter = wholeCatalog();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(report.get("leagues").values()).hasSize(League.values().length).allSatisfy(league -> {
+            assertThat(league.get("status").asString()).isEqualTo("FAILED");
+            assertThat(league.get("failureReason").asString()).isEqualTo(FORBIDDEN_REASON);
+        });
+        assertThat(report.get("inactivationApplied").asBoolean()).isFalse();
+        assertThat(catalogBefore.get("totalElements").asLong())
+                .isEqualTo((long) PLAYERS_PER_LEAGUE * League.values().length);
+        assertThat(catalogAfter).isEqualTo(catalogBefore);
+    }
+
+    @Test
+    void elTokenDeLaFuenteNoApareceEnLaRespuestaNiEnElRegistro(CapturedOutput output) throws Exception {
+        MvcTestResult succeeded = synchronizeAs(adminToken);
+        willThrow(new ExternalSourceException(FORBIDDEN_REASON)).given(adapter).fetchLeague(any());
+        MvcTestResult failed = synchronizeAs(adminToken);
+
+        assertThat(succeeded.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(failed.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(succeeded.getResponse().getContentAsString()).doesNotContain(SOURCE_TOKEN);
+        assertThat(failed.getResponse().getContentAsString()).doesNotContain(SOURCE_TOKEN);
+        assertThat(output.getAll())
+                .contains("Sincronización FULL (MANUAL) iniciada.")
+                .doesNotContain(SOURCE_TOKEN);
+    }
+
+    @Test
+    void unJugadorQueFaltaEnUnaCompletaConUnaLigaFallidaNoSeInactiva() throws Exception {
+        synchronizeAs(adminToken);
+        long alissonId = idOfLiverpoolPlayer("Alisson Becker");
+        willReturn(withoutPlayer(snapshot(League.PREMIER), ALISSON_ID)).given(adapter).fetchLeague(League.PREMIER);
+        willThrow(new ExternalSourceException(TIMEOUT_REASON)).given(adapter).fetchLeague(League.LIGUE_1);
+
+        JsonNode report = body(synchronizeAs(adminToken));
+        JsonNode alisson = playerDetail(alissonId);
+
+        assertThat(report.get("inactivationApplied").asBoolean()).isFalse();
+        assertThat(report.get("inactivatedPlayers").values()).isEmpty();
+        assertThat(alisson.get("active").asBoolean()).isTrue();
+    }
+
+    @Test
+    void unJugadorQueFaltaEnUnaCompletaConLasCincoLigasEnExitoQuedaInactivoConSuEquipoYSaleDelListado()
+            throws Exception {
+        synchronizeAs(adminToken);
+        long alissonId = idOfLiverpoolPlayer("Alisson Becker");
+        willReturn(withoutPlayer(snapshot(League.PREMIER), ALISSON_ID)).given(adapter).fetchLeague(League.PREMIER);
+
+        JsonNode report = body(synchronizeAs(adminToken));
+        JsonNode detail = playerDetail(alissonId);
+        JsonNode liverpoolPage = playersOf(LIVERPOOL_NAME);
+        JsonNode catalog = wholeCatalog();
+
+        assertThat(report.get("inactivationApplied").asBoolean()).isTrue();
+        assertThat(report.get("inactivatedPlayers").values()).singleElement().satisfies(inactivated -> {
+            assertThat(inactivated.get("id").asLong()).isEqualTo(alissonId);
+            assertThat(inactivated.get("externalId").asString()).isEqualTo(ALISSON_ID);
+            assertThat(inactivated.get("name").asString()).isEqualTo("Alisson Becker");
+            assertThat(inactivated.get("team").asString()).isEqualTo(LIVERPOOL_NAME);
+        });
+        assertThat(detail.get("active").asBoolean()).isFalse();
+        assertThat(detail.get("team").asString()).isEqualTo(LIVERPOOL_NAME);
+        assertThat(liverpoolPage.get("totalElements").asLong()).isEqualTo(LIVERPOOL_PLAYERS - 1L);
+        assertThat(liverpoolPage.get("content").values())
+                .extracting(player -> player.get("name").asString())
+                .doesNotContain("Alisson Becker");
+        assertThat(catalog.get("totalElements").asLong())
+                .isEqualTo((long) PLAYERS_PER_LEAGUE * League.values().length - 1);
+        assertThat(catalog.get("content").values())
+                .extracting(player -> player.get("name").asString())
+                .doesNotContain("Alisson Becker");
+    }
+
+    @Test
+    void unJugadorInactivoQueVuelveALlegarFiguraEntreLosReactivadosYVuelveAlListado() throws Exception {
+        synchronizeAs(adminToken);
+        willReturn(withoutPlayer(snapshot(League.PREMIER), ALISSON_ID)).given(adapter).fetchLeague(League.PREMIER);
+        synchronizeAs(adminToken);
+        willReturn(snapshot(League.PREMIER)).given(adapter).fetchLeague(League.PREMIER);
+
+        JsonNode report = body(synchronizeAs(adminToken));
+        JsonNode liverpoolPage = playersOf(LIVERPOOL_NAME);
+
+        assertThat(report.get("leagues").get(0).get("reactivatedPlayers").values()).singleElement()
+                .satisfies(reactivated -> {
+                    assertThat(reactivated.get("name").asString()).isEqualTo("Alisson Becker");
+                    assertThat(reactivated.get("team").asString()).isEqualTo(LIVERPOOL_NAME);
+                });
+        assertThat(liverpoolPage.get("totalElements").asLong()).isEqualTo(LIVERPOOL_PLAYERS);
+        assertThat(liverpoolPage.get("content").values())
+                .extracting(player -> player.get("name").asString())
+                .contains("Alisson Becker");
+    }
+
+    @Test
+    void unJugadorEnPlantelesDeDosLigasFiguraEntreLosDuplicadosYApareceUnaSolaVezEnElCatalogo() throws Exception {
+        willReturn(snapshot(League.SERIE_A, team(JUVENTUS_ID, JUVENTUS_NAME, chiesa())))
+                .given(adapter).fetchLeague(League.SERIE_A);
+
+        JsonNode report = body(synchronizeAs(adminToken));
+        JsonNode catalog = wholeCatalog();
+
+        assertThat(report.get("duplicatedPlayers").values()).singleElement().satisfies(duplicated -> {
+            assertThat(duplicated.get("externalId").asString()).isEqualTo(CHIESA_ID);
+            assertThat(duplicated.get("name").asString()).isEqualTo("Federico Chiesa");
+            assertThat(duplicated.get("keptTeam").asString()).isEqualTo(LIVERPOOL_NAME);
+            assertThat(duplicated.get("ignoredTeam").asString()).isEqualTo(JUVENTUS_NAME);
+        });
+        assertThat(catalog.get("content").values())
+                .filteredOn(player -> player.get("name").asString().equals("Federico Chiesa"))
+                .singleElement()
+                .satisfies(kept -> assertThat(kept.get("team").asString()).isEqualTo(LIVERPOOL_NAME));
+    }
+
+    @Test
+    void unaSolaLigaSincronizaSoloEsaYNoTocaLasDemas() throws Exception {
+        synchronizeAs(adminToken);
+        JsonNode premierBefore = playersOfLeague(League.PREMIER);
+        clearInvocations(adapter);
+
+        MvcTestResult result = synchronizeLeagueAs(adminToken, "SERIE_A");
+        JsonNode report = body(result);
+        JsonNode premierAfter = playersOfLeague(League.PREMIER);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(report.get("type").asString()).isEqualTo("SINGLE_LEAGUE");
+        assertThat(report.get("origin").asString()).isEqualTo("MANUAL");
+        assertThat(report.get("leagues").values())
+                .extracting(league -> league.get("league").asString())
+                .containsExactly("SERIE_A");
+        assertThat(report.get("inactivationApplied").asBoolean()).isFalse();
+        verify(adapter).fetchLeague(League.SERIE_A);
+        verifyNoMoreInteractions(adapter);
+        assertThat(premierAfter).isEqualTo(premierBefore);
+    }
+
+    @Test
+    void unaLigaQueNoEsUnaDeLasCincoResponde400ConElValorRecibidoSinConsultarLaFuente() throws Exception {
+        MvcTestResult result = synchronizeLeagueAs(adminToken, "MLS");
+        JsonNode body = body(result);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(body.get("message").asString())
+                .isEqualTo("La liga 'MLS' no es una de las admitidas: PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1.");
+        assertThat(body.get("path").asString()).isEqualTo(SYNC_PATH);
+        verifyNoInteractions(adapter);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "premier"})
+    void unaLigaVaciaOEnMinusculasResponde400SinConsultarLaFuente(String league) throws Exception {
+        MvcTestResult result = synchronizeLeagueAs(adminToken, league);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        verifyNoInteractions(adapter);
+    }
+
+    /**
+     * El adapter avisa que la primera sincronización entró y la retiene hasta que el test la libera.
+     * Así el segundo disparo llega con la primera en curso, sin depender del tiempo. Todas las esperas
+     * tienen timeout, para que un error no deje el test colgado.
+     */
+    @Test
+    void unSegundoDisparoConOtroEnCursoResponde409YElPrimeroTerminaBien() throws Exception {
+        CountDownLatch firstEntered = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        willAnswer(invocation -> {
+            firstEntered.countDown();
+            if (!releaseFirst.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("El test no liberó la primera sincronización a tiempo.");
+            }
+            return snapshot(invocation.<League>getArgument(0));
+        }).given(adapter).fetchLeague(any());
+
+        CompletableFuture<MvcTestResult> first = CompletableFuture.supplyAsync(() -> synchronizeAs(adminToken));
+        boolean entered = firstEntered.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        MvcTestResult second = synchronizeAs(adminToken);
+        releaseFirst.countDown();
+        MvcTestResult firstResult = first.get(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        assertThat(entered).isTrue();
+        assertThat(second.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(body(second).get("message").asString()).isEqualTo("Ya hay una sincronización en curso.");
+        assertThat(firstResult.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+    }
+
+    private MvcTestResult synchronizeLeagueAs(String sessionToken, String league) {
+        return mvc.post().uri(SYNC_PATH)
+                .param("league", league)
+                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionToken)
+                .exchange();
+    }
+
+    private long idOfLiverpoolPlayer(String name) throws Exception {
+        return playerNamed(playersOf(LIVERPOOL_NAME), name).get("id").asLong();
+    }
+
+    private JsonNode playerDetail(long id) throws Exception {
+        return body(mvc.get().uri(PLAYERS_PATH + "/{id}", id).exchange());
+    }
+
+    private JsonNode playersOfLeague(League league) throws Exception {
+        return body(mvc.get().uri(PLAYERS_PATH).param("league", league.name()).exchange());
+    }
+
+    /**
+     * Todos los jugadores del catálogo en una sola página: entran los de las cinco ligas.
+     */
+    private JsonNode wholeCatalog() throws Exception {
+        return body(mvc.get().uri(PLAYERS_PATH).param("size", "50").exchange());
+    }
+}

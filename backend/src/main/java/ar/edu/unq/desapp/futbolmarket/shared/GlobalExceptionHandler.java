@@ -48,6 +48,12 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.CONFLICT, exception.getMessage(), request, null);
     }
 
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ApiError> handleServiceUnavailableException(ServiceUnavailableException exception,
+                                                                      HttpServletRequest request) {
+        return response(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, null);
+    }
+
     /** Los mensajes de cada violación ya vienen en español desde las anotaciones de los DTO. */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleInvalidBody(MethodArgumentNotValidException exception, HttpServletRequest request) {

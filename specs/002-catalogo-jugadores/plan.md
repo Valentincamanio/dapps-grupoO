@@ -1,3 +1,5 @@
+> **Estructura de paquetes histórica**: reemplazada por la constitución 2.0.0 (ver [specs/003](../003-monolito-por-capas/plan.md)).
+
 # Plan de implementación: Catálogo de jugadores
 
 **Rama**: `002-catalogo-jugadores` | **Fecha**: 2026-09-16 | **Especificación**: [spec.md](./spec.md)

@@ -1,6 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.shared;
 
-import ar.edu.unq.desapp.futbolmarket.catalog.modelo.PlayerNotFoundException;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.PlayerNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;

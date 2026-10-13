@@ -1,0 +1,44 @@
+{
+  "filters": { "season": "2026" },
+  "resultSet": { "count": 380, "first": "2026-08-21", "last": "2027-05-30", "played": 50 },
+  "competition": { "id": 2021, "name": "Premier League", "code": "PL", "type": "LEAGUE" },
+  "matches": [
+    {
+      "season": { "id": 2502, "startDate": "2026-08-21", "endDate": "2027-05-30",
+                  "currentMatchday": 6, "winner": null },
+      "id": 560542, "utcDate": "2026-08-21T19:00:00Z", "status": "FINISHED", "matchday": 1,
+      "stage": "REGULAR_SEASON", "group": null, "lastUpdated": "2026-10-06T00:20:38Z",
+      "homeTeam": { "id": 57, "name": "Arsenal FC", "shortName": "Arsenal", "tla": "ARS",
+                    "crest": "https://crests.football-data.org/57.png" },
+      "awayTeam": { "id": 1076, "name": "Coventry City FC", "shortName": "Coventry City",
+                    "tla": "COV", "crest": "https://crests.football-data.org/1076.png" },
+      "score": { "winner": "HOME_TEAM", "duration": "REGULAR",
+                 "fullTime": { "home": 3, "away": 0 }, "halfTime": { "home": 2, "away": 0 } },
+      "odds": { "msg": "Activate Odds-Package in User-Panel to retrieve odds." },
+      "referees": [ { "id": 11620, "name": "Thomas Bramall", "type": "REFEREE",
+                      "nationality": "England" } ]
+    },
+    {
+      "id": 560593, "utcDate": "2026-10-10T11:30:00Z", "status": "TIMED", "matchday": 6,
+      "homeTeam": { "id": 57, "name": "Arsenal FC" },
+      "awayTeam": { "id": 341, "name": "Leeds United FC" },
+      "score": { "winner": null, "duration": "REGULAR",
+                 "fullTime": { "home": null, "away": null },
+                 "halfTime": { "home": null, "away": null } },
+      "referees": []
+    },
+    {
+      "season": { "id": 2502, "startDate": "2026-08-21", "endDate": "2027-05-30",
+                  "currentMatchday": 6, "winner": null },
+      "id": 560571, "utcDate": "2026-09-27T14:00:00Z", "status": "POSTPONED", "matchday": 6,
+      "stage": "REGULAR_SEASON", "group": null, "lastUpdated": "2026-10-06T00:20:38Z",
+      "homeTeam": { "id": 64, "name": "Liverpool FC", "shortName": "Liverpool", "tla": "LIV" },
+      "awayTeam": { "id": 61, "name": "Chelsea FC", "shortName": "Chelsea", "tla": "CHE" },
+      "score": { "winner": null, "duration": "REGULAR",
+                 "fullTime": { "home": null, "away": null },
+                 "halfTime": { "home": null, "away": null } },
+      "odds": { "msg": "Activate Odds-Package in User-Panel to retrieve odds." },
+      "referees": []
+    }
+  ]
+}

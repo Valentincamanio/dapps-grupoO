@@ -1,0 +1,26 @@
+.reveal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+}
+
+.key {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: monospace;
+  font-size: 1rem;
+  color: var(--chalk);
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px dashed var(--chalk-dim);
+  border-radius: 6px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

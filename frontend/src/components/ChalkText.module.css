@@ -1,0 +1,36 @@
+.text {
+  color: var(--chalk);
+}
+
+.title {
+  font-family: var(--font-marker);
+  font-size: 42px;
+  line-height: 1;
+  transform: rotate(-2deg);
+  text-shadow: 0 0 1px var(--chalk);
+}
+
+.heading {
+  font-family: var(--font-script);
+  font-size: 30px;
+  margin-bottom: 6px;
+}
+
+.body {
+  font-family: var(--font-hand);
+  font-size: 18px;
+}
+
+.hint {
+  font-family: var(--font-script);
+  color: var(--yellow);
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.scribble {
+  font-family: var(--font-script);
+  color: var(--chalk-dim);
+  font-size: 24px;
+  transform: rotate(-1deg);
+}

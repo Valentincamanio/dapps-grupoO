@@ -15,3 +15,9 @@ futbolmarket:
   security:
     jwt:
       secret: /tfNkTteCHEpxj9lzElDi/ss60bi7icliBx9uFkxD+u9HFSH7IF0WQjr+upsKbgJ
+  football-data:
+    token: ""
+    base-url: http://football-data.invalid/v4
+    sync:
+      cron: "-"
+      on-startup: false
