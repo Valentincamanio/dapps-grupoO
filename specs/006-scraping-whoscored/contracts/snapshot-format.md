@@ -55,7 +55,7 @@ sin espacios.
 | # | Columna | Tipo | Origen |
 |---|---|---|---|
 | 0 | `player` | string | Id de Football-Data del jugador |
-| 1 | `whoscored` | string | Id de WhoScored del jugador |
+| 1 | `whoscored` | string o `null` | Id de WhoScored del jugador. Es `null` si el jugador no está cruzado: sus estadísticas se cargaron del snapshot con un `CONFLICTING_CROSS` y el id quedó en otro jugador |
 | 2 | `starter` | `0` o `1` | Titular |
 | 3 | `minutesPlayed` | entero ≥ 0 | Minutos jugados |
 | 4 a 18 | `goals` … `redCards` | enteros ≥ 0 | Las 15 métricas de `Metric`, en su orden |
@@ -138,10 +138,11 @@ cualquier página y sin depender de WhoScored (FR-024 y FR-025):
    | Entrada | Situación | Efecto |
    |---|---|---|
    | `team` | El equipo no está en el catálogo | Se saltea: `TEAM_NOT_IN_CATALOG` |
+   | | Está en el catálogo pero no juega la temporada en curso | Se ignora sin contarlo |
    | | Está sin cruzar y el id está libre | Se cruza |
    | | Ya tiene ese id | Nada |
    | | Tiene otro id, o el id es de otro equipo | Gana la base: `CONFLICTING_CROSS` |
-   | `match` | Igual que `team` | `MATCH_NOT_IN_CATALOG` o `CONFLICTING_CROSS` |
+   | `match` | Igual que `team` | `MATCH_NOT_IN_CATALOG` o `CONFLICTING_CROSS`; uno de otra temporada se ignora sin contarlo |
    | `stats` | El partido no está en el catálogo | Se saltea: `MATCH_NOT_IN_CATALOG` |
    | | Ya tiene estadísticas | Se ignora sin contarlo: conserva las suyas |
    | | No está terminado | Se saltea: `MATCH_NOT_FINISHED`. Se carga en la primera sincronización posterior a que figure terminado. |
@@ -149,6 +150,10 @@ cualquier página y sin depender de WhoScored (FR-024 y FR-025):
    | | Está pendiente | Se carga en una transacción y cuenta como "procesado desde el snapshot" |
    | Fila de `stats` | El jugador no está en el catálogo | Se saltea la fila: `PLAYER_NOT_IN_CATALOG`. El resto del partido se carga (FR-026). |
    | | El id de WhoScored del jugador choca con otro cruce | Gana la base: `CONFLICTING_CROSS`. Sus estadísticas se cargan igual. |
+   | | `whoscored` es `null` | Sus estadísticas se cargan; no se cruza a nadie |
+
+   "En el catálogo" se decide buscando por id de Football-Data, de cualquier temporada, los
+   equipos y partidos que nombra el snapshot de la liga (`CatalogReferences`, research D20).
 
 3. Las entradas salteadas se cuentan por motivo en el informe de cada liga (FR-048).
 

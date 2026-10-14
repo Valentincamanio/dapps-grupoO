@@ -84,7 +84,7 @@ Inferencias propias, que no estaban en el prompt y conviene revisar:
 - **SC-004 a SC-006**: los tiempos (15 minutos por fecha, 60 desde el inicio sin
   snapshot), con margen sobre lo medido el 2026-10-13.
 - **Assumptions**: el entorno de tests no consulta WhoScored real y no corre la puesta al
-  dia salvo que un test la habilite; el disparo manual puede tardar hasta unos 40 minutos.
+  dia salvo que un test la habilite; el disparo manual puede tardar hasta unos 47 minutos.
 
 ### Iteracion 2 - 2026-10-13
 

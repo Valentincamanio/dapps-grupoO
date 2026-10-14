@@ -175,8 +175,8 @@ valor por si sola: la cotizacion ya tiene datos de rendimiento.
 
 ### User Story 2 - Arranque rapido con el snapshot (Priority: P2)
 
-Ponerse al dia desde el inicio de la temporada son unas 400 paginas de WhoScored y cerca
-de 40 minutos. Para no repetirlo en cada base nueva, el repositorio incluye un snapshot con
+Ponerse al dia desde el inicio de la temporada son unas 430 paginas de WhoScored y cerca
+de 47 minutos. Para no repetirlo en cada base nueva, el repositorio incluye un snapshot con
 las estadisticas ya obtenidas y los cruces con WhoScored. La sincronizacion de WhoScored
 completa primero desde el snapshot los partidos pendientes que este contiene y despues
 scrapea solo lo que sigue faltando. Un desarrollador regenera el snapshot desde su base
@@ -415,7 +415,7 @@ corrida siguiente sigue con los pendientes.
 - El arranque con puesta al dia coincide con el lunes a las 04:00: la corrida programada
   se omite porque ya hay una sincronizacion en curso.
 - Un administrador dispara a mano la de WhoScored sin snapshot sobre una temporada
-  avanzada: el disparo espera a que termine, lo que puede llevar unos 40 minutos.
+  avanzada: el disparo espera a que termine, lo que puede llevar unos 47 minutos.
 - Una base creada con la 005 no tiene registrada su ultima sincronizacion completa: el
   primer arranque con esta funcionalidad se pone al dia.
 - La puesta al dia falla en las cinco ligas de Football-Data: la de WhoScored corre igual,
@@ -723,7 +723,8 @@ corrida siguiente sigue con los pendientes.
   insistir lo empeora: por eso dos fallas seguidas cortan la corrida.
 - El volumen sale de lo verificado ese dia: un fin de semana completo son 48 partidos
   entre las cinco ligas, en la temporada ya se jugaron unos 330, y ponerse al dia desde el
-  inicio son unas 400 paginas, cerca de 40 minutos al ritmo de FR-042.
+  inicio son unas 430 paginas (5 de liga, hasta 96 de equipos y unas 330 de partidos), cerca
+  de 47 minutos al ritmo de FR-042.
 - Los terminos de uso de WhoScored no permiten el scraping. Es un requisito del TP, asi
   que el sistema pide poco volumen y no expone los datos a los usuarios.
 - WhoScored publica las estadisticas poco despues de cada partido, no en vivo. Un partido
@@ -745,7 +746,7 @@ corrida siguiente sigue con los pendientes.
   completa: el primer arranque con esta funcionalidad se pone al dia, y asi trae por
   primera vez las estadisticas.
 - El disparo manual de WhoScored puede tardar lo que tarde la sincronizacion: unos pocos
-  minutos para una fecha y hasta unos 40 sin snapshot desde el inicio de la temporada.
+  minutos para una fecha y hasta unos 47 sin snapshot desde el inicio de la temporada.
 - La herramienta con la que se bajan las paginas (un cliente HTTP o un navegador sin
   ventana) la decide el plan.
 - Los mensajes de error del sistema se redactan en espanol, segun el Principio VII de la

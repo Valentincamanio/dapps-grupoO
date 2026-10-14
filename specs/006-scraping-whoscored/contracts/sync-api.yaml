@@ -49,7 +49,7 @@ paths:
         El request espera a que la sincronización termine y devuelve su informe con 200. También
         cuando WhoScored bloqueó: en ese caso `cut` dice en qué página se cortó, lo ya guardado
         se conserva y lo que falta queda pendiente para la próxima. Sin snapshot y con la
-        temporada avanzada puede tardar unos 45 minutos.
+        temporada avanzada puede tardar unos 47 minutos.
       security:
         - bearerAuth: []
         - apiKeyAuth: []
@@ -258,12 +258,14 @@ components:
         se cargó del snapshot.
     StatsSkipReason:
       type: string
-      enum: [UNCROSSED_TEAM, NOT_IN_SOURCE, NOT_FINISHED_IN_SOURCE, WRITE_FAILED]
+      enum: [UNCROSSED_TEAM, NOT_IN_SOURCE, NOT_FINISHED_IN_SOURCE, INVALID_IN_SOURCE, WRITE_FAILED]
       description: |
         `UNCROSSED_TEAM`: el local o el visitante no se pudo cruzar. `NOT_IN_SOURCE`: el partido no
         aparece entre los partidos de liga de sus equipos en WhoScored. `NOT_FINISHED_IN_SOURCE`:
-        WhoScored todavía no lo da por terminado. `WRITE_FAILED`: no se pudo guardar. En todos los
-        casos el partido queda pendiente y no cuenta como una falla de WhoScored.
+        WhoScored todavía no lo da por terminado. `INVALID_IN_SOURCE`: WhoScored informó un valor
+        imposible (un rating fuera de 0 a 10 o una métrica negativa). `WRITE_FAILED`: no se pudo
+        guardar. En todos los casos el partido queda pendiente y no cuenta como una falla de
+        WhoScored.
     CrossFailure:
       type: string
       enum: [NOT_FOUND, AMBIGUOUS, NOT_CONFIRMED]

@@ -82,8 +82,8 @@ Resultado esperado: `BUILD SUCCESSFUL`. La suite cubre:
 - **Adapter**, con `MockRestServiceServer` y fixtures reales recortadas:
   - los tres extractores (llaves dentro de strings, apóstrofos escapados, posiciones vacías);
   - las métricas, con quites desde `tackleSuccessful`;
-  - el rating del último minuto;
-  - los headers;
+  - el rating del último minuto, redondeado a dos decimales;
+  - los headers y el INFO de cada pedido;
   - una pausa de 4 s entre pedidos y ninguna antes del primero;
   - un 403 que se reintenta a los 30 s y responde bien;
   - una página sin bloque que falla dos veces y corta;
@@ -91,8 +91,9 @@ Resultado esperado: `BUILD SUCCESSFUL`. La suite cubre:
   - `matchCentreData: null`, que no es un rechazo.
 
   Ningún test duerme: usan `RecordingWhoScoredSleeper` y un `Clock` fijo.
-- **Configuración**: los valores de `application.yaml`, y que un `request-interval` menor a 4 s
-  o un `retry-wait` menor a 30 s impiden el arranque.
+- **Configuración**: los valores de `application.yaml`, que un `request-interval` menor a 4 s o
+  un `retry-wait` menor a 30 s impiden el arranque, y que el cliente HTTP sigue las redirecciones
+  y tiene 10 s de timeout de conexión.
 - **Unitarios de servicio**:
   - `StatsSyncService`:
     - el snapshot de todas las ligas antes del primer pedido;
@@ -121,7 +122,8 @@ Resultado esperado: `BUILD SUCCESSFUL`. La suite cubre:
   - 200 completa, de una liga y cortada;
   - 400, 401 y 403 sin consultar WhoScored;
   - 409 contra Football-Data y contra la cadena;
-  - sin token de Football-Data, WhoScored corre igual;
+  - sin token de Football-Data, WhoScored corre igual (`StatsSyncWithoutTokenIT`, una clase
+    aparte);
   - con WhoScored bloqueando, el catálogo y `POST /players/sync` responden igual.
 
 ## 2. Levantar con el perfil local
@@ -174,9 +176,11 @@ Qué verificar:
 
    Los números son ilustrativos. Sin snapshot, la primera vez tarda unos 47 minutos (SC-005:
    menos de 60).
-4. Si WhoScored rechaza alguna página, queda un WARN con su ruta y el reintento:
+4. Cada pedido a WhoScored deja una línea INFO, y cada rechazo, un WARN con su ruta y el
+   reintento:
 
    ```text
+   INFO  ... WhoScoredClient    : Pedido a WhoScored: /matches/1983619/live (200, 1180 KB; pausa previa de 4 s).
    WARN  ... WhoScoredClient    : WhoScored rechazó la página /matches/1983620/live (403, 5 KB): se reintenta en 30 s.
    ```
 
@@ -206,11 +210,13 @@ Con la aplicación detenida, desde la consola de H2:
 UPDATE LAST_FULL_SYNCS SET FINISHED_AT = DATEADD('DAY', -9, CURRENT_TIMESTAMP) WHERE SOURCE = 'WHOSCORED';
 ```
 
-Al arrancar corre solo la de WhoScored, con origen `CATCH_UP` (HU3, escenario 4).
+Al arrancar, el registro muestra
+`Puesta al día al arrancar: la última sincronización completa exitosa de WhoScored terminó el <fecha>: se corre solo la de WhoScored en segundo plano.`
+y corre solo la de WhoScored, con origen `CATCH_UP` (HU3, escenario 4).
 
 ## 3. Prueba manual contra WhoScored con pocas páginas
 
-Sirve para probar el adapter contra el sitio real sin esperar 45 minutos. Hace falta una base con
+Sirve para probar el adapter contra el sitio real sin esperar 47 minutos. Hace falta una base con
 el catálogo sincronizado y **ningún partido de la Premier con estadísticas** (por ejemplo, una
 base recién creada por la sección 2.2 antes de la primera corrida de WhoScored, o una de prueba
 aparte).
@@ -235,7 +241,7 @@ aparte).
    ```
 
    Son 1 página de liga, las de fixtures necesarias para cruzar los 20 equipos (hasta 20) y 2 de
-   partidos: unos 2 a 3 minutos. El registro muestra cada pedido con su pausa.
+   partidos: unos 2 a 3 minutos. El registro muestra cada pedido con su pausa (`Pedido a WhoScored: ...`).
 3. Verificar en el informe: `matchesScraped: 2`, `uncrossedTeams` vacío y los jugadores sin
    cruzar.
 4. Verificar en la consola de H2 los 20 equipos cruzados y las filas de los dos partidos
@@ -363,7 +369,9 @@ El resultado esperado es `0`: ninguna línea vigente se borra ni cambia (FR-031)
 
 ### 5.3 Base nueva con el snapshot
 
-1. Con la aplicación detenida, apartar la base local (no se borra, así se puede volver):
+1. Con la aplicación detenida, apartar la base local (no se borra, así se puede volver). El
+   respaldo tiene los usuarios con sus contraseñas resguardadas y sus claves de API, y
+   `.gitignore` ignora `backend/data-*/`, así nunca se versiona (FR-032):
 
    ```bash
    mv data data-respaldo
@@ -431,14 +439,29 @@ Además:
 - al repetir las cuentas después de otra sincronización, ninguna baja y las filas del 1983600 no
   cambian (SC-008 y SC-010).
 
+**Muestreo de cruces (SC-003)**: elegir al azar 20 jugadores y 10 partidos cruzados:
+
+```sql
+SELECT P.NAME, T.NAME AS TEAM, P.WHOSCORED_ID
+FROM PLAYERS P JOIN TEAMS T ON T.ID = P.TEAM_ID
+WHERE P.WHOSCORED_ID IS NOT NULL ORDER BY RAND() LIMIT 20;
+SELECT M.EXTERNAL_ID, H.NAME AS HOME, A.NAME AS AWAY, M.UTC_DATE, M.WHOSCORED_ID
+FROM MATCHES M JOIN TEAMS H ON H.ID = M.HOME_TEAM_ID JOIN TEAMS A ON A.ID = M.AWAY_TEAM_ID
+WHERE M.WHOSCORED_ID IS NOT NULL ORDER BY RAND() LIMIT 10;
+```
+
+Abrir cada uno en el navegador, sin apurar el ritmo (`/players/{id}` y `/matches/{id}/live`), y
+comparar el nombre y el equipo del jugador, y los equipos y la fecha del partido. Resultado
+esperado: ninguno mal cruzado.
+
 ## 8. Cobertura de los criterios de éxito
 
 | Criterio | Dónde se valida |
 |---|---|
 | SC-001 | Sección 7 (terminados sin estadísticas = omitidos) y `StatsSyncServiceTest`. |
-| SC-002 | Informe de la sección 2.2 (jugadores sin cruzar contra apariciones) y `PlayerCrossingTest`. |
-| SC-003 y SC-003a | Sección 7 (96 equipos cruzados) y `TeamCrossingTest`. |
-| SC-004 | Corrida semanal en vivo (sección 4.2) o una fecha completa: menos de 15 minutos. |
+| SC-002 | Sección 2.2: con el informe, `filas de PLAYER_MATCH_STATS / (filas + jugadores sin cruzar)` es al menos 0,95; y `PlayerCrossingTest`. |
+| SC-003 y SC-003a | Sección 7: 96 equipos cruzados y el muestreo de cruces sin ninguno mal cruzado; y `TeamCrossingTest` y `PlayerCrossingTest`. |
+| SC-004 | Sección 2.2: `duración / pedidos × 48` (los pedidos son las líneas `Pedido a WhoScored`) da menos de 15 minutos; o una fecha completa en vivo (sección 4.2). |
 | SC-005 | Sección 2.2 sin snapshot: menos de 60 minutos. |
 | SC-006 | Sección 5.3. |
 | SC-007 | `WhoScoredAdapterTest` (pausa de 4 s, una página a la vez) y el registro de la sección 3. |

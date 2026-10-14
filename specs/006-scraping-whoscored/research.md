@@ -201,6 +201,8 @@ comparte el candado, el origen y el informe.
     `Accept-Language`, con los valores verificados ([contracts/whoscored-pages.md](./contracts/whoscored-pages.md)).
   - Un `applyDefaults` estático, igual que `FootballDataClientConfig`, para que el test del
     adapter arme su builder enlazado a un `MockRestServiceServer`.
+  - Un `httpClient` estático, que usa el bean, para probar sin red las redirecciones y el timeout
+    de conexión (`WhoScoredClientConfigTest`).
 - **Compresión apagada** (el valor por defecto de spring-web 7.0.9): es la combinación verificada
   con `curl` y con Java, y el cliente del JDK no descomprime solo.
 - `HttpPageDownloader` usa `exchange` para leer el status y el cuerpo como `String` sin que el
@@ -237,6 +239,8 @@ con Java, 49 de 50 con `curl`). La página de un partido pesa entre 1,0 y 1,3 MB
   - Si sigue `{`, recorta el objeto y lo lee con Jackson a `MatchCentreDto`. El bloque es JSON
     válido.
   - Si el marcador no está, o el JSON no se puede leer, la página llegó sin los datos.
+  - Devuelve los tres resultados como `Optional<Optional<MatchCentreDto>>`: vacío es un rechazo, y
+    un `Optional` vacío adentro es una página válida sin datos.
 - **`FixtureMatchesExtractor`**: busca `fixtureMatches:` y recorta el array. Como es JavaScript,
   lo normaliza a JSON con un recorrido de un solo paso: cada string con comillas simples pasa a
   comillas dobles (`\'` queda `'` y `"` pasa a `\"`), y cada posición vacía (`[,`, `,,` o `,]`)
@@ -399,7 +403,9 @@ WhoScored (`Assisted`, `VoidYellowCard`, `expandedMinute`) en el modelo.
 - **Mapas por minuto**: solo traen los minutos con valor distinto de cero, así que una métrica
   que falta suma 0.
 - **Rating**: la tabla del partido muestra el último valor del mapa (8,95 para Calvert-Lewin,
-  7,76 para Muharemovic). Un jugador que entró y no tiene `ratings` queda con rating `null`.
+  7,76 para Muharemovic). Un jugador que entró y no tiene `ratings` queda con rating `null`. El
+  valor se redondea a dos decimales (`HALF_UP`), que es como lo muestra la tabla; los ratings
+  verificados ya traen dos.
 - Las 23 claves restantes de `stats` (`touches`, `possession`, `totalSaves`, etc.) se ignoran
   (FR-002).
 
@@ -597,6 +603,7 @@ Cruzar también los futuros convierte el costo de las páginas de fixtures en un
   | `UNCROSSED_TEAM` | El local o el visitante no quedó cruzado (FR-018). |
   | `NOT_IN_SOURCE` | Sus dos equipos están cruzados, pero no hay fila con ese local y ese visitante, o la página trae otros equipos (FR-014). |
   | `NOT_FINISHED_IN_SOURCE` | La página trae `matchCentreData: null` o un `statusCode` distinto de 6 (FR-014). |
+  | `INVALID_IN_SOURCE` | La página trae un valor imposible: un rating fuera de 0 a 10 o una métrica negativa (D18). |
   | `WRITE_FAILED` | La base rechazó la escritura del partido (D18). |
 
 - Un partido procesado no se vuelve a pedir: deja de ser pendiente (FR-012).
@@ -681,8 +688,10 @@ en un único orden (el del snapshot, el de la tabla y el del mapper) y no duplic
 - `StatsSyncReportLogger` lo registra con SLF4J: una línea por liga en INFO (en WARN la liga
   cortada), las líneas de detalle que tengan algo (omitidos, sin cruzar y entradas salteadas) y
   una línea final con la duración, los totales y, si hubo, el corte.
-- `WhoScoredClient` registra en WARN cada rechazo con su ruta, su status y su tamaño, y si se
-  reintenta. Esas líneas alimentan el criterio del plan B (D5).
+- `WhoScoredClient` registra en INFO cada pedido, con su ruta, su status, su tamaño y la pausa
+  previa (`Pedido a WhoScored: {ruta} ({status}, {n} KB; pausa previa de {s} s).`), y en WARN
+  cada rechazo y si se reintenta. Esas líneas alimentan el criterio del plan B (D5), las
+  verificaciones del quickstart (secciones 3, 4.1 y 5.3) y la medición de SC-004.
 - El informe no se guarda (FR-049).
 
 **Justificación**: separa lo que el spec pide por liga de lo que pasa en la corrida entera (el
@@ -713,6 +722,10 @@ la 005.
   - `last_full_syncs`, con una fila por fuente (`source` es la clave primaria).
 - **La base local no se borra**. Es lo que pide el escenario 9 de la HU3: una base de la 005 con
   datos se pone al día en el primer arranque.
+- **Prueba del default**: `MatchStatsRepositoryIT` inserta con `JdbcTemplate` una fila de
+  `matches` sin `stats_loaded`, como una de la 005, y la lee con el repository. Es el único SQL
+  nativo de la feature: un `INSERT` estándar, sin funciones de H2, solo en ese test. El equipo lo
+  aprobó el 2026-10-14, como pide el principio VI. El código de producción no usa SQL nativo.
 - **Marca de procesado** `stats_loaded` y no "tiene filas": un partido en el que no se pudo cruzar
   a nadie igual queda procesado (FR-012 y FR-013).
 - **Consultas** (solo derived queries y `@EntityGraph`):
@@ -763,7 +776,13 @@ ya existen.
   corrida y no se hace ningún otro pedido. La liga en la que ocurre queda `CUT` y las que faltan,
   `NOT_REACHED`. Lo ya confirmado se conserva (FR-044 y FR-045).
 - **Falla de la base en un partido** (`DataAccessException`): ese partido queda omitido con
-  `WRITE_FAILED` y la corrida sigue.
+  `WRITE_FAILED` y la corrida sigue. Si lo que falla es una carga del snapshot, queda un WARN y el
+  partido sigue pendiente: se scrapea en la fase 2 de la misma corrida, sin contarse como
+  `WRITE_FAILED`.
+- **Valor imposible de la fuente** (`CatalogInvariantException` al pedir y preparar un partido
+  scrapeado: un rating fuera de 0 a 10 o una métrica negativa): ese partido queda omitido con
+  `INVALID_IN_SOURCE`, con un WARN con el motivo, y la corrida sigue. Se captura solo ahí: en
+  cualquier otro lugar, un invariante roto es un error de programación y aborta la corrida.
 - **Aplicación detenida**: lo confirmado queda y el partido que se estaba escribiendo se revierte
   solo, porque la transacción no llegó a confirmarse. La corrida siguiente lo encuentra pendiente
   (HU4, escenario 5).
@@ -790,7 +809,8 @@ transacción por partido mantiene cada escritura chica y hace la corrida reanuda
   - `team`: liga, id de Football-Data e id de WhoScored del equipo;
   - `match`: liga, id de Football-Data e id de WhoScored del partido;
   - `stats`: liga, id de Football-Data del partido y una fila por jugador, que es un array con
-    el id de Football-Data y el de WhoScored del jugador y las 19 métricas en orden fijo.
+    el id de Football-Data y el de WhoScored del jugador (`null` si no está cruzado) y las 19
+    métricas en orden fijo.
 - **Orden canónico**: encabezado, equipos, partidos y estadísticas; dentro de cada tipo, por liga
   en el orden del enum y por id de Football-Data (primero por largo y después alfabético, que en
   ids numéricos es el orden numérico); las filas de jugadores, por id de Football-Data del
@@ -830,10 +850,12 @@ transacción por partido mantiene cada escritura chica y hace la corrida reanuda
   `UNREADABLE` y **se ignora entero**. En los dos casos queda un WARN y se scrapea todo lo
   pendiente (FR-027).
 - **Por liga, en la fase 1** (D18), se aplican solo las entradas de las ligas pedidas:
-  - `team`: si el equipo no está en el catálogo, se saltea (`TEAM_NOT_IN_CATALOG`); si no tiene
-    id de WhoScored y ese id está libre, se cruza; si ya tiene el mismo, no hace nada; si tiene
-    otro, o el id ya es de otro equipo, gana la base (`CONFLICTING_CROSS`).
-  - `match`: lo mismo con el partido (`MATCH_NOT_IN_CATALOG` o `CONFLICTING_CROSS`).
+  - `team`: si el equipo no está en el catálogo, se saltea (`TEAM_NOT_IN_CATALOG`); si está pero
+    no juega la temporada en curso, se ignora sin contarlo; si no tiene id de WhoScored y ese id
+    está libre, se cruza; si ya tiene el mismo, no hace nada; si tiene otro, o el id ya es de otro
+    equipo, gana la base (`CONFLICTING_CROSS`).
+  - `match`: lo mismo con el partido (`MATCH_NOT_IN_CATALOG` o `CONFLICTING_CROSS`); uno de otra
+    temporada se ignora sin contarlo.
   - `stats`, solo para partidos pendientes (FR-024):
     - si el partido no está en el catálogo, se saltea (`MATCH_NOT_IN_CATALOG`);
     - si ya tiene estadísticas, se ignora sin contarlo: conserva las suyas (HU2, escenario 6);
@@ -844,7 +866,12 @@ transacción por partido mantiene cada escritura chica y hace la corrida reanuda
     Cada fila de un jugador que no está en el catálogo se saltea (`PLAYER_NOT_IN_CATALOG`) y el
     resto del partido se carga (FR-026). El id de WhoScored del jugador se guarda con las mismas
     reglas que `team` (`CONFLICTING_CROSS` si choca), pero sus estadísticas se cargan igual,
-    porque se ubican por el id de Football-Data.
+    porque se ubican por el id de Football-Data. Una fila con el id de WhoScored en `null` se
+    carga sin cruzar a nadie.
+- **Qué está en el catálogo**: `StatsSnapshotService.references` busca por id de Football-Data,
+  con los `findAllByExternalIds` de la 005, los equipos y partidos que nombra el snapshot de la
+  liga, de cualquier temporada (`CatalogReferences`). Así se distingue lo que no está en el
+  catálogo, que se cuenta, de lo que es de otra temporada o de un equipo que dejó la liga, que no.
 - Cada partido cargado es una transacción, como uno scrapeado (D18), y cuenta como "procesado
   desde el snapshot".
 - La carga no hace ningún pedido a WhoScored (FR-025).
@@ -877,8 +904,8 @@ mantiene FR-022 sin borrar cruces confirmados.
 
   No es un recurso de la aplicación: no hay endpoint (FR-028).
 - **`export()`**:
-  1. lee el snapshot vigente; si existe y no se puede leer, **no lo pisa** y termina con un
-     error;
+  1. lee el snapshot vigente; si existe y no se puede leer, **no lo pisa**: `export()` devuelve
+     `false` y `StatsSnapshotExport` termina con código 1;
   2. arma desde la base las entradas `team` (equipos con id de WhoScored), `match` (partidos con
      id de WhoScored) y `stats` (partidos con estadísticas, con sus filas);
   3. `StatsSnapshot.merge` conserva sin cambios cada entrada vigente, también las que la base no
@@ -1064,7 +1091,11 @@ del spec no se pueden bajar por error.
   - los e2e, con `@MockitoBean WhoScoredAdapter`.
 
   El perfil test usa una URL `.invalid`.
-- **Fixtures** en `src/test/resources/whoscored/`, recortadas de páginas reales:
+- **Fixtures** en `src/test/resources/whoscored/`, recortadas de las páginas guardadas el
+  2026-10-13; si no están, armadas con los fragmentos reales de
+  [contracts/whoscored-pages.md](./contracts/whoscored-pages.md) y los valores de
+  [quickstart.md](./quickstart.md), sección 7, con los marcadores, las claves y los formatos
+  exactos del contrato. Nunca se bajan de nuevo para los tests:
   - `match-1983600.html`: el bloque del ejemplo del pedido, con el gol en contra, la asistencia
     de un pase con solo `ShotAssist`, un suplente que entra, uno que no entra y un titular que
     sale;
@@ -1081,29 +1112,30 @@ del spec no se pueden bajar por error.
 | Nivel | Clases |
 |---|---|
 | Unitarios de modelo | `NormalizedNameTest`, `TeamCrossingTest`, `PlayerCrossingTest`, `CatalogPlayersTest`, `ReportedMatchStatsTest` (minutos, goles, asistencias, tarjetas y quién entró), `PlayerMatchStatsTest`, `MetricCountsTest`, `LeagueStatsSyncTest`, `SnapshotLoadTest`, `StatsSnapshotTest` (orden y combinación), `StatsSyncRunTest`, `CatchUpPolicyTest`, `CurrentSeasonsTest`, `SyncReportLastFullSyncTest`, `TeamWhoScoredTest`, `PlayerWhoScoredTest` y `MatchStatsStateTest` |
-| Adapter | `ScriptBlockReaderTest`, `MatchCentreExtractorTest`, `FixtureMatchesExtractorTest`, `TournamentFixturesExtractorTest`, `WhoScoredMapperTest` (sin HTTP) y `WhoScoredAdapterTest` (`MockRestServiceServer`: headers, pausa de 4 s, reintento a los 30 s, corte, 403, página sin bloque, timeout y `matchCentreData: null`) |
-| Configuración | `WhoScoredPropertiesTest` y `SyncPropertiesTest` |
-| Unitarios de servicio | `StatsSyncServiceTest`, `SyncCoordinatorTest`, `SyncLockTest`, `StatsSyncReportLoggerTest`, `StatsSnapshotServiceTest` (con `@TempDir`), y los modificados `StartupSyncTest`, `SyncSchedulerTest` y `SyncServiceTest` |
+| Adapter | `ScriptBlockReaderTest`, `MatchCentreExtractorTest`, `FixtureMatchesExtractorTest`, `TournamentFixturesExtractorTest`, `WhoScoredMapperTest` (sin HTTP), `WhoScoredThreadSleeperTest` (la interrupción) y `WhoScoredAdapterTest` (`MockRestServiceServer`: headers, el INFO de cada pedido, pausa de 4 s, reintento a los 30 s, corte, 403, página sin bloque, timeout y `matchCentreData: null`) |
+| Configuración | `WhoScoredPropertiesTest`, `SyncPropertiesTest` y `WhoScoredClientConfigTest` (redirecciones y timeout del `HttpClient`, sin red) |
+| Unitarios de servicio | `StatsSyncServiceTest`, `SyncCoordinatorTest`, `SyncLockTest`, `StatsSyncReportLoggerTest`, `StatsSnapshotServiceTest` (con `@TempDir`), `SyncServiceLastFullSyncTest` (la última completa de Football-Data, en una clase nueva para no tocar `SyncServiceTest` más de lo avalado), y los modificados `StartupSyncTest`, `SyncSchedulerTest` y `SyncServiceTest` |
 | Persistencia sin Spring | `StatsSnapshotRepositoryTest`, con `@TempDir`: lectura entera, archivo faltante o ilegible, y escritura con el temporal y el movimiento |
 | Integración contra H2 | `TeamCrossRepositoryIT`, `PlayerCrossRepositoryIT`, `MatchStatsRepositoryIT`, `PlayerMatchStatsRepositoryIT`, `LastFullSyncRepositoryIT`, `StatsWriteServiceIT` (incluye que una sincronización de Football-Data posterior conserva los ids de WhoScored y la marca) y `SyncChainIT` (la cadena con los dos adapters mockeados) |
-| End to end | `StatsSyncControllerIT`: 200 completa y de una liga, 200 cortada, 400, 401, 403, 409 contra Football-Data y contra la cadena, sin token de Football-Data, y que el catálogo responde igual con WhoScored caído |
+| End to end | `StatsSyncControllerIT`: 200 completa y de una liga, 200 cortada, 400, 401, 403, 409 contra Football-Data y contra la cadena, y que el catálogo responde igual con WhoScored caído. `StatsSyncWithoutTokenIT`: sin token de Football-Data, WhoScored corre igual; es una clase aparte, como `SyncDisabledIT`, porque `StatsSyncControllerIT` necesita el token para los 409 |
 
 - **Los comportamientos nuevos de las entidades de la 005 se prueban en clases de test nuevas**
   (`TeamWhoScoredTest`, `PlayerWhoScoredTest`, `MatchStatsStateTest`, `TeamCrossRepositoryIT`,
   etc.), así no se toca ningún test existente de esas entidades.
-- **Aislamiento de la base**: los IT nuevos usan su propia H2 (`jdbc:h2:mem:stats-it`) y limpian
-  en orden: estadísticas, partidos, temporadas, jugadores, equipos y últimas completas. Así la
+- **Aislamiento de la base**: los IT nuevos usan su propia H2 (`jdbc:h2:mem:stats-it`) y limpian,
+  antes y después de cada test, en orden: estadísticas, partidos, temporadas, jugadores, equipos y últimas completas. Así la
   `sync-it` de la 005 nunca tiene filas en `player_match_stats` que bloqueen su limpieza. Los e2e
   usan su H2 propia, como `SyncControllerIT`.
 - **Determinismo**: `on-startup` es `false` en test, no hay `Thread.sleep`, el 409 se prueba con
   un latch como en la 005, y ningún test comparte estado.
 - **Tests existentes que cambian**, con el sí de Lucas del 2026-10-13 (aval del spec más el sí
-  del mismo día para los dos casos del borde):
+  del mismo día para los dos casos del borde) y el del 2026-10-14 para renombrar tres métodos y
+  borrar uno cuyo nombre dejaba de describir lo que prueban (principio IV):
 
 | Test | Cambio | Por qué |
 |---|---|---|
-| `service/sync/StartupSyncTest` | El helper arma `StartupSync(properties, coordinator)` y el método probado pasa a ser `catchUp()`. `conElCatalogoVacioYTokenDisparaUnaCompletaDeArranque` pasa a verificar que delega la puesta al día en el coordinador. `sinTokenDejaLaAdvertenciaExactaYNoConsultaElCatalogo` conserva la advertencia exacta y pasa a verificar que la puesta al día corre igual. `conLaSincronizacionDeArranqueApagadaNoHaceNada` cambia solo el mock que verifica. `conOtraEnCursoDejaUnWarnSinPropagarLaExcepcion` hace que el coordinador lance `SyncInProgressException`, con el mismo WARN. **Se borra** `conJugadoresNoDisparaYDejaElInfo`. | FR-033 de la 005 queda reemplazado por la puesta al día (FR-051), y `STARTUP` pasa a `CATCH_UP` (FR-053). Las decisiones de qué corre se prueban en `CatchUpPolicyTest` y `SyncCoordinatorTest`. |
-| `service/sync/SyncSchedulerTest` | El helper arma `SyncScheduler(coordinator)`. `conTokenDisparaUnaSincronizacionCompletaSemanal` verifica `runWeeklyChain()`. `sinTokenNoLlamaAlServicioYDejaUnInfo` pasa a verificar que sin token igual dispara la cadena (el INFO de Football-Data se prueba en `SyncCoordinatorTest`). `conOtraEnCursoNoPropagaLaExcepcionYDejaUnWarnConElMotivo` hace que lance el coordinador, con el mismo WARN. `laCorridaSemanalTomaElCronYLaZonaDeLaConfiguracion` **no cambia**. | La corrida del lunes encadena WhoScored (FR-033 y FR-036 de la 006, que amplían FR-026 de la 005) y el candado es común (FR-031). |
+| `service/sync/StartupSyncTest` | El helper arma `StartupSync(properties, coordinator)` y el método probado pasa a ser `catchUp()`. `conElCatalogoVacioYTokenDisparaUnaCompletaDeArranque` pasa a llamarse `conTokenDelegaLaPuestaAlDiaEnElCoordinador` y verifica que delega la puesta al día en el coordinador. `sinTokenDejaLaAdvertenciaExactaYNoConsultaElCatalogo` pasa a llamarse `sinTokenDejaLaAdvertenciaExactaYSePoneAlDiaIgual`: conserva la advertencia exacta y verifica que la puesta al día corre igual. `conLaSincronizacionDeArranqueApagadaNoHaceNada` cambia solo el mock que verifica. `conOtraEnCursoDejaUnWarnSinPropagarLaExcepcion` hace que el coordinador lance `SyncInProgressException`, con el mismo WARN. **Se borra** `conJugadoresNoDisparaYDejaElInfo`. | FR-033 de la 005 queda reemplazado por la puesta al día (FR-051), y `STARTUP` pasa a `CATCH_UP` (FR-053). Las decisiones de qué corre se prueban en `CatchUpPolicyTest` y `SyncCoordinatorTest`. |
+| `service/sync/SyncSchedulerTest` | El helper arma `SyncScheduler(coordinator)`. `conTokenDisparaUnaSincronizacionCompletaSemanal` pasa a llamarse `disparaLaCadenaSemanal` y verifica `runWeeklyChain()`. **Se borra** `sinTokenNoLlamaAlServicioYDejaUnInfo`: el scheduler ya no mira el token y quedaría igual al anterior; el salteo de Football-Data sin token y su INFO se prueban en `SyncCoordinatorTest`. `conOtraEnCursoNoPropagaLaExcepcionYDejaUnWarnConElMotivo` hace que lance el coordinador, con el mismo WARN. `laCorridaSemanalTomaElCronYLaZonaDeLaConfiguracion` **no cambia**. | La corrida del lunes encadena WhoScored (FR-033 y FR-036 de la 006, que amplían FR-026 de la 005) y el candado es común (FR-031). |
 | `service/sync/SyncServiceTest` | Solo el helper `service(token, clock)` y un `@Mock` nuevo: el constructor recibe `new SyncLock()` y el `LastFullSyncRepository` mockeado. Ningún método, aserción ni dato cambia, incluido el 409. | Candado común (FR-031) y última completa exitosa (FR-047). |
 
 - **Se conservan sin cambios** todos los demás, entre ellos `SyncControllerIT`, `SyncDisabledIT`,
@@ -1125,7 +1157,9 @@ feature reemplaza o amplía.
 - **Sumar métodos a `TeamTest`, `PlayerTest`, `MatchTest` y los IT de la 005**: es modificar
   tests existentes sin necesidad, cuando una clase nueva prueba lo mismo.
 - **Reescribir `StartupSyncTest` y `SyncSchedulerTest` como clases nuevas y borrar las viejas**:
-  borra más de lo que cambia. Se conservan los métodos cuyo comportamiento sigue, con su nombre.
+  borra más de lo que cambia. Se conservan los métodos cuyo comportamiento sigue; los que cambian de
+  comportamiento cambian también de nombre, para que el nombre siga describiendo lo que prueban
+  (principio IV).
 - **Un e2e que levante la aplicación con `on-startup` en `true`**: la puesta al día corre en otro
   hilo al arrancar y competiría con los demás tests del contexto (005, D13). Se prueba con
   `SyncCoordinatorTest` y `SyncChainIT`.

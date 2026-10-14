@@ -105,6 +105,25 @@ No quedan otras contradicciones entre el spec, el pedido y la constitución:
   declarando en el plan, y la clase main va en el paquete raíz, sin crear un paquete;
 - no se agrega ningún status al advice: el disparo de WhoScored usa 200, 400, 401, 403 y 409.
 
+### Decisiones posteriores al análisis (2026-10-14)
+
+Después de `/speckit-analyze`, Lucas resolvió estos puntos:
+
+1. **Nombres de tests de la 005**: se renombran tres métodos de `StartupSyncTest` y
+   `SyncSchedulerTest` y se borra `SyncSchedulerTest.sinTokenNoLlamaAlServicioYDejaUnInfo`, porque
+   sus nombres dejaban de describir lo que prueban (principio IV). Ver D26.
+2. **SQL nativo en un test**: se aprueba un `INSERT` estándar en `MatchStatsRepositoryIT` para
+   probar el default de `stats_loaded` (principio VI). Ver D17.
+3. **Valores imposibles de la fuente**: el rating se redondea a dos decimales, y un rating fuera
+   de 0 a 10 o una métrica negativa omiten el partido con `INVALID_IN_SOURCE`. Ver D8, D13 y D18.
+4. **Fila del snapshot sin id de WhoScored**: la columna `whoscored` admite `null`. Ver D19 y
+   [contracts/snapshot-format.md](./contracts/snapshot-format.md).
+5. **Referencias del snapshot**: `SnapshotLoad` recibe los equipos y partidos del catálogo que
+   nombra el snapshot (`CatalogReferences`), así lo que es de otra temporada se ignora sin
+   contarse. Ver D20.
+6. **Respaldos de la base local**: `.gitignore` suma `backend/data-*/`, para que un respaldo como
+   el de [quickstart.md](./quickstart.md) 5.3 nunca se versione (FR-032).
+
 ### Validación de las decisiones técnicas propuestas en el pedido
 
 | # | Propuesta | Resultado | Dónde |
@@ -139,6 +158,8 @@ divergencias, pero conviene tenerlos a la vista:
 
 - **Quites**: el spec dice "quites" y se guardan los quites ganados (`tackleSuccessful`), que es lo
   que muestra WhoScored.
+- **Rating**: se guarda con dos decimales, redondeando si WhoScored informara más, que es como lo
+  muestra el sitio (FR-008).
 - **Minutos**: se miden en los minutos expandidos de WhoScored, que ya suman lo agregado. Es la
   definición de FR-005 con la precisión de un minuto que usa la fuente. Los números de la HU1
   (96, 72, 24 y 62) se reproducen en los tests con un partido de 2 y 4 minutos agregados.
@@ -152,10 +173,12 @@ divergencias, pero conviene tenerlos a la vista:
   con uno de la base, gana la base y la entrada se cuenta como `CONFLICTING_CROSS`. Las
   estadísticas del jugador se cargan igual, porque se ubican por su id de Football-Data.
 - **Entradas del snapshot que no se cuentan como salteadas**: las de un partido que ya tiene
-  estadísticas, que conserva las suyas (HU2, escenario 6), y las de otra temporada. No son una
-  anomalía: aparecerían en casi todas las corridas.
+  estadísticas, que conserva las suyas (HU2, escenario 6), y las de otra temporada o de un equipo
+  que ya no juega la liga. No son una anomalía: aparecerían en casi todas las corridas.
 - **Partido que falla al guardarse**: el spec no lo menciona. Se omite con `WRITE_FAILED`, queda
   pendiente y la corrida sigue.
+- **Valor imposible de la fuente**: el spec no lo menciona. Un rating fuera de 0 a 10 o una
+  métrica negativa omiten el partido con `INVALID_IN_SOURCE`; queda pendiente y la corrida sigue.
 - **Tolerancia del cruce por calendario**: el spec dice que los partidos "coinciden". Se admiten
   hasta dos fechas sin alinear, para no dejar sin cruzar a un equipo por una fecha reprogramada
   que una fuente todavía no actualizó, y se exige que los rivales correspondan uno a uno.
@@ -240,9 +263,9 @@ No queda ningún NEEDS CLARIFICATION: todo se resolvió en [research.md](./resea
 | I. Capas estrictas (NO NEGOCIABLE) | Cumple | Ver el detalle debajo de la tabla. |
 | II. Modelo rico | Cumple | Las reglas viven en el modelo: `ReportedMatchStats` (minutos, goles, asistencias y tarjetas), `TeamCrossing` y `PlayerCrossing` (cruces), `LeagueStatsSync` (pendientes, omisiones y qué página pedir), `SnapshotLoad` y `StatsSnapshot.merge` (snapshot), `CatchUpPolicy` (puesta al día) y `lastFullSync()` (éxito). Los `if` de los servicios son de la aplicación: si hay token, si el candado está libre y si `on-startup` está prendido. |
 | III. Validación en su nivel | Cumple | Las invariantes están en el modelo, con excepciones propias: `crossWith` no cambia un cruce, `MetricCounts` no admite negativos y el rating tiene su rango. `league` se valida con `League.fromName` (005, D15). El advice sigue siendo único y no suma ningún status. |
-| IV. Tests (NO NEGOCIABLE) | Cumple | Hay unitarios de modelo sin Spring, de servicio con mocks, del adapter con `MockRestServiceServer`, integración contra H2 y end to end en `e2e/`. Los tests existentes que se tocan son tres, con el sí de Lucas del 2026-10-13: el aval del spec más el sí para los dos casos del borde (decisión 3). Se borra un método de `StartupSyncTest`. El resto queda igual, y los constructores de conveniencia de las entidades evitan cambios innecesarios. |
+| IV. Tests (NO NEGOCIABLE) | Cumple | Hay unitarios de modelo sin Spring, de servicio con mocks, del adapter con `MockRestServiceServer`, integración contra H2 y end to end en `e2e/`. Los tests existentes que se tocan son tres, con el sí de Lucas del 2026-10-13: el aval del spec más el sí para los dos casos del borde (decisión 3). Se borran un método de `StartupSyncTest` y uno de `SyncSchedulerTest`, y se renombran tres, con el sí del 2026-10-14. El resto queda igual, y los constructores de conveniencia de las entidades evitan cambios innecesarios. |
 | V. Calidad medible | Cumple | Ver el detalle debajo de la tabla. |
-| VI. Persistencia explícita | Cumple | Las tablas nuevas tienen `@Table(name = ...)` y los índices únicos tienen nombre. Solo hay derived queries y `@EntityGraph`. Los enums nuevos son `VARCHAR`. `@ColumnDefault("false")` genera un `default false` que también existe en PostgreSQL. `open-in-view` y los perfiles no cambian. |
+| VI. Persistencia explícita | Cumple | Las tablas nuevas tienen `@Table(name = ...)` y los índices únicos tienen nombre. En producción solo hay derived queries y `@EntityGraph`; el único SQL nativo es un `INSERT` estándar en `MatchStatsRepositoryIT`, aprobado por el equipo el 2026-10-14 (D17). Los enums nuevos son `VARCHAR`. `@ColumnDefault("false")` genera un `default false` que también existe en PostgreSQL. `open-in-view` y los perfiles no cambian. |
 | VII. Idioma | Cumple | Los identificadores, el endpoint (`/matches/stats/sync`) y el contexto (`performance`) están en inglés y en singular. Los mensajes, la documentación y los comentarios están en español. |
 | Stack tecnológico | Cumple | Sin dependencias nuevas. `build.gradle` suma una tarea `JavaExec` y no se reemplaza. |
 | Definición de terminado | Cumple | `./gradlew build` y `./gradlew bootRun` con `local`, sobre la base existente. `POST /matches/stats/sync` queda documentado y se puede ejecutar desde `/swagger-ui.html` con los dos esquemas de Authorize ([quickstart.md](./quickstart.md), sección 6). |
@@ -283,9 +306,13 @@ Detalle del principio V:
   códigos de tarjeta, los umbrales del cruce (`MIN_ALIGNED_FIXTURES`, `MAX_UNALIGNED_FIXTURES` y
   `DATE_TOLERANCE`) y las palabras de club.
 - **Excepciones**:
-  - No hay `catch (Exception e)`. Se capturan solo `SourceBlockedException` (corte),
-    `DataAccessException` (un partido que no se guarda) y `SyncInProgressException`
-    (disparadores automáticos).
+  - No hay `catch (Exception e)`. Los servicios capturan solo `SourceBlockedException` (corte),
+    `DataAccessException` (un partido que no se guarda), `SyncInProgressException`
+    (disparadores automáticos) y, al pedir y preparar un partido scrapeado,
+    `CatalogInvariantException` (un valor imposible de la fuente, D18).
+  - El adapter captura `RestClientException` (una página fallida, D3) y `JacksonException` (un
+    bloque ilegible es un rechazo, D4). El repository del snapshot captura `JacksonException` y
+    `CatalogInvariantException` (un archivo ilegible, D20).
   - `InterruptedException` restaura la marca de interrupción.
 - **Sin duplicación**:
   - `ScriptBlockReader` recorta los tres bloques;
@@ -318,7 +345,8 @@ Se revisaron [data-model.md](./data-model.md), [contracts/](./contracts/) y
   `SourceBlockedException` lleva la ruta de la página, que es pública.
 - **IV**: la lista exacta de tests tocados está en D26 y en la Estructura del proyecto. El 409 se
   prueba de forma determinística, con un latch, y la puesta al día no corre en los tests.
-- **VI**: no hay SQL nativo. Las columnas nuevas no dependen de tipos propios de H2.
+- **VI**: no hay SQL nativo en producción; la única excepción, un `INSERT` en un test, está
+  aprobada (D17). Las columnas nuevas no dependen de tipos propios de H2.
 - **Stack**: no aparece ninguna dependencia.
 
 **Resultado**: la puerta sigue pasando.
@@ -394,7 +422,7 @@ modelo/
 │   ├── SyncReport.java                           # CAMBIA: + lastFullSync()
 │   ├── SyncSource.java   LastFullSync.java   CatchUp.java   CatchUpPolicy.java                       # NUEVOS
 │   ├── NormalizedName.java   ReportedTeam.java   ReportedFixture.java                                # NUEVOS
-│   ├── TeamCrossing.java   CatalogPlayers.java   PlayerCrossing.java   MatchStatsLoad.java   LoadSource.java   # NUEVOS
+│   ├── TeamCrossing.java   CatalogPlayers.java   PlayerCrossing.java   MatchStatsLoad.java   LoadSource.java   CatalogReferences.java   # NUEVOS
 │   ├── LeagueStatsSync.java   StatsSyncRun.java   StatsSyncReport.java   LeagueStatsResult.java   LeagueStatsStatus.java   # NUEVOS
 │   ├── SkippedStatsMatch.java   StatsSkipReason.java   UncrossedTeam.java   UncrossedPlayer.java   CrossFailure.java   # NUEVOS
 │   ├── RunCut.java   BlockedPage.java   PageKind.java                                                # NUEVOS
@@ -453,6 +481,7 @@ backend/src/main/resources/application-local.yml  # sin cambios
 backend/build.gradle                              # CAMBIA: + tarea exportStatsSnapshot (JavaExec), sin dependencias
 backend/snapshot/whoscored-stats.jsonl            # NUEVO: el primer snapshot, generado en la fase 9
 .gitattributes                                    # CAMBIA: + backend/snapshot/*.jsonl text eol=lf
+.gitignore                                        # CAMBIA: + backend/data-*/ (respaldos de la base local, FR-032)
 ```
 
 Tests, en `backend/src/test/`:
@@ -464,12 +493,15 @@ java/ar/edu/unq/desapp/futbolmarket/
 │   ├── MatchCentreExtractorTest.java   FixtureMatchesExtractorTest.java   TournamentFixturesExtractorTest.java   # NUEVOS
 │   ├── WhoScoredMapperTest.java                  # NUEVO: traducciones sin HTTP (quites, rating, tarjetas, asistidor)
 │   ├── WhoScoredAdapterTest.java                 # NUEVO: MockRestServiceServer (headers, pausa, reintento, corte, null)
+│   ├── WhoScoredThreadSleeperTest.java           # NUEVO: la interrupción → SyncInterruptedException
 │   └── RecordingWhoScoredSleeper.java            # NUEVO: doble de WhoScoredSleeper
 ├── config/
 │   ├── WhoScoredPropertiesTest.java              # NUEVO: valores de application.yaml y mínimos
+│   ├── WhoScoredClientConfigTest.java            # NUEVO: redirecciones y timeout del HttpClient, sin red
 │   └── SyncPropertiesTest.java                   # NUEVO
 ├── e2e/
-│   └── StatsSyncControllerIT.java                # NUEVO: 200 (completa, una liga, cortada), 400, 401, 403, 409; sin token de FD
+│   ├── StatsSyncControllerIT.java                # NUEVO: 200 (completa, una liga, cortada), 400, 401, 403, 409
+│   └── StatsSyncWithoutTokenIT.java              # NUEVO: sin token de FD, WhoScored corre igual (como SyncDisabledIT)
 ├── modelo/
 │   ├── match/MatchStatsStateTest.java            # NUEVO (MatchTest no cambia)
 │   ├── performance/
@@ -492,11 +524,11 @@ java/ar/edu/unq/desapp/futbolmarket/
 │       └── StatsSnapshotRepositoryTest.java      # NUEVO: @TempDir, sin Spring
 └── service/sync/
     ├── StatsSyncServiceTest.java   SyncCoordinatorTest.java   SyncLockTest.java   # NUEVOS
-    ├── StatsSyncReportLoggerTest.java   StatsSnapshotServiceTest.java   # NUEVOS
+    ├── StatsSyncReportLoggerTest.java   StatsSnapshotServiceTest.java   SyncServiceLastFullSyncTest.java   # NUEVOS
     ├── StatsWriteServiceIT.java                  # NUEVO (H2 stats-it): rollback por partido; FD conserva los cruces y la marca
     ├── SyncChainIT.java                          # NUEVO (H2 stats-it): la cadena con los dos adapters mockeados y un 409 en el medio
-    ├── StartupSyncTest.java                      # SE MODIFICA (y se borra un método)
-    ├── SyncSchedulerTest.java                    # SE MODIFICA (el método del cron no cambia)
+    ├── StartupSyncTest.java                      # SE MODIFICA (se renombran dos métodos y se borra uno)
+    ├── SyncSchedulerTest.java                    # SE MODIFICA (se renombra un método y se borra uno; el del cron no cambia)
     └── SyncServiceTest.java                      # SE MODIFICA solo el helper y un @Mock
 resources/
 ├── application-test.yml                          # CAMBIA: + whoscored (URL .invalid y snapshot inexistente)
@@ -507,9 +539,10 @@ resources/
 **Tests existentes que cambian**: el detalle de cada cambio y su motivo está en
 [research.md](./research.md), D26. En resumen:
 
-- `StartupSyncTest`: se adapta a la puesta al día y se borra
+- `StartupSyncTest`: se adapta a la puesta al día, se renombran dos métodos y se borra
   `conJugadoresNoDisparaYDejaElInfo`, cuya regla (FR-033 de la 005) desaparece;
-- `SyncSchedulerTest`: la corrida semanal es la cadena; el método del cron no cambia;
+- `SyncSchedulerTest`: la corrida semanal es la cadena; se renombra un método, se borra
+  `sinTokenNoLlamaAlServicioYDejaUnInfo`, que quedaría repetido, y el método del cron no cambia;
 - `SyncServiceTest`: solo el helper del constructor y un `@Mock`;
 - el resto queda sin cambios, incluidos `SyncControllerIT`, `SyncDisabledIT`, `TeamTest`,
   `PlayerTest`, `MatchTest`, `LeagueSyncTest`, `SyncWriteServiceIT` y `FootballDataPropertiesTest`.
@@ -547,7 +580,7 @@ verde.
      `application.yaml` y `application-test.yml`.
    - `WhoScoredProperties` y `SyncProperties` con sus tests, registradas en `ApplicationConfig`.
    - `WhoScoredClientConfig`.
-   - La línea de `.gitattributes`.
+   - La línea de `.gitattributes` y la de `.gitignore` (`backend/data-*/`).
 2. **Modelo nuevo**:
    - `performance`: `Metric`, `MetricCounts`, `PlayerMatchStats` y los `Reported*`, con
      `ReportedMatchStatsTest` (minutos, goles, asistencias y tarjetas).
@@ -602,6 +635,14 @@ verde.
    - La primera puesta al día completa, la generación del primer snapshot con
      `./gradlew exportStatsSnapshot` y su commit (sección 5).
    - Las secciones 4, 6 y 7.
+
+**Ajustes de orden de tasks.md (2026-10-14)**:
+
+- La lectura del snapshot y `StatsSnapshotService` (paso 6) van antes de `StatsSyncService`
+  (paso 5), para que el servicio y su test nazcan con su forma final (principio IV). La fase 1 de
+  `StatsSyncService` queda en el paso 5, y `StatsSnapshotExport` con su tarea de Gradle, en la HU2.
+- El disparo manual (paso 8) va antes que el coordinador (paso 7), porque es la HU1 y el MVP. No
+  hay dependencia técnica: los 409 que necesitan el candado común se prueban con el coordinador.
 
 **Riesgo de merge**: el compañero puede tocar `application.yaml`, `ApplicationConfig`,
 `SecurityConfig` o las entidades del catálogo en otra rama. Los cambios de esta feature son

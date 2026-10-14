@@ -194,6 +194,8 @@ con su equipo.
 
 - `of(List<Player>)`.
 - `byWhoscoredId(String)`.
+- `byExternalId(String)`: por id de Football-Data. Lo usa `SnapshotLoad`, porque las filas del
+  snapshot ubican al jugador así.
 - `inTeam(Team, NormalizedName)`: los jugadores cuyo equipo actual es ese y tienen ese nombre.
 - `named(NormalizedName)`: todos los jugadores con ese nombre.
 - `confirm(List<Player> crossed)`: actualiza el índice con los cruces de un partido ya confirmado
@@ -220,11 +222,12 @@ con su equipo.
 |---|---|
 | `SnapshotTeamEntry` | Record `(League league, String teamExternalId, String whoscoredId)`. |
 | `SnapshotMatchEntry` | Record `(League league, String matchExternalId, String whoscoredId)`. |
-| `SnapshotPlayerRow` | Record `(String playerExternalId, String whoscoredId, boolean starter, int minutesPlayed, MetricCounts counts, BigDecimal rating, boolean manOfTheMatch)`. |
+| `SnapshotPlayerRow` | Record `(String playerExternalId, String whoscoredId, boolean starter, int minutesPlayed, MetricCounts counts, BigDecimal rating, boolean manOfTheMatch)`. `whoscoredId` es nulo si el jugador no está cruzado: sus estadísticas se cargaron con un `CONFLICTING_CROSS`. |
 | `SnapshotStatsEntry` | Record `(League league, String matchExternalId, List<SnapshotPlayerRow> players)`. Puede no tener filas: es un partido procesado en el que no se cruzó a nadie. |
 | `SnapshotStatus` | Enum `LOADED`, `MISSING` o `UNREADABLE`. |
 | `SnapshotRead` | Record `(SnapshotStatus status, StatsSnapshot snapshot, String problem)`, con las fábricas `loaded`, `missing` y `unreadable(problem)`. Fuera de `LOADED`, `snapshot` es el vacío. |
 | `SnapshotSkipReason` | Enum `TEAM_NOT_IN_CATALOG`, `MATCH_NOT_IN_CATALOG`, `PLAYER_NOT_IN_CATALOG`, `MATCH_NOT_FINISHED` o `CONFLICTING_CROSS`. |
+| `CatalogReferences` | Record `(List<Team> teams, List<Match> matches)`: los equipos y partidos del catálogo, de cualquier temporada, que nombra el snapshot de una liga. Los arma `StatsSnapshotService.references` con los `findAllByExternalIds` de la 005. |
 
 **StatsSnapshot**: record `(List<SnapshotTeamEntry> teams, List<SnapshotMatchEntry> matches, List<SnapshotStatsEntry> stats)`.
 
@@ -235,27 +238,34 @@ con su equipo.
 | `of(List<Team> crossedTeams, List<Match> crossedMatches, List<Match> loadedMatches, List<PlayerMatchStats> stats)` | Arma las entradas desde la base (FR-023 y FR-029). |
 | `merge(StatsSnapshot fromDatabase)` | Conserva cada entrada vigente tal cual, también las que la base no tiene, y suma las de la base cuya clave no está (FR-030 y FR-031). |
 | `forLeague(League)` | Las entradas de esa liga. |
+| `teamExternalIds()` y `matchExternalIds()` | Los ids de Football-Data de las entradas `team`, y de las `match` y `stats`. Con ellos se buscan en el catálogo las `CatalogReferences`. |
 
 **SnapshotLoad**: lo que se carga del snapshot en una liga (FR-024 a FR-026; [research.md](./research.md) D20).
 
-- Se crea con `(StatsSnapshot forLeague, List<Match> seasonMatches, List<Team> seasonTeams, CatalogPlayers catalog)`.
+- Se crea con `(StatsSnapshot forLeague, List<Match> seasonMatches, List<Team> seasonTeams, CatalogPlayers catalog, CatalogReferences referenced)`.
 - Expone:
   - `teamCrosses()` y `matchCrosses()`: los equipos y partidos sin cruzar a los que el snapshot
     les da un id libre;
   - `loads()`: un `MatchStatsLoad` con origen `SNAPSHOT` por cada partido pendiente del snapshot;
   - `skipped()`: `Map<SnapshotSkipReason, Integer>` con las entradas salteadas.
-- Un partido ya procesado o de otra temporada se ignora sin contarlo. Ante un cruce en conflicto
-  gana la base, pero las estadísticas del jugador se cargan igual, porque se ubican por su id de
-  Football-Data.
+- Un partido ya procesado se ignora sin contarlo. Lo que está en el catálogo (`referenced`) pero no
+  en la temporada en curso, como un equipo que dejó la liga o un partido de otra temporada, también
+  se ignora sin contarlo: `TEAM_NOT_IN_CATALOG` y `MATCH_NOT_IN_CATALOG` son solo para lo que no
+  está en el catálogo.
+- Ante un cruce en conflicto gana la base, pero las estadísticas del jugador se cargan igual,
+  porque se ubican por su id de Football-Data. Una fila sin id de WhoScored se carga sin cruzar a
+  nadie.
 
 #### Una liga de una corrida de WhoScored
 
 **LeagueStatsSync**: aplica las reglas de una liga. Se crea con
 `(League league, Season currentSeason, List<Match> seasonMatches)`, acumula los resultados y el
-servicio lo usa paso a paso. No decide nada el servicio.
+servicio lo usa paso a paso. No decide nada el servicio. `currentSeason` es nulo si la liga no
+tiene temporada en el catálogo: entonces no hay pendientes.
 
 | Método | Regla |
 |---|---|
+| `seasonTeams()` | Los locales y visitantes de los partidos de la temporada, sin repetir. Los usan `TeamCrossing` y el servicio, para armar `SnapshotLoad`. |
 | `pendingMatches()` | Los partidos de la temporada con `needsStats()`, del más antiguo al más reciente (FR-010 y FR-011). |
 | `recordSnapshot(SnapshotLoad, List<MatchStatsLoad> saved)` | Cuenta los procesados desde el snapshot y las entradas salteadas. |
 | `needsLeaguePage()` | `true` si hay pendientes y algún equipo de la temporada no está cruzado. |
@@ -268,7 +278,7 @@ servicio lo usa paso a paso. No decide nada el servicio.
 | `closeDiscovery()` | Omite los pendientes que siguen sin id: `UNCROSSED_TEAM` si les falta un equipo cruzado y `NOT_IN_SOURCE` si no (FR-014 y FR-018). |
 | `matchesToScrape()` | Los pendientes con id, en orden de fecha. |
 | `prepare(Match, Optional<ReportedMatchStats>, CatalogPlayers)` | `Optional<MatchStatsLoad>` con origen `SCRAPING`. Vacío y omitido con `NOT_FINISHED_IN_SOURCE` si no hay datos o no está terminado, y con `NOT_IN_SOURCE` si los equipos no coinciden. Si no, corre `PlayerCrossing` y arma las estadísticas de los que entraron. Los jugadores sin cruzar van al informe (FR-021). |
-| `recordScraped(MatchStatsLoad)` y `recordWriteFailure(Match)` | El segundo omite con `WRITE_FAILED`. |
+| `recordScraped(MatchStatsLoad)`, `recordWriteFailure(Match)` y `recordInvalidSource(Match)` | El segundo omite con `WRITE_FAILED` y el tercero con `INVALID_IN_SOURCE` (un valor imposible de la fuente, [research.md](./research.md) D18). |
 | `result(LeagueStatsStatus)` | `LeagueStatsResult` de la liga. |
 
 #### Corrida e informe de WhoScored
@@ -305,7 +315,7 @@ el scraping no llegó, con lo que haya cargado del snapshot.
 |---|---|
 | `LeagueStatsStatus` | Enum `PROCESSED`, `CUT` o `NOT_REACHED`. |
 | `SkippedStatsMatch` | Record `(String matchExternalId, String homeTeamName, String awayTeamName, Instant utcDate, StatsSkipReason reason)`. |
-| `StatsSkipReason` | Enum `UNCROSSED_TEAM`, `NOT_IN_SOURCE`, `NOT_FINISHED_IN_SOURCE` o `WRITE_FAILED` ([research.md](./research.md) D13). |
+| `StatsSkipReason` | Enum `UNCROSSED_TEAM`, `NOT_IN_SOURCE`, `NOT_FINISHED_IN_SOURCE`, `INVALID_IN_SOURCE` o `WRITE_FAILED` ([research.md](./research.md) D13). |
 | `UncrossedTeam` | Record `(String teamExternalId, String name, CrossFailure reason)`: un equipo del catálogo. |
 | `UncrossedPlayer` | Record `(String whoscoredId, String name, String teamName, String matchExternalId, CrossFailure reason)`: su nombre, su equipo y el partido (FR-021). |
 | `CrossFailure` | Enum `NOT_FOUND`, `AMBIGUOUS` o `NOT_CONFIRMED` (este último, solo para equipos). |
@@ -393,7 +403,7 @@ Solo hay derived queries, JPQL y `@EntityGraph`. No hay SQL nativo.
 |---|---|
 | `TeamSQLDAO` | `List<TeamSQL> findAllByWhoscoredIdIsNotNull()` |
 | `PlayerSQLDAO` | `@Override @EntityGraph(attributePaths = "team") List<PlayerSQL> findAll()` |
-| `MatchSQLDAO` | `@EntityGraph(attributePaths = {"season", "homeTeam", "awayTeam"}) List<MatchSQL> findAllBySeasonExternalId(String)`, `@EntityGraph(attributePaths = "season") List<MatchSQL> findAllByWhoscoredIdIsNotNull()` y `@EntityGraph(attributePaths = "season") List<MatchSQL> findAllByStatsLoadedTrue()` |
+| `MatchSQLDAO` | `findAllBySeasonExternalId(String)`, `findAllByWhoscoredIdIsNotNull()` y `findAllByStatsLoadedTrue()`, los tres `List<MatchSQL>` con `@EntityGraph(attributePaths = {"season", "homeTeam", "awayTeam"})`, porque `MatchMapper` traduce los dos equipos fuera de la transacción |
 | `PlayerMatchStatsSQLDAO` (nuevo) | `@Override @EntityGraph(attributePaths = {"player", "player.team", "match", "match.season", "match.homeTeam", "match.awayTeam"}) List<PlayerMatchStatsSQL> findAll()` |
 | `LastFullSyncSQLDAO` (nuevo) | `JpaRepository<LastFullSyncSQL, String>`: `findById` y `save` |
 
@@ -434,7 +444,7 @@ Ningún repository de esta feature borra datos (SC-008).
    SCHEDULED/TIMED/POSTPONED/... ──────────────────────► no es pendiente (FR-011)
    FINISHED, sin estadísticas, temporada en curso ──────► PENDIENTE
    PENDIENTE ──snapshot o scraping, en una transacción──► CON ESTADÍSTICAS (statsLoaded); nunca vuelve (FR-012)
-   PENDIENTE ──equipo sin cruzar / no está en WS / WS no lo da por terminado / falla al guardar──► PENDIENTE (va al informe)
+   PENDIENTE ──equipo sin cruzar / no está en WS / WS no lo da por terminado / valor imposible / falla al guardar──► PENDIENTE (va al informe)
    PENDIENTE de una temporada que dejó de estar en curso ──► queda sin estadísticas; no se procesa más
 
  Partido (cruce)
