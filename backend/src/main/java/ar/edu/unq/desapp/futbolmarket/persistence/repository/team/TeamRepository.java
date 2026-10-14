@@ -32,6 +32,14 @@ public class TeamRepository {
         return toTeams(teamDAO.findAllByExternalIdIn(externalIds));
     }
 
+    /**
+     * Los equipos ya cruzados con WhoScored, que van al snapshot.
+     */
+    @Transactional(readOnly = true)
+    public List<Team> findAllCrossed() {
+        return toTeams(teamDAO.findAllByWhoscoredIdIsNotNull());
+    }
+
     @Transactional
     public List<Team> saveAll(List<Team> teams) {
         List<TeamSQL> savedTeams = teamDAO.saveAll(teams.stream().map(teamMapper::toSQL).toList());

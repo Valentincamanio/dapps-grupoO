@@ -10,4 +10,13 @@ import java.util.List;
 public interface MatchSQLDAO extends JpaRepository<MatchSQL, Long> {
     @EntityGraph(attributePaths = {"season", "homeTeam", "awayTeam"})
     List<MatchSQL> findAllByExternalIdIn(Collection<String> externalIds);
+
+    @EntityGraph(attributePaths = {"season", "homeTeam", "awayTeam"})
+    List<MatchSQL> findAllBySeasonExternalId(String seasonExternalId);
+
+    @EntityGraph(attributePaths = {"season", "homeTeam", "awayTeam"})
+    List<MatchSQL> findAllByWhoscoredIdIsNotNull();
+
+    @EntityGraph(attributePaths = {"season", "homeTeam", "awayTeam"})
+    List<MatchSQL> findAllByStatsLoadedTrue();
 }
