@@ -114,31 +114,31 @@ escritos y en verde, y cada bloque termina con `./gradlew build` en verde.
 **Propósito**: propiedades, configuración del cliente HTTP, `.gitattributes` y `.gitignore` (paso
 1 del plan).
 
-- [ ] T001 [P] En backend/src/main/resources/application.yaml agregar los bloques `whoscored` y `sync` dentro del bloque `futbolmarket` existente, después de `football-data`, exactamente como figuran en contracts/configuration.md ("Cambios en los archivos existentes"). No reemplazar el archivo ni tocar las claves existentes
-- [ ] T002 [P] En backend/src/test/resources/application-test.yml agregar, dentro del bloque `futbolmarket` existente, `whoscored.base-url: http://whoscored.invalid` y `whoscored.snapshot.path: build/test-snapshot/absent.jsonl`, como indica contracts/configuration.md. No tocar las claves existentes
-- [ ] T003 [P] En .gitattributes (raíz del repositorio) agregar la línea `backend/snapshot/*.jsonl text eol=lf` (research D19). En .gitignore (raíz del repositorio), debajo de `backend/data/`, agregar `backend/data-*/`: así un respaldo de la base local, como el de quickstart.md 5.3 (`data-respaldo`), nunca se versiona (FR-032). No crear todavía la carpeta `backend/snapshot/`
-- [ ] T004 [P] Crear el record `WhoScoredProperties` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/WhoScoredProperties.java, siguiendo el patrón de `FootballDataProperties` (research D25):
+- [X] T001 [P] En backend/src/main/resources/application.yaml agregar los bloques `whoscored` y `sync` dentro del bloque `futbolmarket` existente, después de `football-data`, exactamente como figuran en contracts/configuration.md ("Cambios en los archivos existentes"). No reemplazar el archivo ni tocar las claves existentes
+- [X] T002 [P] En backend/src/test/resources/application-test.yml agregar, dentro del bloque `futbolmarket` existente, `whoscored.base-url: http://whoscored.invalid` y `whoscored.snapshot.path: build/test-snapshot/absent.jsonl`, como indica contracts/configuration.md. No tocar las claves existentes
+- [X] T003 [P] En .gitattributes (raíz del repositorio) agregar la línea `backend/snapshot/*.jsonl text eol=lf` (research D19). En .gitignore (raíz del repositorio), debajo de `backend/data/`, agregar `backend/data-*/`: así un respaldo de la base local, como el de quickstart.md 5.3 (`data-respaldo`), nunca se versiona (FR-032). No crear todavía la carpeta `backend/snapshot/`
+- [X] T004 [P] Crear el record `WhoScoredProperties` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/WhoScoredProperties.java, siguiendo el patrón de `FootballDataProperties` (research D25):
   - `@ConfigurationProperties("futbolmarket.whoscored")` y `@Validated`;
   - componentes: `URI baseUrl` (`@NotNull`), `String userAgent`, `String accept` y `String acceptLanguage` (`@NotBlank`), `Duration connectTimeout`, `Duration readTimeout`, `Duration requestInterval` y `Duration retryWait` (`@NotNull`), y el record anidado `Snapshot(@NotBlank String path)` (`@NotNull @Valid`);
   - constantes públicas `MIN_REQUEST_INTERVAL = Duration.ofSeconds(4)` (FR-042) y `MIN_RETRY_WAIT = Duration.ofSeconds(30)` (FR-043);
   - el constructor compacto lanza `IllegalArgumentException`, con un mensaje en español, ante un timeout cero o negativo, un `requestInterval` menor a `MIN_REQUEST_INTERVAL` o un `retryWait` menor a `MIN_RETRY_WAIT`. Así la aplicación no arranca con valores por debajo del spec
-- [ ] T005 [P] Crear el record `SyncProperties(Duration catchUpAfter)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/SyncProperties.java: `@ConfigurationProperties("futbolmarket.sync")`, `@Validated`, `@NotNull` y un constructor compacto que rechaza con `IllegalArgumentException` una duración cero o negativa (research D25)
-- [ ] T006 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/ApplicationConfig.java sumar `WhoScoredProperties.class` y `SyncProperties.class` a `@EnableConfigurationProperties` y actualizar el Javadoc (depende de T004 y T005)
-- [ ] T007 [P] Crear `WhoScoredClientConfig` (`@Configuration`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/WhoScoredClientConfig.java (research D3) (depende de T004):
+- [X] T005 [P] Crear el record `SyncProperties(Duration catchUpAfter)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/SyncProperties.java: `@ConfigurationProperties("futbolmarket.sync")`, `@Validated`, `@NotNull` y un constructor compacto que rechaza con `IllegalArgumentException` una duración cero o negativa (research D25)
+- [X] T006 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/ApplicationConfig.java sumar `WhoScoredProperties.class` y `SyncProperties.class` a `@EnableConfigurationProperties` y actualizar el Javadoc (depende de T004 y T005)
+- [X] T007 [P] Crear `WhoScoredClientConfig` (`@Configuration`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/WhoScoredClientConfig.java (research D3) (depende de T004):
   - el método estático público `RestClient.Builder applyDefaults(RestClient.Builder builder, WhoScoredProperties properties)`, que pone la `baseUrl` y los headers por defecto `User-Agent`, `Accept` y `Accept-Language` de las propiedades. No manda `Accept-Encoding` ni cookies. El test del adapter (T096) lo reutiliza;
   - el método estático público `HttpClient httpClient(WhoScoredProperties)`: `HttpClient.newBuilder().connectTimeout(connectTimeout).followRedirects(HttpClient.Redirect.NORMAL).build()`, con la versión por defecto (HTTP/2 con *fallback* a HTTP/1.1);
   - el bean `RestClient whoScoredRestClient(WhoScoredProperties)`: `applyDefaults(RestClient.builder(), properties)` con un `JdkClientHttpRequestFactory` sobre `httpClient(properties)` y `setReadTimeout(readTimeout)`;
   - la compresión queda apagada (no se llama a `enableCompression`) y no hay interceptores de logging;
   - `FootballDataClient` sigue recibiendo el suyo con `@Qualifier("footballDataRestClient")`: no cambia;
   - escribir `WhoScoredClientConfigTest` (unitario, sin red) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/WhoScoredClientConfigTest.java: con las propiedades de application.yaml, `httpClient` sigue las redirecciones (`followRedirects()` es `NORMAL`) y tiene 10 s de `connectTimeout()` (research D3)
-- [ ] T008 [P] Escribir `WhoScoredPropertiesTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/WhoScoredPropertiesTest.java (depende de T001, T002 y T004):
+- [X] T008 [P] Escribir `WhoScoredPropertiesTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/WhoScoredPropertiesTest.java (depende de T001, T002 y T004):
   - acepta exactamente 4 s de pausa y 30 s de espera;
   - rechaza 3999 ms de pausa y 29 s de espera, con sus mensajes, y un timeout cero o negativo;
   - leyendo application.yaml con `YamlPropertySourceLoader`, como `FootballDataPropertiesTest`: la URL base, los tres headers, `10s`, `30s`, `4s`, `30s` y `snapshot/whoscored-stats.jsonl` (contracts/configuration.md);
   - leyendo application-test.yml: `http://whoscored.invalid` y `build/test-snapshot/absent.jsonl`;
   - con `ApplicationContextRunner`, `@EnableConfigurationProperties(WhoScoredProperties.class)` y los valores de application.yaml, un `request-interval` de `3s` o un `retry-wait` de `10s` hacen fallar el contexto (quickstart 1, "Configuración")
-- [ ] T009 [P] Escribir `SyncPropertiesTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/SyncPropertiesTest.java (depende de T001 y T005): `catch-up-after` es `7d` en application.yaml, y una duración cero o negativa se rechaza con su mensaje
-- [ ] T010 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T009 [P] Escribir `SyncPropertiesTest` (unitario) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/SyncPropertiesTest.java (depende de T001 y T005): `catch-up-after` es `7d` en application.yaml, y una duración cero o negativa se rechaza con su mensaje
+- [X] T010 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 ---
 

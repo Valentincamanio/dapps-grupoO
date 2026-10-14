@@ -21,3 +21,7 @@ futbolmarket:
     sync:
       cron: "-"
       on-startup: false
+  whoscored:
+    base-url: http://whoscored.invalid
+    snapshot:
+      path: build/test-snapshot/absent.jsonl

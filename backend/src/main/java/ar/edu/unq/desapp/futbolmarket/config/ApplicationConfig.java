@@ -15,9 +15,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * <p>También habilita {@code @Scheduled}, para la sincronización semanal con Football-Data.org,
  * y {@code @Async}, para que la sincronización al arrancar corra en segundo plano y no demore el
  * arranque (research D12 y D13).</p>
+ *
+ * <p>Las propiedades de WhoScored y el plazo de la puesta al día al arrancar se validan al
+ * enlazarse: con un valor por debajo de los mínimos del spec, la aplicación no arranca (research
+ * D25 de la 006).</p>
  */
 @Configuration
-@EnableConfigurationProperties({AuthProperties.class, JwtProperties.class, FootballDataProperties.class})
+@EnableConfigurationProperties({AuthProperties.class, JwtProperties.class, FootballDataProperties.class,
+        WhoScoredProperties.class, SyncProperties.class})
 @EnableScheduling
 @EnableAsync
 public class ApplicationConfig {
