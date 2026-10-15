@@ -57,10 +57,31 @@ Pendiente antes de implementar (no es una duda de comportamiento, es una puerta 
 - Q: Se pueden modificar los tests del frontend de la 004 que hoy prohíben mostrar precios,
   valores o puntajes (`NoPurchaseActions.test.tsx`, CE-009)? -> A: El equipo decidió que
   deben modificarse, porque esta funcionalidad muestra cotizaciones. El Principio IV de la
-  constitución exige el "sí" explícito del equipo registrado acá antes de implementar. **Falta
-  registrar ese "sí"** (quién lo da y en qué fecha). Hasta que figure, no se modifica ni se
-  borra ningún test. El plan tiene que listar qué tests y qué aserciones cambian y por qué
-  (FR-072).
+  constitución exige el "sí" explícito del equipo registrado acá antes de implementar. **El "sí"
+  quedó registrado el 2026-10-15 (Valentin), en la sesión de abajo.** El plan lista qué tests y qué
+  aserciones cambian y por qué (FR-072).
+
+### Session 2026-10-15
+
+- Q: Cuando se recotiza en el acto la última semana cerrada, ¿el cierre de la semana siguiente
+  parte del valor recotizado o del valor que el jugador tenía a las 00:00 del lunes? → A: Parte
+  del valor recotizado. El valor base de una semana es la última cotización del jugador (por
+  vigencia) de las semanas anteriores a esa semana, incluidas las recotizadas.
+- Q: ¿Los pares de un jugador son los de su misma posición de las cinco ligas juntas, o solo los de
+  su misma liga? → A: De las cinco ligas juntas (confirma FR-017 y su Assumption).
+- Q: ¿Las respuestas de la API y las pantallas muestran el score de cada cotización? → A: No. El
+  score se guarda (FR-003) pero ninguna respuesta ni pantalla lo expone (confirma FR-006 y Fuera
+  de Alcance).
+- Q: ¿Se confirma la fórmula aditiva con factor 10 y mínimo 10,00, sabiendo que una simulación
+  sintética (600 jugadores, 38 semanas, datos inventados) dejó a un 22 % de los jugadores en el piso
+  a las 38 semanas? → A: Sí, se confirma la aditiva (FR-024 y FR-025). El factor y el mínimo se
+  recalibran con la simulación sobre datos reales; no se adopta la variante proporcional.
+- Q: ¿Se autoriza modificar los tests de la 004 que prohíben mostrar precios y valores? → A: Sí.
+  **"Sí" explícito del equipo (Principio IV), dado por Valentin el 2026-10-15.** Alcanza solo a los
+  cambios que lista el plan (FR-072): quitar `precio` y `valor` de las expresiones de
+  `NoPurchaseActions.test.tsx`, `PostIt.test.tsx` y `PlayerPage.test.tsx`, actualizar sus
+  descripciones, y sumar los handlers de cotizaciones a `tests/mocks/handlers.ts`. No autoriza
+  borrar tests ni cambiar otras aserciones.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -357,6 +378,10 @@ qué precio se calculan, que las anteriores se conservan y que repetir no acumul
     sistema lo rechaza por falta de permiso y no cambia nada.
 14. **Given** un sistema sin ninguna cotización todavía, **When** se activa otra estrategia,
     **Then** cambia la activa y no hay nada que recotizar.
+15. **Given** un jugador con una recotizada de 104,00 de la última semana cerrada, hecha durante
+    la semana siguiente, y un score de +0,20 en esa semana siguiente con factor 10, **When**
+    cierra esa semana siguiente, **Then** su cotización calculada pasa a 106,00 (parte de la
+    recotizada de 104,00 y no de la calculada anterior de 101,00).
 
 ---
 
@@ -629,8 +654,11 @@ administrador no ve la sección ni puede usarla entrando por la dirección.
   entre −1 y +1.
 - **FR-024**: El valor MUST ser valorBase + score × factorEscala, redondeado una sola vez a
   2 decimales, y MUST NOT ser menor que la cotización mínima de la estrategia. El valorBase
-  es 100,00 la primera vez y después es el valor anterior del jugador. El valor puede bajar,
-  y la baja máxima por semana es el factor de escala.
+  es 100,00 la primera vez y después es el valor anterior del jugador: el de su última
+  cotización (por vigencia) de las semanas anteriores a la que se cotiza, incluidas las
+  recotizadas. Una recotizada de la última semana cerrada, hecha durante la semana siguiente,
+  es entonces la base del cierre de esa semana siguiente. El valor puede bajar, y la baja
+  máxima por semana es el factor de escala.
 - **FR-025**: El factor de escala por defecto MUST ser 10 (como máximo ±10 créditos por
   semana sobre el 100 % del jugador, o ±0,10 por token) y la cotización mínima por defecto
   MUST ser 10,00 (0,10 por token). Valen cuando una estrategia no los indica.
@@ -806,7 +834,8 @@ administrador no ve la sección ni puede usarla entrando por la dirección.
 - **FR-072**: El plan MUST listar cada test existente de la 004 que cambia, qué aserciones
   cambian y por qué. Ningún test MUST modificarse ni borrarse hasta que el "sí" explícito del
   equipo figure en Clarifications. El cambio levanta solo la prohibición de mostrar precios,
-  valores, cotizaciones y puntajes; las prohibiciones de FR-071 se conservan.
+  valores y cotizaciones; la de mostrar puntajes se conserva (el score no se expone, FR-006), igual
+  que las prohibiciones de FR-071.
 
 ### Key Entities
 
@@ -891,7 +920,7 @@ administrador no ve la sección ni puede usarla entrando por la dirección.
 - Hora de Argentina es UTC−3, sin cambio de hora de verano. Los lunes a las 06:00 son hora
   de Argentina.
 - Los pares de un jugador son los activos de su misma posición **de las cinco ligas juntas**,
-  no de su liga, porque el pedido no habla de liga al definirlos. El equipo lo puede acotar.
+  no de su liga, y el equipo lo confirmó el 2026-10-15 (Clarifications).
 - Para las métricas que solo existen si el jugador jugó (rating, precisión de pase, resultado
   del equipo), el grupo con que se compara es el de los pares que sí la tienen. Los que no la
   tienen valen 0. Es una interpretación de la regla "si no se puede calcular, vale 0".
@@ -935,6 +964,9 @@ administrador no ve la sección ni puede usarla entrando por la dirección.
 - Los tiempos de los criterios de éxito suponen alrededor de 2.600 jugadores activos y la
   base local del proyecto.
 - Los mensajes de error se redactan en español, según el Principio VII de la constitución.
+- Riesgo conocido de la fórmula aditiva (confirmada el 2026-10-15): con el correr de las semanas una
+  parte de los jugadores puede quedar en la cotización mínima. El factor de escala y el mínimo por
+  defecto son un punto de partida y se recalibran con la simulación (historia 7) sobre datos reales.
 
 ## Dependencies
 
@@ -954,8 +986,8 @@ administrador no ve la sección ni puede usarla entrando por la dirección.
 - **Frontend de la pizarra táctica (004)**: aporta la estética, la pizarra, la ficha, las
   rutas y el cliente. Esta funcionalidad modifica su RF-002 y sus escenarios que prohíben
   mostrar precio, valor o puntaje (US1.5, US2.5), y su CE-009 con el test
-  `NoPurchaseActions.test.tsx`, en lo que prohíben mostrar precios, valores, cotizaciones y
-  puntajes. Se conserva todo lo que prohíben de compra y venta (FR-071). Su RF-018 se
+  `NoPurchaseActions.test.tsx`, en lo que prohíben mostrar precios, valores y cotizaciones. Se
+  conserva todo lo que prohíben de compra y venta (FR-071) y de puntajes (FR-006). Su RF-018 se
   extiende al ranking. El resto de la 004 sigue vigente.
 - **Autenticación (001)**: aporta el rol ADMIN y la cuenta de administrador de arranque. Las
   consultas siguen el criterio público del catálogo; las funciones de administrador exigen el
