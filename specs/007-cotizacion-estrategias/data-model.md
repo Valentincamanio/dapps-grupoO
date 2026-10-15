@@ -345,6 +345,23 @@ hasta que el equipo decida sumarla a `ValuationMetric`.
 | Guarda el equipo del jugador en cada partido | `WeeklyPerformance` (resolver el lado con ese equipo) y se simplifica D5 |
 | Renombra `Match.needsStats()` | `QuotingPlan` y sus tests |
 
+**Contraste del 2026-10-15 (T002)** contra `origin/feature/scraping-whoscored` en `c2a46ec`, sin
+integrar todavía en `develop` (puerta G1 pendiente; si la 006 cambia antes del merge, repetir el
+contraste). Coinciden todos los nombres de 5.1: `PlayerMatchStats.player()`, `match()`,
+`minutesPlayed()` (`int`), `counts().get(Metric.X)` (`int`, las 15 constantes con los mismos nombres),
+`rating()` (`BigDecimal` o `null`, escala 2); `Match.needsStats()` (`FINISHED` y `!statsLoaded`),
+`statsLoaded()`, `winner()` (`MatchWinner`), `fullTime()` (`Score(Integer home, Integer away)`),
+`homeTeam()` y `awayTeam()`; `Team.externalId()`; `SyncLock.runExclusively(Supplier<T>)` en
+`service/sync/` y `SyncInProgressException` (`ConflictException`, en `modelo/sync/exception/`);
+`PlayerMatchStatsRepository` y `PlayerMatchStatsSQLDAO` en `.../performance/`. Diferencias y notas:
+
+| Hallazgo | Qué cambia |
+|---|---|
+| `MatchSQL.status` es `String` (columna `status`), no un enum; el mapper hace `MatchStatus.valueOf(...)` | T005: el derived query es `findAllByStatus(String status)` y `MatchRepository.findAllFinished()` le pasa `MatchStatus.FINISHED.name()`. Con un parámetro `MatchStatus` Hibernate rechaza el tipo al enlazar |
+| `MatchMapper.toDomain` mapea la temporada (`Match` la exige) y el `findAll()` existente trae `match.season` en el `@EntityGraph` | T004: sumar `match.season` al `@EntityGraph` de `findAllByMatchUtcDateBetween` (si no, una consulta más por partido) |
+| El constructor es `PlayerMatchStats(Long id, Player, Match, boolean starter, int minutesPlayed, MetricCounts counts, BigDecimal rating, boolean manOfTheMatch)`; `MetricCounts.of(Map<Metric, Integer>)`, `empty()` y `with(Metric, int)`; las invariantes lanzan `CatalogInvariantException` | Solo T041 (`PlayerMatchStatsBuilder`); `WeeklyPerformance` no cambia |
+| `SyncLock` no es reentrante (el permiso no está atado al hilo) | T049 no cambia; para P-3 de D18 (`CHAIN`), el recálculo no se puede disparar desde adentro de `SyncCoordinator` mientras tiene el candado: tendría que correr después de soltarlo |
+
 ### 5.5 Builder de test
 
 `PlayerMatchStatsBuilder` (en `src/test/.../modelo/quote/`) arma un `PlayerMatchStats` con valores
