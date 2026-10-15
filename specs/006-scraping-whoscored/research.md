@@ -1145,8 +1145,8 @@ del spec no se pueden bajar por error.
   - Los constructores actuales de `Team` (5 y 4 argumentos), `Player` (8, 5 y 4) y `Match` (11)
     se conservan como constructores de conveniencia, con el id de WhoScored en `null` y la marca
     en `false`, así no cambia ninguna línea que arma una entidad.
-  - `JwtServiceTest.unTokenConLaFirmaAlteradaSeRechazaComoInvalido` es intermitente en la máquina
-    de Lucas y no se toca: si falla, se reintenta el build.
+  - `JwtServiceTest.unTokenConLaFirmaAlteradaSeRechazaComoInvalido` era intermitente; ya está
+    corregido.
 
 **Justificación**: cada nivel de la constitución cubre lo suyo sin salir a internet, y la lista de
 tests tocados es la mínima: solo cambian los que prueban un comportamiento de la 005 que esta
@@ -1189,27 +1189,6 @@ cuello de botella es la pausa que exige el spec.
 - **Pedir páginas en paralelo**: FR-042 lo prohíbe y aceleraría el bloqueo.
 - **Leer el HTML como flujo para no tenerlo entero en memoria**: 1,3 MB por página no justifica un
   parser incremental.
-
-## D28. AVG y Java en la máquina de Lucas
-
-**Decisión**: el quickstart avisa que AVG intercepta HTTPS y Java falla con
-`PKIX path building failed`. Hay dos salidas:
-
-- agregar `https://www.whoscored.com/*` a las excepciones de AVG, como se hizo con
-  Football-Data;
-- o, solo en la sesión, usar
-  `JAVA_TOOL_OPTIONS=-Djavax.net.ssl.trustStore=NONE -Djavax.net.ssl.trustStoreType=Windows-ROOT`,
-  que hace que Java confíe en el almacén de certificados de Windows.
-
-La suite automatizada no lo necesita, porque nunca sale a internet.
-
-**Justificación**: es el mismo problema que ya se resolvió para Football-Data, y sin aviso la
-primera prueba real se cortaría por "bloqueo" en la primera página, que es un diagnóstico
-equivocado.
-
-**Alternativa descartada**: **un truststore propio en el repositorio, o desactivar la validación
-de certificados en el cliente**: es un cambio de seguridad del código para resolver un problema
-de una máquina.
 
 ---
 

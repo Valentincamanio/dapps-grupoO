@@ -22,10 +22,12 @@ personal y nunca se commitea.
 
 - Sin token, la aplicación levanta igual, pero con la sincronización deshabilitada: el catálogo
   queda vacío, o con lo que ya tenía guardado.
-- Con token y el catálogo vacío, al arrancar dispara una sincronización completa en segundo
-  plano. En menos de un minuto quedan unos 2.600 jugadores.
+- Al arrancar, si no hay una sincronización completa exitosa registrada (por ejemplo, con la base
+  vacía) o la última tiene más de 7 días, se pone al día en segundo plano, seguida de la de
+  WhoScored (ver la sección siguiente). En menos de un minuto quedan unos 2.600 jugadores.
 - Después se sincroniza sola los lunes a las 04:00 de Argentina, si la aplicación está
-  encendida a esa hora. Una corrida perdida no se recupera.
+  encendida a esa hora, también seguida de la de WhoScored. Una corrida perdida la recupera la
+  puesta al día del próximo arranque.
 - Un administrador puede dispararla a mano: `POST /players/sync` sincroniza las cinco ligas, y
   `POST /players/sync?league=SERIE_A`, una sola. El administrador se configura con las tres
   variables `FUTBOLMARKET_AUTH_ADMIN_*`.
@@ -42,6 +44,46 @@ Las variables están detalladas en
 [contracts/configuration.md](specs/005-integracion-football-data/contracts/configuration.md), y
 la validación de punta a punta, en
 [quickstart.md](specs/005-integracion-football-data/quickstart.md).
+
+### Estadísticas de los partidos (WhoScored)
+
+Las estadísticas de cada jugador en cada partido terminado de las cinco ligas se obtienen de
+[WhoScored](https://www.whoscored.com) leyendo sus páginas, sin ninguna credencial. Se guardan,
+pero ningún endpoint las devuelve todavía.
+
+- **La cadena del lunes**: a las 04:00 de Argentina corre Football-Data y, al terminar, WhoScored,
+  como una sola sincronización. Sin `FOOTBALL_DATA_TOKEN` saltea Football-Data y WhoScored corre
+  igual sobre lo guardado.
+- **La puesta al día al arrancar**: si la última sincronización completa exitosa de
+  Football-Data tiene más de 7 días o no hay ninguna, corre la cadena; si solo la de WhoScored
+  está vencida, corre solo WhoScored; si las dos están al día, no corre nada. Los 7 días se
+  cambian con `FUTBOLMARKET_SYNC_CATCHUPAFTER`.
+- **El disparo manual**: el administrador llama a `POST /matches/stats/sync` para las cinco ligas
+  o a `POST /matches/stats/sync?league=PREMIER` para una sola. No necesita el token de
+  Football-Data.
+- Hay a lo sumo una sincronización a la vez, de cualquiera de las dos fuentes: un disparo manual
+  con otra en curso responde 409.
+- WhoScored se consulta una página a la vez, con al menos 4 segundos entre una y la siguiente.
+  Sin snapshot, la primera vez tarda unos 47 minutos. Si WhoScored bloquea, la corrida se corta,
+  lo guardado se conserva y lo que falta queda para la próxima.
+
+**El snapshot**: `backend/snapshot/whoscored-stats.jsonl` está versionado. Cada sincronización
+carga primero desde ahí los partidos pendientes que trae, sin consultar WhoScored, y solo scrapea
+los demás. Se regenera con la aplicación detenida:
+
+    cd backend
+    ./gradlew exportStatsSnapshot
+
+La tarea no levanta el servidor web ni sincroniza: lee la base local, escribe el archivo y
+termina. Solo lleva equipos, partidos, jugadores y estadísticas, nunca usuarios ni claves.
+
+**La base local no se borra**: una base que ya tiene el catálogo de Football-Data se conserva.
+Al arrancar, `ddl-auto: update` agrega las columnas y las tablas nuevas sin tocar lo guardado, y
+como todavía no hay ninguna completa registrada, la primera vez se ponen al día las dos fuentes.
+
+Las propiedades están detalladas en
+[contracts/configuration.md](specs/006-scraping-whoscored/contracts/configuration.md), y la
+validación de punta a punta, en [quickstart.md](specs/006-scraping-whoscored/quickstart.md).
 
 ### Base local con el dataset ficticio
 
@@ -70,7 +112,8 @@ La app queda en http://localhost:5173. Más detalle en [frontend/README.md](fron
     cd backend
     ./gradlew test
 
-La suite no necesita token ni conexión a internet: nunca llama a la API real.
+La suite no necesita token ni conexión a internet: nunca llama a la API de Football-Data.org
+ni consulta WhoScored.
 
 ## Estructura
 
@@ -78,8 +121,10 @@ La suite no necesita token ni conexión a internet: nunca llama a la API real.
     frontend/  React + Vite + TypeScript (pizarra táctica)
 
 El backend es un monolito organizado primero por capa y, dentro de cada capa, por contexto
-(`auth`, `user`, `player`, `team`, `league`, `position`, `season`, `match`, `sync`). Las APIs
-externas van en la capa `adapter`, organizada por proveedor. El árbol lo fija el Principio I de
+(`auth`, `user`, `player`, `team`, `league`, `position`, `season`, `match`, `performance`,
+`sync`). `performance` tiene las estadísticas de cada jugador en cada partido. Las fuentes
+externas van en la capa `adapter`, organizada por proveedor: `footballdata` (la API de
+Football-Data.org) y `whoscored` (las páginas de WhoScored). El árbol lo fija el Principio I de
 [la constitución](.specify/memory/constitution.md):
 
     backend/src/main/java/ar/edu/unq/desapp/futbolmarket/
@@ -94,8 +139,9 @@ externas van en la capa `adapter`, organizada por proveedor. El árbol lo fija e
     │   └── sql/
     │       ├── entity/<contexto>/      clases *SQL con anotaciones JPA
     │       └── interfaces/<contexto>/  *SQLDAO extends JpaRepository
-    ├── adapter/<proveedor>/            una API externa (footballdata): cliente, mapper y adapter
-    │   └── dto/                        JSON del proveedor; nunca sale del adapter
+    ├── adapter/<proveedor>/            una fuente externa (footballdata, whoscored): cliente,
+    │   │                               mapper y adapter
+    │   └── dto/                        lo que devuelve el proveedor; nunca sale del adapter
     ├── security/                       transversal: filtros, JwtService, SecurityConfig
     ├── config/                         transversal: clases @Configuration
     └── shared/                         transversal: errores de la API y excepciones base

@@ -214,8 +214,7 @@ divergencias, pero conviene tenerlos a la vista:
 - Ningún test consulta WhoScored ni Football-Data.
 
 **Plataforma**: API REST local en el puerto 8080, con `./gradlew bootRun`. Salen a internet solo
-las sincronizaciones: hacia `api.football-data.org` y hacia `www.whoscored.com`. En la máquina de
-Lucas, AVG necesita una excepción para WhoScored (D28).
+las sincronizaciones: hacia `api.football-data.org` y hacia `www.whoscored.com`.
 
 **Tipo de proyecto**: servicio web en un monorepo (`backend/` y `frontend/`). Solo se toca el
 backend: el frontend no cambia, porque las estadísticas no se exponen.
@@ -359,12 +358,12 @@ Se revisaron [data-model.md](./data-model.md), [contracts/](./contracts/) y
 specs/006-scraping-whoscored/
 ├── spec.md                        # especificación (sin cambios en este plan)
 ├── plan.md                        # este archivo
-├── research.md                    # decisiones D1 a D28 y lo verificado contra WhoScored
+├── research.md                    # decisiones D1 a D27 y lo verificado contra WhoScored
 ├── data-model.md                  # modelo, persistencia, transiciones y trazabilidad
 ├── quickstart.md                  # guía de validación de punta a punta
 ├── contracts/
 │   ├── sync-api.yaml              # OpenAPI 3.0.3: POST /matches/stats/sync y cambios en POST /players/sync
-│   ├── configuration.md           # propiedades nuevas, valores por perfil, variables de entorno y AVG
+│   ├── configuration.md           # propiedades nuevas, valores por perfil y variables de entorno
 │   ├── whoscored-pages.md         # contrato externo: páginas, bloques, campos, reglas y señales de rechazo
 │   └── snapshot-format.md         # formato del snapshot, orden canónico, exportación y carga
 ├── checklists/requirements.md     # existente
@@ -630,7 +629,7 @@ verde.
 9. **Cierre y definición de terminado**:
    - `./gradlew build`.
    - `./gradlew bootRun` con `local` sobre la base existente: la puesta al día de las dos fuentes
-     ([quickstart.md](./quickstart.md), sección 2), con la excepción de AVG.
+     ([quickstart.md](./quickstart.md), sección 2).
    - La prueba con pocas páginas (sección 3).
    - La primera puesta al día completa, la generación del primer snapshot con
      `./gradlew exportStatsSnapshot` y su commit (sección 5).

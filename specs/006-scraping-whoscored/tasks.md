@@ -103,8 +103,7 @@ escritos y en verde, y cada bloque termina con `./gradlew build` en verde.
   el paquete raíz. No se crean otras carpetas, ni carpetas vacías ni `.gitkeep`.
   `backend/snapshot/` nace con el primer snapshot (T142).
 - **WhoScored no permite el scraping en sus términos de uso**: solo se consulta el sitio real en
-  las tareas de la Fase 7, con pocas páginas y el ritmo de la aplicación. En la máquina de Lucas,
-  AVG necesita la excepción de `https://www.whoscored.com/*` (contracts/configuration.md).
+  las tareas de la Fase 7, con pocas páginas y el ritmo de la aplicación.
 - **El token de Football-Data.org nunca se escribe en un archivo, un commit, un log ni el chat.**
 
 ---
@@ -630,16 +629,16 @@ T132; 11 → T129; 12 y 13 → T124, T126 y T131; 14 → T073 y T111.
 Cada tarea cierra con sus tests. T126, T128 y T129 modifican los tres tests de la 005 que lista
 research D26, y nada más.
 
-- [ ] T124 [P] [US3] Agregar `Optional<LastFullSync> lastFullSync()` al record `SyncReport` de la 005 en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncReport.java: presente, de `FOOTBALL_DATA` y con `finishedAt`, solo si el tipo es `FULL` y ninguna liga falló (FR-047). Escribir `SyncReportLastFullSyncTest` (clase nueva; `SyncRunTest` no cambia) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncReportLastFullSyncTest.java, armando los informes con `SyncRun` como `SyncRunTest`: completa con las cinco ligas bien → presente; con una liga fallida → vacío; de una liga → vacío (HU3, escenario 13)
-- [ ] T125 [P] [US3] Crear el enum `CatchUp` (`CHAIN`, `WHOSCORED_ONLY` y `NONE`) y el record `CatchUpPolicy(Duration maxAge)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/CatchUp.java y backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/CatchUpPolicy.java (data-model.md, "Origen, fuente y puesta al día"): `maxAge` positiva (`CatalogInvariantException`) y `CatchUp decide(Optional<LastFullSync> footballData, Optional<LastFullSync> whoScored, Instant now)` con la tabla de research D22; una completa con exactamente 7 días está al día. Escribir `CatchUpPolicyTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/CatchUpPolicyTest.java: Football-Data sin ninguna, de 8 días, de 7 días exactos y de 3 días, combinadas con WhoScored sin ninguna, de 9 días y de 2 días (HU3, escenarios 2 a 5 y 9; FR-034 y FR-035)
-- [ ] T126 [US3] Pasar `SyncService` al candado común en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncService.java (research D22 y D23) (depende de T105, T064 y T124):
+- [X] T124 [P] [US3] Agregar `Optional<LastFullSync> lastFullSync()` al record `SyncReport` de la 005 en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncReport.java: presente, de `FOOTBALL_DATA` y con `finishedAt`, solo si el tipo es `FULL` y ninguna liga falló (FR-047). Escribir `SyncReportLastFullSyncTest` (clase nueva; `SyncRunTest` no cambia) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncReportLastFullSyncTest.java, armando los informes con `SyncRun` como `SyncRunTest`: completa con las cinco ligas bien → presente; con una liga fallida → vacío; de una liga → vacío (HU3, escenario 13)
+- [X] T125 [P] [US3] Crear el enum `CatchUp` (`CHAIN`, `WHOSCORED_ONLY` y `NONE`) y el record `CatchUpPolicy(Duration maxAge)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/CatchUp.java y backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/CatchUpPolicy.java (data-model.md, "Origen, fuente y puesta al día"): `maxAge` positiva (`CatalogInvariantException`) y `CatchUp decide(Optional<LastFullSync> footballData, Optional<LastFullSync> whoScored, Instant now)` con la tabla de research D22; una completa con exactamente 7 días está al día. Escribir `CatchUpPolicyTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/CatchUpPolicyTest.java: Football-Data sin ninguna, de 8 días, de 7 días exactos y de 3 días, combinadas con WhoScored sin ninguna, de 9 días y de 2 días (HU3, escenarios 2 a 5 y 9; FR-034 y FR-035)
+- [X] T126 [US3] Pasar `SyncService` al candado común en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncService.java (research D22 y D23) (depende de T105, T064 y T124):
   - el `Semaphore` propio se reemplaza por `SyncLock`. Los campos quedan en este orden: `properties`, `adapter`, `writeService`, `playerRepository`, `reportLogger`, `lastFullSyncRepository`, `syncLock` y `clock`;
   - `synchronizeAll` y `synchronizeLeague` mantienen sus firmas: revisan el token (503) y después toman el candado (409), en el mismo orden de la 005;
   - suma `SyncReport runFull(SyncOrigin)`, de visibilidad de paquete, que corre una completa sin tomar el candado ni revisar el token (lo hace la cadena);
   - al terminar cualquier corrida, `report.lastFullSync().ifPresent(lastFullSyncRepository::save)`, también con un disparo manual (HU3, escenario 12);
   - **modificar `SyncServiceTest`** en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncServiceTest.java, solo como dice D26: agregar `@Mock LastFullSyncRepository lastFullSyncRepository` y que el helper `service(token, clock)` arme `new SyncService(properties(token), adapter, writeService, playerRepository, reportLogger, lastFullSyncRepository, new SyncLock(), clock)`. Ningún método, aserción ni dato cambia, incluido el 409;
   - escribir `SyncServiceLastFullSyncTest` (clase nueva, research D26) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncServiceLastFullSyncTest.java: una completa con las cinco ligas bien guarda `LastFullSync(FOOTBALL_DATA, fin)`, también la manual; con una liga fallida o de una sola liga no guarda nada (HU3, escenarios 7, 12 y 13); `runFull` funciona con el candado ya tomado por quien lo llama
-- [ ] T127 [US3] Crear `SyncCoordinator` (`@Service`, SLF4J) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncCoordinator.java con `FootballDataProperties`, `SyncProperties`, `SyncLock`, `SyncService`, `StatsSyncService`, `LastFullSyncRepository` y `Clock` (research D22) (depende de T108, T125 y T126):
+- [X] T127 [US3] Crear `SyncCoordinator` (`@Service`, SLF4J) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncCoordinator.java con `FootballDataProperties`, `SyncProperties`, `SyncLock`, `SyncService`, `StatsSyncService`, `LastFullSyncRepository` y `Clock` (research D22) (depende de T108, T125 y T126):
   - `void runWeeklyChain()`: la cadena con origen `WEEKLY`;
   - la cadena toma el candado de punta a punta (`lock.runExclusively`), así cuenta como una sola sincronización (FR-041): sin token, INFO `Se omite Football-Data.org en la cadena: falta la credencial (FOOTBALL_DATA_TOKEN).`; con token, `syncService.runFull(origen)`; después, siempre, `statsSyncService.runFull(origen)`, aunque Football-Data haya fallado en alguna liga o en todas (FR-036). Un error de programación no se captura;
   - `void catchUpOnStartup()`: lee las dos últimas completas, decide con `new CatchUpPolicy(syncProperties.catchUpAfter()).decide(..., clock.instant())` y deja uno de estos INFO (quickstart.md 2.2, 2.3 y 2.5), con la fecha como `Instant`:
@@ -652,27 +651,27 @@ research D26, y nada más.
     Después, `CHAIN` corre la cadena con `CATCH_UP` y `WHOSCORED_ONLY` llama a `statsSyncService.synchronizeAll(CATCH_UP)`;
   - con otra en curso, `SyncInProgressException` se propaga: la manejan `StartupSync` y `SyncScheduler`;
   - escribir `SyncCoordinatorTest` (con `OutputCaptureExtension`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncCoordinatorTest.java, con `SyncLock` real, los dos servicios y el repository mockeados y un `Clock` fijo: la cadena en orden (`InOrder`); sin token saltea Football-Data con el INFO exacto y corre WhoScored (HU3, escenario 8); con Football-Data fallida corre WhoScored (escenario 7); un disparo manual pedido desde adentro de cada paso lanza `SyncInProgressException` (escenario 10); las tres decisiones de la puesta al día con su origen `CATCH_UP` y sus líneas (escenarios 1 a 5); con el candado tomado, `runWeeklyChain` y `catchUpOnStartup` lanzan `SyncInProgressException`
-- [ ] T128 [US3] Renombrar `STARTUP` a `CATCH_UP` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncOrigin.java (con su Javadoc) y pasar `StartupSync` a la puesta al día en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StartupSync.java (FR-034, FR-035, FR-051 y FR-053) (depende de T127):
+- [X] T128 [US3] Renombrar `STARTUP` a `CATCH_UP` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/SyncOrigin.java (con su Javadoc) y pasar `StartupSync` a la puesta al día en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StartupSync.java (FR-034, FR-035, FR-051 y FR-053) (depende de T127):
   - constructor `(FootballDataProperties properties, SyncCoordinator coordinator)`; el método pasa a `catchUp()`, con `@Async` y `@EventListener(ApplicationReadyEvent.class)`;
   - sin token, escribe la misma advertencia exacta de la 005 y **sigue**: WhoScored corre igual (HU3, escenario 8);
   - con `on-startup` en `false` termina sin hacer nada; si no, llama a `coordinator.catchUpOnStartup()`;
   - con `SyncInProgressException`, el mismo WARN de la 005: `Se omite la sincronización de arranque: {motivo}`;
   - la regla del catálogo vacío desaparece (`hasPlayers()` queda en `PlayerRepository`);
   - **modificar `StartupSyncTest`** en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StartupSyncTest.java, solo como dice D26: `@Mock SyncCoordinator coordinator` en lugar de los mocks de `PlayerRepository` y `SyncService`, y el helper arma `new StartupSync(properties, coordinator)`; `conElCatalogoVacioYTokenDisparaUnaCompletaDeArranque` pasa a llamarse `conTokenDelegaLaPuestaAlDiaEnElCoordinador` y verifica que delega en `coordinator.catchUpOnStartup()`; `sinTokenDejaLaAdvertenciaExactaYNoConsultaElCatalogo` pasa a llamarse `sinTokenDejaLaAdvertenciaExactaYSePoneAlDiaIgual`, conserva la advertencia exacta y verifica que la puesta al día corre igual; `conLaSincronizacionDeArranqueApagadaNoHaceNada` cambia solo el mock que verifica; `conOtraEnCursoDejaUnWarnSinPropagarLaExcepcion` hace que el coordinador lance `SyncInProgressException`, con el mismo WARN; **se borra** `conJugadoresNoDisparaYDejaElInfo`. Se quitan los imports que quedan sin uso
-- [ ] T129 [US3] Pasar `SyncScheduler` a la cadena en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncScheduler.java (FR-033) (depende de T127):
+- [X] T129 [US3] Pasar `SyncScheduler` a la cadena en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncScheduler.java (FR-033) (depende de T127):
   - constructor `(SyncCoordinator coordinator)`; `runWeeklySync()` conserva su `@Scheduled` con el cron y la zona de la configuración y llama a `coordinator.runWeeklyChain()`; el INFO sin token pasa al coordinador;
   - con `SyncInProgressException`, el mismo WARN de la 005: `Se omite la sincronización semanal: {motivo}` (HU3, escenario 11);
   - **modificar `SyncSchedulerTest`** en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncSchedulerTest.java, solo como dice D26: `@Mock SyncCoordinator` en lugar del de `SyncService` y el helper arma `new SyncScheduler(coordinator)`; `conTokenDisparaUnaSincronizacionCompletaSemanal` pasa a llamarse `disparaLaCadenaSemanal` y verifica `runWeeklyChain()`; **se borra** `sinTokenNoLlamaAlServicioYDejaUnInfo`, que quedaría igual al anterior (el salteo de Football-Data sin token y su INFO se prueban en `SyncCoordinatorTest`); `conOtraEnCursoNoPropagaLaExcepcionYDejaUnWarnConElMotivo` hace que lance el coordinador, con el mismo WARN; `laCorridaSemanalTomaElCronYLaZonaDeLaConfiguracion` **no cambia**. Se quitan los imports que quedan sin uso
-- [ ] T130 [P] [US3] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/SyncController.java cambiar solo la descripción del `@ApiResponse` 409: también responde 409 si corre WhoScored o la cadena (contracts/sync-api.yaml, `SyncInProgress`). El comportamiento no cambia y `SyncControllerIT` tampoco
-- [ ] T131 [US3] Escribir `SyncChainIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncChainIT.java con el armado de T026 (H2 `stats-it` y limpieza completa), un token de Football-Data de prueba en `@TestPropertySource`, `@MockitoBean FootballDataAdapter` (devuelve `SnapshotFixtures.snapshot(liga)`) y `@MockitoBean WhoScoredAdapter` (depende de T127 a T129):
+- [X] T130 [P] [US3] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/SyncController.java cambiar solo la descripción del `@ApiResponse` 409: también responde 409 si corre WhoScored o la cadena (contracts/sync-api.yaml, `SyncInProgress`). El comportamiento no cambia y `SyncControllerIT` tampoco
+- [X] T131 [US3] Escribir `SyncChainIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncChainIT.java con el armado de T026 (H2 `stats-it` y limpieza completa), un token de Football-Data de prueba en `@TestPropertySource`, `@MockitoBean FootballDataAdapter` (devuelve `SnapshotFixtures.snapshot(liga)`) y `@MockitoBean WhoScoredAdapter` (depende de T127 a T129):
   - `runWeeklyChain()` corre Football-Data y después WhoScored (`InOrder` sobre los adapters) y guarda la última completa de las dos fuentes (HU3, escenario 6);
   - con Football-Data fallando en las cinco ligas, WhoScored corre igual y la última completa de Football-Data no cambia (escenario 7);
   - con el adapter de Football-Data detenido en un latch, y después con el de WhoScored detenido (entre los pasos), `syncService.synchronizeAll(MANUAL)` y `statsSyncService.synchronizeAll(MANUAL)` lanzan `SyncInProgressException` (escenario 10; SC-013); latches con timeout, sin `Thread.sleep`;
   - una completa manual de Football-Data con las cinco ligas bien guarda su última completa, y una de una liga no la cambia (escenarios 12 y 13)
-- [ ] T132 [US3] Agregar métodos a `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java, con latches como el 409 de `SyncControllerIT` (depende de T117 y T127). Para la cadena, agregar un campo `@Autowired SyncCoordinator` (agregar un campo no modifica ningún método existente):
+- [X] T132 [US3] Agregar métodos a `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java, con latches como el 409 de `SyncControllerIT` (depende de T117 y T127). Para la cadena, agregar un campo `@Autowired SyncCoordinator` (agregar un campo no modifica ningún método existente):
   - `POST /matches/stats/sync` mientras corre `POST /players/sync` responde 409 con `Ya hay una sincronización en curso.`, y al revés también (FR-041);
   - con la cadena corriendo en otro hilo, detenida en Football-Data y después en WhoScored, los dos disparos manuales responden 409 (HU3, escenario 10)
-- [ ] T133 [US3] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T133 [US3] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 **Checkpoint**: las HU1 a HU3 funcionan. La aplicación se pone al día sola.
 
@@ -695,14 +694,14 @@ T112; 7 → T135; 8 → T070, T111 y T135; 9 → T136.
 
 ### Tests de la Historia 4
 
-- [ ] T134 [US4] Agregar métodos a `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java (depende de T117):
+- [X] T134 [US4] Agregar métodos a `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java (depende de T117):
   - con el adapter lanzando `SourceBlockedException` en el segundo partido, una completa responde 200 con `cut` (`page: MATCH`, su `whoscoredId`, su `path`, `league: PREMIER` y el id de Football-Data en `match`), la Premier `CUT` y las demás `NOT_REACHED`; el primer partido quedó guardado y el adapter no recibió ningún otro pedido (HU4, escenario 3);
   - la siguiente completa, con el adapter respondiendo, procesa solo el partido pendiente sin volver a pedir el guardado (escenario 4; SC-009)
-- [ ] T135 [US4] Agregar más métodos a `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java (depende de T134):
+- [X] T135 [US4] Agregar más métodos a `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java (depende de T134):
   - con el adapter de WhoScored lanzando `SourceBlockedException` en cada pedido, `GET /players` y `POST /players/sync` (con el adapter de Football-Data mockeado) responden igual que siempre (escenario 7; FR-046 y SC-016);
   - un partido que el adapter devuelve sin datos se omite con `NOT_FINISHED_IN_SOURCE`, sin corte, y se procesa en la corrida siguiente (escenario 8)
-- [ ] T136 [US4] Agregar un método a `SyncChainIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncChainIT.java: con el adapter de WhoScored bloqueando desde el primer pedido, la cadena termina sin propagar nada, guarda la última completa de Football-Data y no la de WhoScored, y los partidos quedan pendientes (HU4, escenario 9) (depende de T131)
-- [ ] T137 [US4] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T136 [US4] Agregar un método a `SyncChainIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncChainIT.java: con el adapter de WhoScored bloqueando desde el primer pedido, la cadena termina sin propagar nada, guarda la última completa de Football-Data y no la de WhoScored, y los partidos quedan pendientes (HU4, escenario 9) (depende de T131)
+- [X] T137 [US4] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 **Checkpoint**: las cuatro historias funcionan.
 
@@ -714,8 +713,8 @@ T112; 7 → T135; 8 → T070, T111 y T135; 9 → T136.
 snapshot y la documentación. La prueba con pocas páginas (quickstart.md 3) va antes de la primera
 puesta al día completa, porque necesita una base sin estadísticas de la Premier.
 
-- [ ] T138 Correr `./gradlew clean build` en backend/ y verificar `BUILD SUCCESSFUL`. Revisar con `git fetch origin` y `git diff --stat origin/develop...HEAD -- backend/src/test/` que los únicos tests existentes modificados son `StartupSyncTest`, `SyncSchedulerTest` y `SyncServiceTest` (research D26). Si falla `JwtServiceTest.unTokenConLaFirmaAlteradaSeRechazaComoInvalido`, reintentar el build (es intermitente en la máquina de Lucas)
-- [ ] T139 Con la excepción de AVG configurada (contracts/configuration.md), seguir quickstart.md sección 3 sobre la base local de la 005, arrancando con `FUTBOLMARKET_FOOTBALLDATA_SYNC_ONSTARTUP=false`:
+- [X] T138 Correr `./gradlew clean build` en backend/ y verificar `BUILD SUCCESSFUL`. Revisar con `git fetch origin` y `git diff --stat origin/develop...HEAD -- backend/src/test/` que los únicos tests existentes modificados son `StartupSyncTest`, `SyncSchedulerTest` y `SyncServiceTest` (research D26). `JwtServiceTest.unTokenConLaFirmaAlteradaSeRechazaComoInvalido`, que era intermitente, ya está corregido
+- [ ] T139 Seguir quickstart.md sección 3 sobre la base local de la 005, arrancando con `FUTBOLMARKET_FOOTBALLDATA_SYNC_ONSTARTUP=false`:
   - `ddl-auto: update` agrega las columnas, las tablas y los índices sin borrar la base (sección 2.1);
   - marcar los partidos de la Premier menos los dos últimos, disparar `?league=PREMIER` y verificar `matchesScraped: 2`, los 20 equipos cruzados y las métricas contra la página del partido en el navegador;
   - **deshacer la marca artificial** con el `UPDATE` del paso 5 antes de seguir
@@ -726,8 +725,8 @@ puesta al día completa, porque necesita una base sin estadísticas de la Premie
 - [ ] T144 Seguir los escenarios HTTP de quickstart.md 4.1 a 4.3 con el administrador configurado y verificar cada resultado esperado
 - [ ] T145 Seguir quickstart.md sección 6 en `http://localhost:8080/swagger-ui.html`: la etiqueta Sincronización con `POST /players/sync` y `POST /matches/stats/sync`, los dos con candado; el parámetro `league` y las respuestas 200, 400, 401, 403 y 409; ningún endpoint devuelve estadísticas (FR-009); 200 con el administrador y 403 con un usuario común
 - [ ] T146 Seguir quickstart.md sección 7 en `http://localhost:8080/h2-console`: 96 equipos cruzados (SC-003a), los terminados sin estadísticas son solo los omitidos (SC-001), las filas del 1983600 coinciden con lo esperado, el muestreo de cruces no encuentra ninguno mal cruzado (SC-003) y ninguna cantidad baja después de otra sincronización (SC-008 y SC-010)
-- [ ] T147 Actualizar README.md en la raíz del repositorio:
-  - en "Cómo levantarlo": la sincronización de WhoScored (la cadena del lunes, la puesta al día al arrancar y `POST /matches/stats/sync` con el administrador), el snapshot y `./gradlew exportStatsSnapshot`, y la excepción de AVG; los enlaces a contracts/configuration.md y quickstart.md;
+- [X] T147 Actualizar README.md en la raíz del repositorio:
+  - en "Cómo levantarlo": la sincronización de WhoScored (la cadena del lunes, la puesta al día al arrancar y `POST /matches/stats/sync` con el administrador), el snapshot y `./gradlew exportStatsSnapshot`; los enlaces a contracts/configuration.md y quickstart.md;
   - que la base local de la 005 **no** se borra;
   - en "Estructura", el contexto `performance` y `adapter/whoscored/`; en "Tests", que la suite no consulta WhoScored
 
@@ -841,7 +840,7 @@ Task: "Texto del 409 en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/con
 2. Fase 2: Fundacional, bloque por bloque, con el build en verde al cerrar cada uno.
 3. Fase 3: HU1.
 4. **Parar y validar**: `./gradlew build` en verde y quickstart.md 3 (pocas páginas) con
-   `bootRun` y la excepción de AVG.
+   `bootRun`.
 
 El MVP deja las estadísticas guardadas con un disparo manual del administrador. Como el motor está
 completo desde la Fase 2, en el MVP ya se lee el snapshot (si existe) y un bloqueo ya corta la

@@ -1,5 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.e2e;
 
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.snapshot;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.ARSENAL;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BARRY;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BETO;
@@ -42,6 +43,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willAnswer;
+import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
@@ -61,6 +64,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -112,6 +118,7 @@ import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.player.PlayerSQ
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.season.SeasonSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.sync.LastFullSyncSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.team.TeamSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.service.sync.SyncCoordinator;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -153,6 +160,9 @@ class StatsSyncControllerIT {
     private static final String MISSING_CREDENTIAL_MESSAGE =
             "Se requiere una credencial: un token de sesión (Authorization: Bearer) o una clave de API (X-API-Key).";
     private static final String TIMEOUT_REASON = "La fuente no respondió a tiempo.";
+    private static final String PLAYERS_PATH = "/players";
+    private static final String IN_PROGRESS_MESSAGE = "Ya hay una sincronización en curso.";
+    private static final long LATCH_TIMEOUT_SECONDS = 10;
 
     private static final int CURRENT_MATCHDAY = 8;
     private static final int EVERTON_BRENTFORD_END_MINUTE = 94;
@@ -230,6 +240,9 @@ class StatsSyncControllerIT {
 
     @Autowired
     private LastFullSyncSQLDAO lastFullSyncDAO;
+
+    @Autowired
+    private SyncCoordinator coordinator;
 
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
     private final StatsSnapshotLineMapper lineMapper = new StatsSnapshotLineMapper();
@@ -618,6 +631,188 @@ class StatsSyncControllerIT {
     }
 
     /**
+     * El adapter de Football-Data avisa que la sincronización entró y la retiene hasta que el test la
+     * libera, como el 409 de {@code SyncControllerIT}. Liberada, falla en todas las ligas, así el
+     * catálogo del test no cambia. Todas las esperas tienen timeout.
+     */
+    @Test
+    void conLaDeFootballDataEnCursoLaDeWhoScoredResponde409() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        willAnswer(invocation -> {
+            entered.countDown();
+            await(release);
+            throw new ExternalSourceException(TIMEOUT_REASON);
+        }).given(footballDataAdapter).fetchLeague(any());
+
+        CompletableFuture<MvcTestResult> footballData =
+                CompletableFuture.supplyAsync(() -> postAsAdmin(PLAYERS_SYNC_PATH));
+        boolean inProgress = entered.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        MvcTestResult whoScored = postAsAdmin(STATS_SYNC_PATH);
+        release.countDown();
+        MvcTestResult footballDataResult = footballData.get(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        assertThat(inProgress).isTrue();
+        assertThat(whoScored.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(body(whoScored).get("message").asString()).isEqualTo(IN_PROGRESS_MESSAGE);
+        assertThat(body(whoScored).get("path").asString()).isEqualTo(STATS_SYNC_PATH);
+        assertThat(footballDataResult.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        verifyNoInteractions(whoScoredAdapter);
+    }
+
+    @Test
+    void conLaDeWhoScoredEnCursoLaDeFootballDataResponde409() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        willAnswer(invocation -> {
+            entered.countDown();
+            await(release);
+            return Optional.of(EVERTON_MAN_UTD_STATS);
+        }).given(whoScoredAdapter).fetchMatchStats(EVERTON_MAN_UTD_WS_ID);
+
+        CompletableFuture<MvcTestResult> whoScored = CompletableFuture.supplyAsync(() -> postAsAdmin(STATS_SYNC_PATH));
+        boolean inProgress = entered.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        MvcTestResult footballData = postAsAdmin(PLAYERS_SYNC_PATH);
+        release.countDown();
+        MvcTestResult whoScoredResult = whoScored.get(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        assertThat(inProgress).isTrue();
+        assertThat(footballData.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(body(footballData).get("message").asString()).isEqualTo(IN_PROGRESS_MESSAGE);
+        assertThat(body(footballData).get("path").asString()).isEqualTo(PLAYERS_SYNC_PATH);
+        assertThat(whoScoredResult.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        verifyNoInteractions(footballDataAdapter);
+    }
+
+    /**
+     * La cadena corre en otro hilo y queda detenida primero en el adapter de Football-Data, que
+     * después falla en todas las ligas, y luego en el de WhoScored.
+     */
+    @Test
+    void conLaCadenaEnCursoLosDosDisparosManualesResponden409() throws Exception {
+        CountDownLatch footballDataEntered = new CountDownLatch(1);
+        CountDownLatch releaseFootballData = new CountDownLatch(1);
+        CountDownLatch whoScoredEntered = new CountDownLatch(1);
+        CountDownLatch releaseWhoScored = new CountDownLatch(1);
+        willAnswer(invocation -> {
+            footballDataEntered.countDown();
+            await(releaseFootballData);
+            throw new ExternalSourceException(TIMEOUT_REASON);
+        }).given(footballDataAdapter).fetchLeague(any());
+        willAnswer(invocation -> {
+            whoScoredEntered.countDown();
+            await(releaseWhoScored);
+            return Optional.of(EVERTON_MAN_UTD_STATS);
+        }).given(whoScoredAdapter).fetchMatchStats(EVERTON_MAN_UTD_WS_ID);
+
+        CompletableFuture<Void> chain = CompletableFuture.runAsync(coordinator::runWeeklyChain);
+        boolean stoppedInFootballData = footballDataEntered.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        List<MvcTestResult> duringFootballData = bothManualTriggers();
+        releaseFootballData.countDown();
+        boolean stoppedInWhoScored = whoScoredEntered.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        List<MvcTestResult> duringWhoScored = bothManualTriggers();
+        releaseWhoScored.countDown();
+        chain.get(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+        assertThat(stoppedInFootballData).isTrue();
+        assertThat(stoppedInWhoScored).isTrue();
+        assertThat(duringFootballData).hasSize(2).allSatisfy(this::assertInProgress);
+        assertThat(duringWhoScored).hasSize(2).allSatisfy(this::assertInProgress);
+    }
+
+    @Test
+    void unBloqueoEnElSegundoPartidoCortaLaCorridaYConservaElPrimero() throws Exception {
+        willThrow(new SourceBlockedException(WhoScoredPages.match(EVERTON_BRENTFORD_WS_ID)))
+                .given(whoScoredAdapter).fetchMatchStats(EVERTON_BRENTFORD_WS_ID);
+
+        MvcTestResult result = synchronizeAs(adminToken);
+        JsonNode report = body(result);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        JsonNode cut = report.get("cut");
+        assertThat(cut.get("page").asString()).isEqualTo("MATCH");
+        assertThat(cut.get("whoscoredId").asString()).isEqualTo(EVERTON_BRENTFORD_WS_ID);
+        assertThat(cut.get("path").asString()).isEqualTo("/matches/" + EVERTON_BRENTFORD_WS_ID + "/live");
+        assertThat(cut.get("league").asString()).isEqualTo("PREMIER");
+        assertThat(cut.get("match").asString()).isEqualTo(EVERTON_BRENTFORD.externalId());
+        assertThat(report.get("leagues").values())
+                .extracting(league -> league.get("league").asString(), league -> league.get("status").asString())
+                .containsExactly(
+                        tuple("PREMIER", "CUT"),
+                        tuple("BUNDESLIGA", "NOT_REACHED"),
+                        tuple("LA_LIGA", "NOT_REACHED"),
+                        tuple("SERIE_A", "NOT_REACHED"),
+                        tuple("LIGUE_1", "NOT_REACHED"));
+        assertThat(report.get("leagues").get(0).get("matchesScraped").asInt()).isEqualTo(1);
+        assertThat(statsLoadedOf(EVERTON_MAN_UTD)).isTrue();
+        assertThat(statsLoadedOf(EVERTON_BRENTFORD)).isFalse();
+        verify(whoScoredAdapter).fetchMatchStats(EVERTON_MAN_UTD_WS_ID);
+        verify(whoScoredAdapter).fetchMatchStats(EVERTON_BRENTFORD_WS_ID);
+        verifyNoMoreInteractions(whoScoredAdapter);
+    }
+
+    @Test
+    void laSiguienteCompletaProcesaSoloElPendienteSinVolverAPedirElGuardado() throws Exception {
+        willThrow(new SourceBlockedException(WhoScoredPages.match(EVERTON_BRENTFORD_WS_ID)))
+                .given(whoScoredAdapter).fetchMatchStats(EVERTON_BRENTFORD_WS_ID);
+        synchronizeAs(adminToken);
+        willReturn(Optional.of(evertonBrentfordStats())).given(whoScoredAdapter)
+                .fetchMatchStats(EVERTON_BRENTFORD_WS_ID);
+        clearInvocations(whoScoredAdapter);
+
+        JsonNode report = body(synchronizeAs(adminToken));
+
+        assertThat(report.get("cut").isNull()).isTrue();
+        assertThat(report.get("leagues").get(0).get("status").asString()).isEqualTo("PROCESSED");
+        assertThat(report.get("leagues").get(0).get("matchesScraped").asInt()).isEqualTo(1);
+        assertThat(statsLoadedOf(EVERTON_BRENTFORD)).isTrue();
+        verify(whoScoredAdapter).fetchMatchStats(EVERTON_BRENTFORD_WS_ID);
+        verify(whoScoredAdapter, never()).fetchMatchStats(EVERTON_MAN_UTD_WS_ID);
+        verifyNoMoreInteractions(whoScoredAdapter);
+    }
+
+    @Test
+    void conWhoScoredBloqueandoElCatalogoYLaSincronizacionDeFootballDataRespondenIgual() throws Exception {
+        willThrow(new SourceBlockedException(WhoScoredPages.match(EVERTON_MAN_UTD_WS_ID)))
+                .given(whoScoredAdapter).fetchMatchStats(any());
+        given(footballDataAdapter.fetchLeague(any()))
+                .willAnswer(invocation -> snapshot(invocation.<League>getArgument(0)));
+        JsonNode catalogBefore = body(mvc.get().uri(PLAYERS_PATH).exchange());
+
+        MvcTestResult blocked = synchronizeAs(adminToken);
+        MvcTestResult catalog = mvc.get().uri(PLAYERS_PATH).exchange();
+        MvcTestResult footballData = postAsAdmin(PLAYERS_SYNC_PATH);
+
+        assertThat(blocked.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(body(blocked).get("cut").get("page").asString()).isEqualTo("MATCH");
+        assertThat(catalog.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(body(catalog)).isEqualTo(catalogBefore);
+        assertThat(footballData.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(body(footballData).get("leagues").values()).hasSize(League.values().length)
+                .allSatisfy(league -> assertThat(league.get("status").asString()).isEqualTo("SUCCEEDED"));
+    }
+
+    @Test
+    void unPartidoSinDatosEnWhoScoredSeOmiteSinCorteYSeProcesaEnLaCorridaSiguiente() throws Exception {
+        given(whoScoredAdapter.fetchMatchStats(EVERTON_BRENTFORD_WS_ID)).willReturn(Optional.empty());
+        JsonNode first = body(synchronizeAs(adminToken));
+        given(whoScoredAdapter.fetchMatchStats(EVERTON_BRENTFORD_WS_ID))
+                .willReturn(Optional.of(evertonBrentfordStats()));
+
+        JsonNode second = body(synchronizeAs(adminToken));
+
+        assertThat(first.get("cut").isNull()).isTrue();
+        assertThat(first.get("leagues").get(0).get("status").asString()).isEqualTo("PROCESSED");
+        assertThat(first.get("leagues").get(0).get("skippedMatches").values()).singleElement().satisfies(skipped -> {
+            assertThat(skipped.get("externalId").asString()).isEqualTo(EVERTON_BRENTFORD.externalId());
+            assertThat(skipped.get("reason").asString()).isEqualTo("NOT_FINISHED_IN_SOURCE");
+        });
+        assertThat(second.get("leagues").get(0).get("matchesScraped").asInt()).isEqualTo(1);
+        assertThat(second.get("leagues").get(0).get("skippedMatches").values()).isEmpty();
+        assertThat(statsLoadedOf(EVERTON_BRENTFORD)).isTrue();
+    }
+
+    /**
      * La temporada de la Premier, el Everton, el Manchester United y el Brentford cruzados con sus
      * jugadores, y los tres partidos con su id de WhoScored.
      */
@@ -716,6 +911,32 @@ class StatsSyncControllerIT {
 
     private MvcTestResult synchronizeAs(String sessionToken) {
         return mvc.post().uri(STATS_SYNC_PATH).header(AUTHORIZATION_HEADER, BEARER_PREFIX + sessionToken).exchange();
+    }
+
+    private MvcTestResult postAsAdmin(String path) {
+        return mvc.post().uri(path).header(AUTHORIZATION_HEADER, BEARER_PREFIX + adminToken).exchange();
+    }
+
+    /**
+     * El disparo manual de cada fuente: primero el de Football-Data y después el de WhoScored.
+     */
+    private List<MvcTestResult> bothManualTriggers() {
+        return List.of(postAsAdmin(PLAYERS_SYNC_PATH), postAsAdmin(STATS_SYNC_PATH));
+    }
+
+    private void assertInProgress(MvcTestResult result) throws Exception {
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(body(result).get("message").asString()).isEqualTo(IN_PROGRESS_MESSAGE);
+    }
+
+    private static void await(CountDownLatch latch) throws InterruptedException {
+        if (!latch.await(LATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("El test no liberó la sincronización a tiempo.");
+        }
+    }
+
+    private boolean statsLoadedOf(Match match) {
+        return matchRepository.findAllByExternalIds(List.of(match.externalId())).getFirst().statsLoaded();
     }
 
     private MvcTestResult synchronizeLeagueAs(String sessionToken, String league) {

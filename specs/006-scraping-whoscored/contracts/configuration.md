@@ -95,23 +95,6 @@ Fuera de los `application*.yml`:
   La clase main los fija, así que no hace falta pasarlos a mano.
 - **`.gitattributes`** suma `backend/snapshot/*.jsonl text eol=lf`.
 
-## Correr contra WhoScored en la máquina de Lucas (AVG)
-
-AVG intercepta HTTPS y Java no reconoce su certificado: el pedido falla con
-`PKIX path building failed`, que la sincronización trata como un rechazo y termina cortando la
-corrida. Hay dos salidas:
-
-1. **Recomendada**: agregar `https://www.whoscored.com/*` a las excepciones de la protección web
-   de AVG, como se hizo con Football-Data.
-2. **Solo para la sesión**: hacer que Java use el almacén de certificados de Windows.
-
-   ```powershell
-   $env:JAVA_TOOL_OPTIONS = '-Djavax.net.ssl.trustStore=NONE -Djavax.net.ssl.trustStoreType=Windows-ROOT'; ./gradlew bootRun
-   ```
-
-   Al terminar se cierra la terminal o se borra la variable. La suite automatizada no lo
-   necesita: nunca sale a internet.
-
 ## Forzar la puesta al día al arrancar
 
 La puesta al día corre sola si la última completa exitosa de cada fuente tiene más de 7 días o

@@ -19,18 +19,12 @@ Esta guía prueba la feature de punta a punta. Los detalles están en otros docu
 - Para las secciones 2 a 7:
   - el administrador configurado con las tres variables `FUTBOLMARKET_AUTH_ADMIN_*` (ver
     [005: contracts/configuration.md](../005-integracion-football-data/contracts/configuration.md#configurar-el-token-en-local));
-  - el token de Football-Data en `FOOTBALL_DATA_TOKEN`, salvo donde se prueba sin él;
-  - **en la máquina de Lucas, AVG**: agregar `https://www.whoscored.com/*` a sus excepciones, o
-    arrancar en la sesión con
-    `JAVA_TOOL_OPTIONS=-Djavax.net.ssl.trustStore=NONE -Djavax.net.ssl.trustStoreType=Windows-ROOT`
-    ([contracts/configuration.md](./contracts/configuration.md#correr-contra-whoscored-en-la-máquina-de-lucas-avg)).
-    Sin eso, cada página falla con `PKIX path building failed` y la corrida se corta por
-    bloqueo en la primera.
+  - el token de Football-Data en `FOOTBALL_DATA_TOKEN`, salvo donde se prueba sin él.
 - WhoScored no permite el scraping en sus términos de uso. Las pruebas contra el sitio real
   (secciones 3 y 5.3) se hacen pocas veces y con el ritmo que trae la aplicación.
 - Los ejemplos usan `curl` de Git Bash. En PowerShell hay que invocar `curl.exe`.
-- `JwtServiceTest.unTokenConLaFirmaAlteradaSeRechazaComoInvalido` falla más o menos 1 de cada 16
-  corridas en la máquina de Lucas. Si falla, se reintenta el build.
+- `JwtServiceTest.unTokenConLaFirmaAlteradaSeRechazaComoInvalido` era intermitente; ya está
+  corregido.
 
 ## 1. Suite automatizada
 

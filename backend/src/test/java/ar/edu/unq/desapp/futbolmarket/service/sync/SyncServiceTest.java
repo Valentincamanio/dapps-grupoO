@@ -63,6 +63,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.ExternalSourceExcept
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.SyncDisabledException;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.SyncInProgressException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.sync.LastFullSyncRepository;
 
 @ExtendWith(MockitoExtension.class)
 class SyncServiceTest {
@@ -87,6 +88,9 @@ class SyncServiceTest {
 
     @Mock
     private SyncReportLogger reportLogger;
+
+    @Mock
+    private LastFullSyncRepository lastFullSyncRepository;
 
     private SyncService service;
 
@@ -286,7 +290,8 @@ class SyncServiceTest {
     }
 
     private SyncService service(String token, Clock clock) {
-        return new SyncService(properties(token), adapter, writeService, playerRepository, reportLogger, clock);
+        return new SyncService(properties(token), adapter, writeService, playerRepository, reportLogger,
+                lastFullSyncRepository, new SyncLock(), clock);
     }
 
     private void givenEverySourceLeague() {
