@@ -2,3 +2,4 @@
 *.sh text eol=lf
 gradlew text eol=lf
 backend/snapshot/*.jsonl text eol=lf
+backend/src/test/resources/whoscored/*.jsonl text eol=lf

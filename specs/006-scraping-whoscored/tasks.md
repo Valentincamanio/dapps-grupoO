@@ -435,49 +435,49 @@ constructores canónicos.
 
 Se adelanta para que `StatsSyncService` nazca con su forma final (ver Organización).
 
-- [ ] T098 Crear `StatsSnapshotLineMapper` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/mapper/sync/StatsSnapshotLineMapper.java con el formato de contracts/snapshot-format.md (depende de T059):
+- [X] T098 Crear `StatsSnapshotLineMapper` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/mapper/sync/StatsSnapshotLineMapper.java con el formato de contracts/snapshot-format.md (depende de T059):
   - un `JsonMapper` propio (`JsonMapper.builder().build()`), así el formato no depende de la configuración de Boot (FR-030);
   - records anidados del mapper para el encabezado y cada tipo de línea, con `@JsonPropertyOrder` y sin espacios; las filas de jugadores son arrays de 21 columnas en el orden de `Metric`; `starter` y `manOfTheMatch` como `0` o `1`; el rating con dos decimales (`7.65`, `6.00`) o `null`; el id de WhoScored del jugador como string o `null`;
   - `List<String> toLines(StatsSnapshot)`: el encabezado exacto y las entradas en orden canónico;
   - `boolean isHeader(String line)` y `StatsSnapshot fromLines(List<String> entries)`. Una línea ilegible propaga la `JacksonException`
-- [ ] T099 Crear `StatsSnapshotRepository` (`@Repository`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/sync/StatsSnapshotRepository.java, con la ruta de `futbolmarket.whoscored.snapshot.path` (research D20 y D21) (depende de T060 y T098):
+- [X] T099 Crear `StatsSnapshotRepository` (`@Repository`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/sync/StatsSnapshotRepository.java, con la ruta de `futbolmarket.whoscored.snapshot.path` (research D20 y D21) (depende de T060 y T098):
   - `SnapshotRead read()`: si el archivo no existe, `missing()`; lo lee entero en UTF-8; un encabezado distinto, otra versión, una línea ilegible (`JacksonException`) o una clave repetida (`CatalogInvariantException`) dan `unreadable(problema)`, sin cargar nada (FR-027);
   - `void write(StatsSnapshot)`: crea la carpeta si falta, escribe con LF y UTF-8 sin BOM a un temporal en la misma carpeta y lo mueve sobre el vigente (`REPLACE_EXISTING` y `ATOMIC_MOVE`); un `IOException` sale como `UncheckedIOException`;
   - recibe y devuelve modelo
-- [ ] T100 Crear `StatsSnapshotService` (`@Service`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSnapshotService.java con `StatsSnapshotRepository`, `TeamRepository`, `MatchRepository` y `PlayerMatchStatsRepository` (research D20 y D21) (depende de T018, T020, T040, T061 y T099):
+- [X] T100 Crear `StatsSnapshotService` (`@Service`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSnapshotService.java con `StatsSnapshotRepository`, `TeamRepository`, `MatchRepository` y `PlayerMatchStatsRepository` (research D20 y D21) (depende de T018, T020, T040, T061 y T099):
   - `SnapshotRead read()`;
   - `CatalogReferences references(StatsSnapshot forLeague)`: `teamRepository.findAllByExternalIds(forLeague.teamExternalIds())` y `matchRepository.findAllByExternalIds(forLeague.matchExternalIds())`, los dos de la 005;
   - `boolean export()`: lee el vigente; si es `UNREADABLE`, registra un ERROR con el problema, no lo pisa y devuelve `false`; si no, arma `StatsSnapshot.of(teamRepository.findAllCrossed(), matchRepository.findAllCrossed(), matchRepository.findAllWithStats(), statsRepository.findAll())`, lo combina con `vigente.merge(...)`, lo escribe y devuelve `true`;
   - solo lee equipos, partidos y estadísticas: nunca usuarios, contraseñas, claves ni operaciones (FR-029)
-- [ ] T101 [P] Crear backend/src/test/resources/whoscored/snapshot-sample.jsonl con el ejemplo de contracts/snapshot-format.md (encabezado, dos `team`, dos `match` y un `stats`), en orden canónico y con fin de línea LF
-- [ ] T102 Escribir `StatsSnapshotRepositoryTest` (sin Spring, con `@TempDir`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/sync/StatsSnapshotRepositoryTest.java (depende de T099 y T101):
+- [X] T101 [P] Crear backend/src/test/resources/whoscored/snapshot-sample.jsonl con el ejemplo de contracts/snapshot-format.md (encabezado, dos `team`, dos `match` y un `stats`), en orden canónico y con fin de línea LF
+- [X] T102 Escribir `StatsSnapshotRepositoryTest` (sin Spring, con `@TempDir`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/persistence/repository/sync/StatsSnapshotRepositoryTest.java (depende de T099 y T101):
   - snapshot-sample.jsonl se lee `LOADED` con sus entradas;
   - un archivo que no existe da `MISSING`;
   - una línea rota en el medio, otro encabezado, la versión 2 o una clave repetida dan `UNREADABLE` (HU2, escenario 5);
   - leer snapshot-sample.jsonl y escribirlo da el mismo archivo byte a byte, con LF y sin BOM;
   - la escritura crea la carpeta y no deja temporales
-- [ ] T103 Escribir `StatsSnapshotServiceTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSnapshotServiceTest.java, con el repository real sobre un `@TempDir`, los repositories de la base mockeados y `StatsFixtures` (depende de T065 y T100):
+- [X] T103 Escribir `StatsSnapshotServiceTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSnapshotServiceTest.java, con el repository real sobre un `@TempDir`, los repositories de la base mockeados y `StatsFixtures` (depende de T065 y T100):
   - sin snapshot vigente, la exportación escribe las entradas de la base en orden canónico, sin nombres ni datos de usuarios (HU2, escenario 7; FR-029);
   - dos exportaciones sin cambios dan el mismo archivo byte a byte (HU2, escenario 8);
   - después de un partido nuevo, solo se agregan sus líneas y los cruces nuevos; ninguna línea vigente cambia ni se borra (HU2, escenario 9; FR-031);
   - las entradas vigentes que la base no tiene, o tiene distintas, se conservan (HU2, escenario 10);
   - con un vigente ilegible, devuelve `false` y el archivo queda igual byte a byte;
   - `references` trae los equipos y los partidos del catálogo que nombra el snapshot, de cualquier temporada
-- [ ] T104 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T104 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 ### 2F. Servicios de WhoScored (paso 5 del plan y fase 1 del paso 6)
 
-- [ ] T105 [P] Crear `SyncLock` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncLock.java, el candado único de las dos fuentes (research D22): `<T> T runExclusively(Supplier<T>)` hace `tryAcquire` de un `Semaphore(1)`, lanza `SyncInProgressException` si está tomado y libera en un `finally`. No espera ni encola. Por ahora lo usa solo WhoScored; `SyncService` pasa a usarlo en T126
-- [ ] T106 [P] Crear `StatsSyncReportLogger` (`@Component`, SLF4J) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncReportLogger.java con `void log(StatsSyncReport)`, según research D16 y los ejemplos de quickstart.md 2.2 (depende de T062):
+- [X] T105 [P] Crear `SyncLock` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncLock.java, el candado único de las dos fuentes (research D22): `<T> T runExclusively(Supplier<T>)` hace `tryAcquire` de un `Semaphore(1)`, lanza `SyncInProgressException` si está tomado y libera en un `finally`. No espera ni encola. Por ahora lo usa solo WhoScored; `SyncService` pasa a usarlo en T126
+- [X] T106 [P] Crear `StatsSyncReportLogger` (`@Component`, SLF4J) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncReportLogger.java con `void log(StatsSyncReport)`, según research D16 y los ejemplos de quickstart.md 2.2 (depende de T062):
   - una línea por liga, en INFO (en WARN la liga `CUT`): `{LIGA}: {procesada | cortada por bloqueo | no alcanzada por el corte}. Partidos: {a} desde el snapshot y {b} por scraping; {c} omitidos; {d} equipos sin cruzar; {e} jugadores sin cruzar; {f} entradas del snapshot salteadas.`;
   - líneas de detalle en INFO solo si hay algo para listar, con los elementos separados por `, `: `{LIGA}: partidos omitidos: {id} ({local} - {visitante}, {motivo})`, `{LIGA}: equipos sin cruzar: {nombre} ({id}, {motivo})`, `{LIGA}: jugadores sin cruzar: {nombre} ({equipo}, partido {id}, {motivo})` y `{LIGA}: entradas del snapshot salteadas: {motivo} {n}`;
   - una línea final en INFO: `Sincronización de WhoScored {tipo} ({origen}) terminada en {s} s: {n} partidos procesados ({a} desde el snapshot y {b} por scraping), {m} omitidos, sin corte.`; si hubo corte, en lugar de `sin corte.` dice `cortada por bloqueo en la página {ruta} ({liga}, partido {id}).`, sin `, partido {id}` si la página no era la de un partido (quickstart.md 2.2);
   - la línea de inicio la escribe `StatsSyncService`
-- [ ] T107 [P] Crear `StatsWriteService` (`@Service`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsWriteService.java con los repositories de equipos, jugadores, partidos y estadísticas (research D18) (depende de T018 a T020 y T040):
+- [X] T107 [P] Crear `StatsWriteService` (`@Service`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsWriteService.java con los repositories de equipos, jugadores, partidos y estadísticas (research D18) (depende de T018 a T020 y T040):
   - `@Transactional List<Team> saveTeamCrosses(List<Team>)` y `@Transactional List<Match> saveMatchCrosses(List<Match>)`;
   - `@Transactional void saveMatchStats(MatchStatsLoad)`: los ids de WhoScored de `crossedPlayers`, las filas de `stats` y el partido con su marca, todo o nada (FR-013);
   - sin `if` de negocio; es otro bean para no depender de la auto-invocación
-- [ ] T108 Crear `StatsSyncService` (`@Service`, no transaccional) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncService.java con el flujo de research D18 y D20 (depende de T057, T061, T063, T064, T088, T100 y T105 a T107):
+- [X] T108 Crear `StatsSyncService` (`@Service`, no transaccional) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncService.java con el flujo de research D18 y D20 (depende de T057, T061, T063, T064, T088, T100 y T105 a T107):
   - dependencias: `WhoScoredAdapter`, `StatsWriteService`, `StatsSnapshotService`, `SyncLock`, `SeasonRepository`, `MatchRepository`, `PlayerRepository`, `LastFullSyncRepository`, `StatsSyncReportLogger`, `WhoScoredProperties` (para la ruta en el WARN) y `Clock`. **No recibe `FootballDataProperties`** (FR-040);
   - `StatsSyncReport synchronizeAll(SyncOrigin)` y `StatsSyncReport synchronizeLeague(League)`: con `lock.runExclusively` (409); `StatsSyncReport runFull(SyncOrigin)`, de visibilidad de paquete, sin tomar el candado (lo usa la cadena, T127). La corrida se crea recién con el candado tomado;
   - INFO `Sincronización de WhoScored {tipo} ({origen}) iniciada.`;
@@ -488,9 +488,9 @@ Se adelanta para que `StatsSyncService` nazca con su forma final (ver Organizaci
   - **corte**: una `SourceBlockedException` se captura, se registra con `run.cut(página, liga, id de Football-Data del partido o null)`, la liga queda `CUT`, las que faltan `NOT_REACHED` y no se hace ningún otro pedido (FR-044 y FR-045). El informe se devuelve igual (FR-039). Sin duplicar el bloque del corte;
   - cierra con `run.finish(clock.instant())`, `StatsSyncReportLogger.log` y `report.lastFullSync().ifPresent(lastFullSyncRepository::save)` (FR-047);
   - `SyncInterruptedException` y los errores de programación no se capturan; el candado se libera igual
-- [ ] T109 [P] Escribir `SyncLockTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncLockTest.java (depende de T105): devuelve el valor; un segundo pedido desde adentro lanza `SyncInProgressException` con `Ya hay una sincronización en curso.`; se libera al terminar y también después de una excepción
-- [ ] T110 [P] Escribir `StatsSyncReportLoggerTest` (con `OutputCaptureExtension`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncReportLoggerTest.java (depende de T106 y T065): una liga procesada en INFO y una cortada en WARN; los detalles aparecen solo si hay algo; la línea final con los totales y `sin corte`, o con la página, la liga y el partido del corte (FR-049 y SC-015)
-- [ ] T111 Escribir `StatsSyncServiceTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncServiceTest.java (depende de T065 y T108):
+- [X] T109 [P] Escribir `SyncLockTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/SyncLockTest.java (depende de T105): devuelve el valor; un segundo pedido desde adentro lanza `SyncInProgressException` con `Ya hay una sincronización en curso.`; se libera al terminar y también después de una excepción
+- [X] T110 [P] Escribir `StatsSyncReportLoggerTest` (con `OutputCaptureExtension`) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncReportLoggerTest.java (depende de T106 y T065): una liga procesada en INFO y una cortada en WARN; los detalles aparecen solo si hay algo; la línea final con los totales y `sin corte`, o con la página, la liga y el partido del corte (FR-049 y SC-015)
+- [X] T111 Escribir `StatsSyncServiceTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncServiceTest.java (depende de T065 y T108):
   - armado: Mockito para el adapter, `StatsWriteService`, `StatsSnapshotService`, los repositories y el logger; un `SyncLock` real; `WhoScoredProperties` reales; un `Clock` fijo; datos de `StatsFixtures`;
   - el snapshot se lee una vez y sus cargas de todas las ligas se guardan antes del primer pedido al adapter (`InOrder`) (HU2, escenarios 1 y 3);
   - `MISSING` y `UNREADABLE` dejan su WARN con la ruta y se scrapea todo lo pendiente; el estado va al informe (HU2, escenario 5);
@@ -510,12 +510,12 @@ Se adelanta para que `StatsSyncService` nazca con su forma final (ver Organizaci
   - un segundo pedido desde la respuesta del adapter lanza `SyncInProgressException`; al terminar, y después de una `RuntimeException` inesperada que se propaga, se puede volver a sincronizar;
   - `runFull` funciona con el candado ya tomado por quien lo llama;
   - el informe va una vez al logger, y el inicio y el fin salen del reloj
-- [ ] T112 Escribir `StatsWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsWriteServiceIT.java con el armado de T026 y la limpieza completa (depende de T107 y T065):
+- [X] T112 Escribir `StatsWriteServiceIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsWriteServiceIT.java con el armado de T026 y la limpieza completa (depende de T107 y T065):
   - `saveMatchStats` guarda las filas, los ids de WhoScored de los jugadores y la marca del partido;
   - una carga con dos filas del mismo jugador lanza `DataIntegrityViolationException` y no deja nada: ninguna fila, la marca en `false` y el jugador sin id (FR-013; HU4, escenario 5; SC-008);
   - `saveTeamCrosses` y `saveMatchCrosses` guardan los ids;
   - **una sincronización de Football-Data posterior conserva los cruces y la marca**: con el catálogo armado por `SyncWriteService.applyLeague` con `SnapshotFixtures.snapshot(PREMIER)` (como `SyncWriteServiceIT`), cruzar un equipo, un jugador y un partido y guardar sus estadísticas; aplicar otra vez la misma liga deja los ids de WhoScored, la marca y las filas iguales (SC-010)
-- [ ] T113 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T113 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 **Checkpoint**: el motor de WhoScored está listo y probado. Las historias pueden empezar.
 

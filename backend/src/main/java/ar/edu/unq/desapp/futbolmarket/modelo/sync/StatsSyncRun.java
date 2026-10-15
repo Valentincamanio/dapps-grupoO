@@ -42,6 +42,14 @@ public class StatsSyncRun {
         return new StatsSyncRun(SyncType.SINGLE_LEAGUE, SyncOrigin.MANUAL, startedAt, List.of(league));
     }
 
+    public SyncType type() {
+        return type;
+    }
+
+    public SyncOrigin origin() {
+        return origin;
+    }
+
     /**
      * Las ligas pedidas, en el orden del enum.
      */
