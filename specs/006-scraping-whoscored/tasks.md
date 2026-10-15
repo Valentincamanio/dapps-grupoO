@@ -539,22 +539,22 @@ T118.
 
 ### Implementación de la Historia 1
 
-- [ ] T114 [P] [US1] Crear el record `StatsSyncReportResponse`, con records anidados y `static StatsSyncReportResponse from(StatsSyncReport)`, como `SyncReportResponse.from`, en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/dto/StatsSyncReportResponse.java:
+- [X] T114 [P] [US1] Crear el record `StatsSyncReportResponse`, con records anidados y `static StatsSyncReportResponse from(StatsSyncReport)`, como `SyncReportResponse.from`, en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/dto/StatsSyncReportResponse.java:
   - los campos y los nombres son exactamente los del esquema `StatsSyncReportResponse` de contracts/sync-api.yaml;
   - el modelo se traduce a esos nombres: `matchExternalId` pasa a `externalId` en los omitidos y a `match` en los jugadores y en el corte; `homeTeamName` a `homeTeam`; `awayTeamName` a `awayTeam`; `teamExternalId` a `externalId`; `teamName` a `team`; la página del corte a `page`, `whoscoredId` y `path`;
   - `skippedSnapshotEntries` es una lista de `{reason, count}` en el orden del enum, vacía si no hay;
   - `cut` sale `null` si no hubo corte
-- [ ] T115 [US1] Crear `StatsSyncController` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/StatsSyncController.java (depende de T114):
+- [X] T115 [US1] Crear `StatsSyncController` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/sync/StatsSyncController.java (depende de T114):
   - `@RestController` y `@RequestMapping("/matches/stats/sync")`;
   - `@Tag(name = "Sincronización")` y dos `@SecurityRequirement` a nivel de clase (`OpenApiConfig.BEARER_AUTH` y `OpenApiConfig.API_KEY_AUTH`), como `SyncController`;
   - `@PostMapping` con `@RequestParam(required = false) String league`: sin `league` llama a `statsSyncService.synchronizeAll(SyncOrigin.MANUAL)`; con `league`, a `synchronizeLeague(League.fromName(league))`, que rechaza un valor no admitido con 400 antes de consultar nada (research D24). Responde 200 con `StatsSyncReportResponse.from(report)`, también con un corte (FR-039);
   - `@Operation` y el parámetro en español, tomados de contracts/sync-api.yaml; un `@ApiResponse` por código: 200, 400, 401, 403 y 409, con el esquema `ApiError` en los errores;
   - solo habla con `StatsSyncService`; no dispara la de Football-Data (FR-038)
-- [ ] T116 [P] [US1] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/security/SecurityConfig.java agregar `.requestMatchers(pathPattern(HttpMethod.POST, "/matches/stats/sync")).hasRole(Role.ADMIN.name())` junto a la regla de `/players/sync`, antes de `anyRequest().authenticated()` (research D24)
+- [X] T116 [P] [US1] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/security/SecurityConfig.java agregar `.requestMatchers(pathPattern(HttpMethod.POST, "/matches/stats/sync")).hasRole(Role.ADMIN.name())` junto a la regla de `/players/sync`, antes de `anyRequest().authenticated()` (research D24)
 
 ### Tests de la Historia 1
 
-- [ ] T117 [US1] Escribir `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java, siguiendo el patrón de `SyncControllerIT` (depende de T115 y T116). Nace con el armado que usan también la HU2, la HU3 y la HU4:
+- [X] T117 [US1] Escribir `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java, siguiendo el patrón de `SyncControllerIT` (depende de T115 y T116). Nace con el armado que usan también la HU2, la HU3 y la HU4:
   - anotaciones: `@SpringBootTest`, `@AutoConfigureMockMvc`, `@ActiveProfiles("test")` y `@ExtendWith(OutputCaptureExtension.class)`;
   - `@DynamicPropertySource` con un administrador al azar, `futbolmarket.football-data.token` al azar, una H2 propia (`jdbc:h2:mem:stats-e2e-<sufijo>;DB_CLOSE_DELAY=-1`) y `futbolmarket.whoscored.snapshot.path` en `build/test-snapshot/stats-e2e-<sufijo>.jsonl`;
   - `@MockitoBean WhoScoredAdapter` y `@MockitoBean FootballDataAdapter`;
@@ -567,8 +567,8 @@ T118.
   - `league=MLS` responde 400 con `La liga 'MLS' no es una de las admitidas: ...` y `verifyNoInteractions(whoScoredAdapter)` (escenario 17);
   - un usuario común recibe 403 y una petición sin credencial 401, sin tocar el adapter (escenario 18; SC-017);
   - después de la de WhoScored, `verifyNoInteractions(footballDataAdapter)`; y después de `POST /players/sync`, `verifyNoInteractions(whoScoredAdapter)` (escenario 20; FR-038)
-- [ ] T118 [P] [US1] Escribir `StatsSyncWithoutTokenIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncWithoutTokenIT.java, como `SyncDisabledIT` de la 005: sin token de Football-Data (el del perfil test), con su H2 propia, `@MockitoBean WhoScoredAdapter` y un catálogo sembrado, `POST /matches/stats/sync` como administrador responde 200 y guarda las estadísticas (FR-040). Es una clase aparte porque `StatsSyncControllerIT` necesita el token para los 409 de la HU3 (research D26) (depende de T115 y T116)
-- [ ] T119 [US1] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+- [X] T118 [P] [US1] Escribir `StatsSyncWithoutTokenIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncWithoutTokenIT.java, como `SyncDisabledIT` de la 005: sin token de Football-Data (el del perfil test), con su H2 propia, `@MockitoBean WhoScoredAdapter` y un catálogo sembrado, `POST /matches/stats/sync` como administrador responde 200 y guarda las estadísticas (FR-040). Es una clase aparte porque `StatsSyncControllerIT` necesita el token para los 409 de la HU3 (research D26) (depende de T115 y T116)
+- [X] T119 [US1] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
 
 **Checkpoint**: la HU1 funciona sola. Las estadísticas se obtienen con un disparo manual. Es el MVP.
 
@@ -589,22 +589,22 @@ T071; 8 y 9 → además T142; 11 → T120 y T145.
 
 ### Implementación de la Historia 2
 
-- [ ] T120 [US2] Crear la clase main `StatsSnapshotExport` (final, con constructor privado) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/StatsSnapshotExport.java, junto a `FutbolMarketApplication` (research D21):
+- [X] T120 [US2] Crear la clase main `StatsSnapshotExport` (final, con constructor privado) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/StatsSnapshotExport.java, junto a `FutbolMarketApplication` (research D21):
   - levanta Spring con `new SpringApplicationBuilder(FutbolMarketApplication.class).web(WebApplicationType.NONE)` y argumentos que pisan cualquier otra fuente: `--spring.profiles.active=local`, `--futbolmarket.football-data.sync.on-startup=false` y `--futbolmarket.football-data.sync.cron=-`. No corre ninguna sincronización;
   - llama a `StatsSnapshotService.export()`, cierra el contexto con `SpringApplication.exit` y termina con código 0, o 1 si el vigente no se pudo leer (única llamada a `System.exit`, en `main`);
   - no es un recurso de la aplicación: no hay endpoint (FR-028)
-- [ ] T121 [US2] En backend/build.gradle agregar la tarea `exportStatsSnapshot` sin dependencias nuevas (research D21): `tasks.register('exportStatsSnapshot', JavaExec)` con `group`, una `description` en español, `classpath = sourceSets.main.runtimeClasspath`, `mainClass = 'ar.edu.unq.desapp.futbolmarket.StatsSnapshotExport'` y `workingDir = projectDir`. No reemplazar el archivo ni tocar lo existente (depende de T120)
+- [X] T121 [US2] En backend/build.gradle agregar la tarea `exportStatsSnapshot` sin dependencias nuevas (research D21): `tasks.register('exportStatsSnapshot', JavaExec)` con `group`, una `description` en español, `classpath = sourceSets.main.runtimeClasspath`, `mainClass = 'ar.edu.unq.desapp.futbolmarket.StatsSnapshotExport'` y `workingDir = projectDir`. No reemplazar el archivo ni tocar lo existente (depende de T120)
 
 ### Tests de la Historia 2
 
-- [ ] T122 [US2] Agregar métodos a `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java, escribiendo el snapshot del test en su ruta (después de crear la carpeta con `Files.createDirectories`) con `StatsSnapshotLineMapper` y datos de `StatsFixtures` (depende de T117):
+- [X] T122 [US2] Agregar métodos a `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java, escribiendo el snapshot del test en su ruta (después de crear la carpeta con `Files.createDirectories`) con `StatsSnapshotLineMapper` y datos de `StatsFixtures` (depende de T117):
   - un snapshot con uno de los dos partidos terminados: queda con las estadísticas del snapshot sin que el adapter reciba su página, el otro se scrapea, y el informe dice `snapshot: LOADED`, `matchesFromSnapshot: 1` y `matchesScraped: 1` (escenario 1);
   - los cruces del snapshot quedan guardados (escenario 2);
   - con el adapter lanzando `SourceBlockedException` desde el primer pedido, lo del snapshot se carga igual y el corte llega después (escenario 3);
   - una entrada de un partido que no está en el catálogo y una fila de un jugador que no está se saltean y se cuentan en `skippedSnapshotEntries`; el resto se carga (escenario 4);
   - un snapshot con una línea rota: `snapshot: UNREADABLE`, un WARN en el registro y se scrapea todo (escenario 5);
   - un partido que ya tenía estadísticas conserva las suyas (escenario 6)
-- [ ] T123 [US2] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`. Con la aplicación detenida, correr `./gradlew exportStatsSnapshot` sobre la base local y verificar que termina solo, sin levantar el servidor web ni sincronizar. Si generó backend/snapshot/whoscored-stats.jsonl, no commitearlo todavía: el primer snapshot se genera en T142
+- [X] T123 [US2] Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`. Con la aplicación detenida, correr `./gradlew exportStatsSnapshot` sobre la base local y verificar que termina solo, sin levantar el servidor web ni sincronizar. Si generó backend/snapshot/whoscored-stats.jsonl, no commitearlo todavía: el primer snapshot se genera en T142
 
 **Checkpoint**: las HU1 y HU2 funcionan. Una base nueva se completa desde el snapshot.
 
