@@ -35,7 +35,9 @@ public class MatchMapper {
                 teamMapper.toDomain(match.getAwayTeam()),
                 toScore(match.getFullTimeHome(), match.getFullTimeAway()),
                 toScore(match.getHalfTimeHome(), match.getHalfTimeAway()),
-                match.getWinner() == null ? null : MatchWinner.valueOf(match.getWinner())
+                match.getWinner() == null ? null : MatchWinner.valueOf(match.getWinner()),
+                match.getWhoscoredId(),
+                match.isStatsLoaded()
         );
     }
 
@@ -53,7 +55,9 @@ public class MatchMapper {
                 awayGoals(match.fullTime()),
                 homeGoals(match.halfTime()),
                 awayGoals(match.halfTime()),
-                match.winner() == null ? null : match.winner().name()
+                match.winner() == null ? null : match.winner().name(),
+                match.whoscoredId(),
+                match.statsLoaded()
         );
     }
 

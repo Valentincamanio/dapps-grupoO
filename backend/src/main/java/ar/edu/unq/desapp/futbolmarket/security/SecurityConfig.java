@@ -65,9 +65,10 @@ public class SecurityConfig {
      * 400 o un 404 en una ruta pública sale disfrazado de 401. Pedir {@code /error} directamente
      * sigue exigiendo credencial, porque no es una ruta pública.
      *
-     * <p>La sincronización manual es la primera regla por rol: sin credencial responde 401 y un
-     * {@code USER} recibe 403, los dos antes del controller (research D15). La regla es por método,
-     * así que {@code GET /players/**} sigue público.</p>
+     * <p>Las dos sincronizaciones manuales, la de Football-Data y la de WhoScored, son las reglas por
+     * rol: sin credencial responden 401 y un {@code USER} recibe 403, los dos antes del controller
+     * (research D15 de la 005 y D24). Las reglas son por método, así que {@code GET /players/**}
+     * sigue público.</p>
      */
     @Bean
     public SecurityFilterChain apiFilterChain(HttpSecurity http, RequestMatcher publicEndpoints,
@@ -85,6 +86,7 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(publicEndpoints).permitAll()
                         .requestMatchers(pathPattern(HttpMethod.POST, "/players/sync")).hasRole(Role.ADMIN.name())
+                        .requestMatchers(pathPattern(HttpMethod.POST, "/matches/stats/sync")).hasRole(Role.ADMIN.name())
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(jsonAuthenticationEntryPoint)

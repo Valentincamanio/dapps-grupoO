@@ -39,4 +39,11 @@ public interface PlayerSQLDAO extends JpaRepository<PlayerSQL, Long> {
 
     @EntityGraph(attributePaths = "team")
     List<PlayerSQL> findAllByActiveTrue();
+
+    /**
+     * Todos los jugadores, activos o inactivos, con su equipo en la misma consulta.
+     */
+    @Override
+    @EntityGraph(attributePaths = "team")
+    List<PlayerSQL> findAll();
 }

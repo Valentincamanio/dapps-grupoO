@@ -3,7 +3,6 @@ package ar.edu.unq.desapp.futbolmarket.service.sync;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
@@ -22,8 +21,8 @@ import ar.edu.unq.desapp.futbolmarket.modelo.sync.SyncRun;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SyncType;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.ExternalSourceException;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.SyncDisabledException;
-import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.SyncInProgressException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.sync.LastFullSyncRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -36,9 +35,12 @@ import lombok.RequiredArgsConstructor;
  * liga se capturan solo las fallas de la fuente y de la base; un error de programación aborta la
  * corrida.</p>
  *
- * <p>Hay a lo sumo una sincronización a la vez. Primero se revisa que esté habilitada (503) y
- * después que no haya otra en curso (409). El semáforo no espera: un segundo pedido se rechaza en
- * lugar de encolarse.</p>
+ * <p>Hay a lo sumo una sincronización a la vez, de cualquiera de las dos fuentes (research D22).
+ * Primero se revisa que esté habilitada (503) y después que no haya otra en curso (409). El
+ * candado común no espera: un segundo pedido se rechaza en lugar de encolarse.</p>
+ *
+ * <p>Una completa con las cinco ligas en éxito queda registrada como la última completa exitosa de
+ * Football-Data, también si la disparó un administrador (FR-047).</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -51,32 +53,31 @@ public class SyncService {
     private final SyncWriteService writeService;
     private final PlayerRepository playerRepository;
     private final SyncReportLogger reportLogger;
+    private final LastFullSyncRepository lastFullSyncRepository;
+    private final SyncLock syncLock;
     private final Clock clock;
-    private final Semaphore running = new Semaphore(1);
 
     public SyncReport synchronizeAll(SyncOrigin origin) {
-        return synchronize(() -> SyncRun.full(origin, clock.instant()));
+        return synchronize(() -> runFull(origin));
     }
 
     public SyncReport synchronizeLeague(League league) {
-        return synchronize(() -> SyncRun.singleLeague(league, clock.instant()));
+        return synchronize(() -> execute(SyncRun.singleLeague(league, clock.instant())));
     }
 
     /**
-     * La corrida se crea recién con el semáforo tomado, así su inicio es el de la sincronización.
+     * Las cinco ligas sin revisar el token ni tomar el candado: la usa la cadena, que ya lo tiene y
+     * ya revisó el token. La corrida se crea recién acá, así su inicio es el de la sincronización.
      */
-    private SyncReport synchronize(Supplier<SyncRun> newRun) {
+    SyncReport runFull(SyncOrigin origin) {
+        return execute(SyncRun.full(origin, clock.instant()));
+    }
+
+    private SyncReport synchronize(Supplier<SyncReport> sync) {
         if (!properties.hasToken()) {
             throw new SyncDisabledException();
         }
-        if (!running.tryAcquire()) {
-            throw new SyncInProgressException();
-        }
-        try {
-            return execute(newRun.get());
-        } finally {
-            running.release();
-        }
+        return syncLock.runExclusively(sync);
     }
 
     /**
@@ -94,6 +95,7 @@ public class SyncService {
         List<Player> inactivated = run.canDeactivate() ? writeService.deactivateMissing(run) : List.of();
         SyncReport report = run.finish(clock.instant(), inactivated);
         reportLogger.log(report);
+        report.lastFullSync().ifPresent(lastFullSyncRepository::save);
         return report;
     }
 
