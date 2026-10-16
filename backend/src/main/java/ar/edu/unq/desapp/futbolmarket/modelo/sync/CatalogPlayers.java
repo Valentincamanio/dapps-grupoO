@@ -1,5 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.modelo.sync;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -53,9 +54,30 @@ public final class CatalogPlayers {
                 .toList();
     }
 
+    /**
+     * Todos los jugadores cuyo equipo actual en el catálogo es ese, activos o inactivos, para los
+     * niveles de cruce por nombre (research D14).
+     */
+    public List<Player> inTeam(Team team) {
+        return byExternalId.values().stream()
+                .filter(player -> player.team().externalId().equals(team.externalId()))
+                .toList();
+    }
+
     public List<Player> named(NormalizedName name) {
         return externalIdsByName.getOrDefault(name, List.of()).stream()
                 .map(byExternalId::get)
+                .toList();
+    }
+
+    /**
+     * Todos los jugadores con esa fecha de nacimiento, de cualquier equipo, activos o inactivos,
+     * para el cruce de un transferido por la página del jugador (FR-019d). Los que no tienen fecha
+     * nunca aparecen.
+     */
+    public List<Player> bornOn(LocalDate birthDate) {
+        return byExternalId.values().stream()
+                .filter(player -> birthDate.equals(player.dateOfBirth()))
                 .toList();
     }
 

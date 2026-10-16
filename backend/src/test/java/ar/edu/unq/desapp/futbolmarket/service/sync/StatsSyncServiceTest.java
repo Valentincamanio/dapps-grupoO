@@ -1,9 +1,14 @@
 package ar.edu.unq.desapp.futbolmarket.service.sync;
 
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BARRY;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BARRY_APPEARANCE;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.EVERTON;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.MAN_UTD;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.MARTINEZ;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.NDIAYE;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.SEASON;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.SEASON_ID;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.ageOf;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.crossed;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.crossedSeasonMatches;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.crossedTeams;
@@ -38,11 +43,13 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,12 +73,16 @@ import ar.edu.unq.desapp.futbolmarket.modelo.performance.MetricCounts;
 import ar.edu.unq.desapp.futbolmarket.modelo.performance.ReportedAppearance;
 import ar.edu.unq.desapp.futbolmarket.modelo.performance.ReportedMatchStats;
 import ar.edu.unq.desapp.futbolmarket.modelo.performance.Side;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.CatalogReferences;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.CrossFailure;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.LastFullSync;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.LeagueStatsResult;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.LeagueStatsStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.MatchStatsLoad;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.PageKind;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.ReportedPlayerProfile;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.ReportedTeam;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.RunCut;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SkippedStatsMatch;
@@ -82,6 +93,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsSyncReport;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SyncOrigin;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SyncSource;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SyncType;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.UncrossedPlayer;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.SourceBlockedException;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.SyncInProgressException;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.SyncInterruptedException;
@@ -101,6 +113,7 @@ class StatsSyncServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-12T07:00:00Z");
     private static final String SNAPSHOT_PATH = "snapshot/whoscored-stats.jsonl";
+    private static final String LISANDRO_WHOSCORED_ID = "400001";
     private static final WhoScoredProperties PROPERTIES = new WhoScoredProperties(
             URI.create("http://whoscored.invalid"), "agente", "text/html", "en-US", Duration.ofSeconds(10),
             Duration.ofSeconds(30), Duration.ofSeconds(4),
@@ -250,6 +263,125 @@ class StatsSyncServiceTest {
         assertThat(first.crossedPlayers()).containsExactly(NDIAYE.crossWith("393485"));
         assertThat(second.crossedPlayers()).isEmpty();
         assertThat(second.stats()).extracting(stats -> stats.player().externalId()).containsExactly("8135");
+    }
+
+    @Test
+    void soloSePidenLasPaginasDeLosJugadoresQueQuedanSinCruzar() {
+        List<Match> matches = pendingOnly(identifiedMatches(), "560601");
+        seasonMatchesAre(matches);
+        when(adapter.fetchMatchStats("1983601"))
+                .thenReturn(Optional.of(reportedWith(match(matches, "560601"), ndiaye("Iliman Ndiaye"), titi())));
+        when(adapter.fetchPlayerProfile(BARRY_APPEARANCE.whoscoredId()))
+                .thenReturn(Optional.of(new ReportedPlayerProfile(BARRY.dateOfBirth(), "Thierno Barry Diallo")));
+        ArgumentCaptor<MatchStatsLoad> saved = ArgumentCaptor.forClass(MatchStatsLoad.class);
+
+        service.synchronizeAll(SyncOrigin.WEEKLY);
+
+        verify(adapter).fetchPlayerProfile(BARRY_APPEARANCE.whoscoredId());
+        verify(adapter, times(1)).fetchPlayerProfile(anyString());
+        verify(writeService).saveMatchStats(saved.capture());
+        assertThat(saved.getValue().crossedPlayers()).containsExactlyInAnyOrder(NDIAYE.crossWith("393485"),
+                BARRY.crossWith(BARRY_APPEARANCE.whoscoredId()));
+    }
+
+    /**
+     * La página de Titi no trae la fecha: el mapa de la corrida guarda también la respuesta vacía.
+     */
+    @Test
+    void unMismoJugadorEnDosPartidosDeLaCorridaSePideUnaSolaVez() {
+        List<Match> matches = pendingOnly(identifiedMatches(), "560601", "560603");
+        seasonMatchesAre(matches);
+        when(adapter.fetchMatchStats("1983601"))
+                .thenReturn(Optional.of(reportedWith(match(matches, "560601"), titi())));
+        when(adapter.fetchMatchStats("1983603"))
+                .thenReturn(Optional.of(reportedWith(match(matches, "560603"), titi())));
+        when(adapter.fetchPlayerProfile(BARRY_APPEARANCE.whoscoredId())).thenReturn(Optional.empty());
+
+        service.synchronizeAll(SyncOrigin.WEEKLY);
+
+        verify(adapter, times(1)).fetchPlayerProfile(BARRY_APPEARANCE.whoscoredId());
+        verify(writeService, times(2)).saveMatchStats(any());
+    }
+
+    @Test
+    void unaPaginaDeJugadorVaciaNoCortaLaCorrida() {
+        List<Match> matches = pendingOnly(identifiedMatches(), "560601", "560603");
+        seasonMatchesAre(matches);
+        when(adapter.fetchMatchStats("1983601"))
+                .thenReturn(Optional.of(reportedWith(match(matches, "560601"), titi())));
+        when(adapter.fetchMatchStats("1983603"))
+                .thenReturn(Optional.of(reportedWith(match(matches, "560603"), ndiaye("Iliman Ndiaye"))));
+        when(adapter.fetchPlayerProfile(BARRY_APPEARANCE.whoscoredId())).thenReturn(Optional.empty());
+
+        StatsSyncReport report = service.synchronizeAll(SyncOrigin.WEEKLY);
+
+        assertThat(report.cut()).isNull();
+        assertThat(premier(report).status()).isEqualTo(LeagueStatsStatus.PROCESSED);
+        assertThat(premier(report).matchesScraped()).isEqualTo(2);
+        assertThat(premier(report).uncrossedPlayers()).extracting(UncrossedPlayer::name).containsExactly("Titi");
+        verify(adapter).fetchMatchStats("1983603");
+    }
+
+    /**
+     * WhoScored informa a Lisandro Martínez en el Everton, y el catálogo lo tiene en el Manchester
+     * United con su misma edad. Pedro Martínez, del Everton y de su edad, lo cruzaría por el apellido
+     * si se probaran los niveles (FR-019a).
+     */
+    @Test
+    void unCandidatoDeOtroEquipoPideSuPaginaAunqueLosNivelesLoCruzarian() {
+        List<Match> matches = pendingOnly(identifiedMatches(), "560601");
+        seasonMatchesAre(matches);
+        when(playerRepository.findAllWithTeam()).thenReturn(withPedroMartinez());
+        when(adapter.fetchMatchStats("1983601"))
+                .thenReturn(Optional.of(reportedWith(match(matches, "560601"), lisandroMartinez())));
+        when(adapter.fetchPlayerProfile(LISANDRO_WHOSCORED_ID)).thenReturn(Optional.empty());
+        ArgumentCaptor<MatchStatsLoad> saved = ArgumentCaptor.forClass(MatchStatsLoad.class);
+
+        StatsSyncReport report = service.synchronizeAll(SyncOrigin.WEEKLY);
+
+        verify(adapter).fetchPlayerProfile(LISANDRO_WHOSCORED_ID);
+        verify(writeService).saveMatchStats(saved.capture());
+        assertThat(saved.getValue().crossedPlayers()).isEmpty();
+        assertThat(premier(report).uncrossedPlayers()).extracting(UncrossedPlayer::reason)
+                .containsExactly(CrossFailure.NOT_CONFIRMED);
+    }
+
+    @Test
+    void unTransferidoCruzadoPorLaFechaDejaLaLineaEnOtroEquipo(CapturedOutput output) {
+        List<Match> matches = pendingOnly(identifiedMatches(), "560601");
+        seasonMatchesAre(matches);
+        when(playerRepository.findAllWithTeam()).thenReturn(withPedroMartinez());
+        when(adapter.fetchMatchStats("1983601"))
+                .thenReturn(Optional.of(reportedWith(match(matches, "560601"), lisandroMartinez())));
+        when(adapter.fetchPlayerProfile(LISANDRO_WHOSCORED_ID))
+                .thenReturn(Optional.of(new ReportedPlayerProfile(MARTINEZ.dateOfBirth(), null)));
+        ArgumentCaptor<MatchStatsLoad> saved = ArgumentCaptor.forClass(MatchStatsLoad.class);
+
+        service.synchronizeAll(SyncOrigin.WEEKLY);
+
+        verify(writeService).saveMatchStats(saved.capture());
+        assertThat(saved.getValue().crossedPlayers()).containsExactly(MARTINEZ.crossWith(LISANDRO_WHOSCORED_ID));
+        assertThat(output).contains("PREMIER: jugador cruzado por fecha de nacimiento en otro equipo (18/01/1998): "
+                + "'Lisandro Martínez' → 'Lisandro Martínez' (Manchester United FC), partido 560601.");
+    }
+
+    /**
+     * La página de Titi trae otra fecha del mismo año que la de Thierno Barry y un nombre completo
+     * que contiene el suyo (FR-019d, paso 3).
+     */
+    @Test
+    void unCrucePorElNombreCompletoDejaSuLineaConElAnio(CapturedOutput output) {
+        List<Match> matches = pendingOnly(identifiedMatches(), "560601");
+        seasonMatchesAre(matches);
+        when(adapter.fetchMatchStats("1983601"))
+                .thenReturn(Optional.of(reportedWith(match(matches, "560601"), titi())));
+        when(adapter.fetchPlayerProfile(BARRY_APPEARANCE.whoscoredId())).thenReturn(Optional.of(
+                new ReportedPlayerProfile(BARRY.dateOfBirth().withDayOfYear(1), "Thierno Barry Diallo")));
+
+        service.synchronizeAll(SyncOrigin.WEEKLY);
+
+        assertThat(output).contains("PREMIER: jugador cruzado por nombre completo y año de nacimiento (2002): "
+                + "'Titi' ('Thierno Barry Diallo') → 'Thierno Barry' (Everton FC), partido 560601.");
     }
 
     @Test
@@ -485,6 +617,29 @@ class StatsSyncServiceTest {
     private static ReportedAppearance ndiaye(String name) {
         return new ReportedAppearance("393485", name, 26, Side.HOME, true, null, null, MetricCounts.empty(), null,
                 false);
+    }
+
+    /**
+     * Thierno Barry con un apodo que no comparte nada con su nombre: solo lo cruza su fecha de
+     * nacimiento.
+     */
+    private static ReportedAppearance titi() {
+        return new ReportedAppearance(BARRY_APPEARANCE.whoscoredId(), "Titi", ageOf(BARRY), Side.HOME, true, null,
+                null, MetricCounts.empty(), null, false);
+    }
+
+    private static ReportedAppearance lisandroMartinez() {
+        return new ReportedAppearance(LISANDRO_WHOSCORED_ID, MARTINEZ.name(), ageOf(MARTINEZ), Side.HOME, true, null,
+                null, MetricCounts.empty(), null, false);
+    }
+
+    /**
+     * El catálogo de siempre y un Pedro Martínez en el Everton, de la edad de Lisandro Martínez.
+     */
+    private static List<Player> withPedroMartinez() {
+        Player pedroMartinez = new Player(109L, "8140", "Pedro Martínez", Position.DEFENDER, EVERTON,
+                LocalDate.of(1998, 5, 5), null, true);
+        return Stream.concat(players().stream(), Stream.of(pedroMartinez)).toList();
     }
 
     private static ReportedTeam sourceTeam(String whoscoredId) {

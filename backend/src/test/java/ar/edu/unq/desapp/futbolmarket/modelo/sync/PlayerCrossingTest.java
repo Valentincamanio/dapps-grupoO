@@ -17,6 +17,7 @@ import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.players;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -85,9 +86,14 @@ class PlayerCrossingTest {
         assertThat(crossing.uncrossed()).extracting(UncrossedPlayer::reason).containsExactly(CrossFailure.AMBIGUOUS);
     }
 
+    /**
+     * El nombre y la edad lo encuentran en el Brentford del catálogo, y la fecha de su página lo
+     * confirma (FR-019a).
+     */
     @Test
     void elTransferidoSeEncuentraEnTodoElCatalogoPorNombreYEdad() {
-        PlayerCrossing crossing = new PlayerCrossing(catalog, tottenhamArsenal, tottenhamArsenalStats());
+        PlayerCrossing crossing = new PlayerCrossing(catalog, tottenhamArsenal, tottenhamArsenalStats(),
+                Map.of("500004", new ReportedPlayerProfile(WISSA.dateOfBirth(), null)));
 
         Optional<Player> crossed = crossing.cross(appearance("500004", "Yoane Wissa", ageOf(WISSA), Side.HOME));
 

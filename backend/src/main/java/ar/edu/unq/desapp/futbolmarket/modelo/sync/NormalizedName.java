@@ -1,9 +1,12 @@
 package ar.edu.unq.desapp.futbolmarket.modelo.sync;
 
 import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -43,6 +46,72 @@ public record NormalizedName(String value) {
                 .filter(word -> !CLUB_WORDS.contains(word))
                 .collect(Collectors.joining(SEPARATOR));
         return new NormalizedName(withoutClubWords);
+    }
+
+    /**
+     * Las palabras del nombre, en orden: {@code "n diaye"} da {@code n} y {@code diaye}. Un nombre
+     * vacío no tiene ninguna. Las usan los niveles de cruce de jugadores (research D14).
+     */
+    public List<String> words() {
+        if (value.isEmpty()) {
+            return List.of();
+        }
+        return List.of(value.split(SEPARATOR));
+    }
+
+    /**
+     * La última palabra, que para un jugador se toma como su apellido. Vacía si el nombre lo es.
+     */
+    public String lastWord() {
+        List<String> words = words();
+        return words.isEmpty() ? "" : words.getLast();
+    }
+
+    /**
+     * El nombre sin separadores: {@code "n diaye"} da {@code ndiaye}.
+     */
+    public String compact() {
+        return value.replace(SEPARATOR, "");
+    }
+
+    /**
+     * Si este nombre está dentro de un nombre completo (FR-019d): cada una de sus palabras es una
+     * palabra distinta de {@code fullName}, o el comienzo de una si tiene al menos
+     * {@link NameMatchLevel#WORD_PREFIX_MIN_LENGTH} letras. Primero se buscan las palabras iguales y
+     * después las que empiezan con las que faltan, siempre entre las que no usó otra palabra:
+     * {@code "rafa garrido"} está dentro de {@code "rafael garrido hierro"} y {@code "pablo garcia"}
+     * no está dentro de {@code "mauro echegoyen garcia"}. Un nombre vacío nunca está dentro.
+     */
+    public boolean isWithin(NormalizedName fullName) {
+        List<String> words = words();
+        if (words.isEmpty()) {
+            return false;
+        }
+        List<String> available = new ArrayList<>(fullName.words());
+        List<String> withoutEqualWord = words.stream().filter(word -> !available.remove(word)).toList();
+        return withoutEqualWord.stream().allMatch(word -> removeStartingWith(available, word));
+    }
+
+    /**
+     * Si los dos nombres tienen una palabra igual de al menos
+     * {@link NameMatchLevel#WORD_PREFIX_MIN_LENGTH} letras: {@code "abdul fatawu"} y
+     * {@code "abdul issahaku"} sí, y {@code "mousa al tamari"} y {@code "musa al taamari"} no,
+     * porque {@code al} es corta. Es una de las relaciones de nombre del paso 1 de FR-019d.
+     */
+    public boolean sharesWordWith(NormalizedName other) {
+        List<String> otherWords = other.words();
+        return words().stream()
+                .filter(word -> word.length() >= NameMatchLevel.WORD_PREFIX_MIN_LENGTH)
+                .anyMatch(otherWords::contains);
+    }
+
+    private static boolean removeStartingWith(List<String> available, String start) {
+        if (start.length() < NameMatchLevel.WORD_PREFIX_MIN_LENGTH) {
+            return false;
+        }
+        Optional<String> word = available.stream().filter(candidate -> candidate.startsWith(start)).findFirst();
+        word.ifPresent(available::remove);
+        return word.isPresent();
     }
 
     private static String normalize(String name) {

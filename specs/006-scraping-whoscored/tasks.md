@@ -714,21 +714,186 @@ snapshot y la documentación. La prueba con pocas páginas (quickstart.md 3) va 
 puesta al día completa, porque necesita una base sin estadísticas de la Premier.
 
 - [X] T138 Correr `./gradlew clean build` en backend/ y verificar `BUILD SUCCESSFUL`. Revisar con `git fetch origin` y `git diff --stat origin/develop...HEAD -- backend/src/test/` que los únicos tests existentes modificados son `StartupSyncTest`, `SyncSchedulerTest` y `SyncServiceTest` (research D26). `JwtServiceTest.unTokenConLaFirmaAlteradaSeRechazaComoInvalido`, que era intermitente, ya está corregido
-- [ ] T139 Seguir quickstart.md sección 3 sobre la base local de la 005, arrancando con `FUTBOLMARKET_FOOTBALLDATA_SYNC_ONSTARTUP=false`:
+- [X] T139 Seguir quickstart.md sección 3 sobre la base local de la 005, arrancando con `FUTBOLMARKET_FOOTBALLDATA_SYNC_ONSTARTUP=false`:
   - `ddl-auto: update` agrega las columnas, las tablas y los índices sin borrar la base (sección 2.1);
   - marcar los partidos de la Premier menos los dos últimos, disparar `?league=PREMIER` y verificar `matchesScraped: 2`, los 20 equipos cruzados y las métricas contra la página del partido en el navegador;
   - **deshacer la marca artificial** con el `UPDATE` del paso 5 antes de seguir
-- [ ] T140 Seguir quickstart.md 2.2 con el token y el administrador exportados en la terminal de Lucas (nunca escritos en un archivo): la aplicación termina de arrancar antes de que empiece la cadena; `GET /players` responde mientras corre; los dos informes quedan en el registro con `CATCH_UP`; la de WhoScored sin snapshot tarda menos de 60 minutos (SC-005); con su informe, `filas de PLAYER_MATCH_STATS / (filas + jugadores sin cruzar)` es al menos 0,95 (SC-002); y con su duración y la cantidad de líneas `Pedido a WhoScored`, `duración / pedidos × 48` da menos de 15 minutos (SC-004)
-- [ ] T141 Seguir quickstart.md 2.3, 2.4 y 2.5: con las dos fuentes al día no corre nada; sin token se saltea Football-Data y WhoScored corre; con solo WhoScored vencida corre solo WhoScored (HU3, escenarios 3, 4 y 8)
-- [ ] T142 Seguir quickstart.md 5.1 y 5.2 con la aplicación detenida: `./gradlew exportStatsSnapshot` genera backend/snapshot/whoscored-stats.jsonl con el encabezado del contrato y sin datos de usuarios (el `grep` da 0); una segunda exportación deja el diff vacío. Commitear el primer snapshot (paso 9 del plan)
-- [ ] T143 Seguir quickstart.md 5.3: con la base apartada (`mv data data-respaldo`, que `.gitignore` ignora desde T003), arrancar y verificar que WhoScored carga casi todo desde el snapshot, sin pedir esas páginas, en menos de 15 minutos después de Football-Data (SC-006); probar también el snapshot renombrado (WARN de faltante) y volver a la base original
-- [ ] T144 Seguir los escenarios HTTP de quickstart.md 4.1 a 4.3 con el administrador configurado y verificar cada resultado esperado
-- [ ] T145 Seguir quickstart.md sección 6 en `http://localhost:8080/swagger-ui.html`: la etiqueta Sincronización con `POST /players/sync` y `POST /matches/stats/sync`, los dos con candado; el parámetro `league` y las respuestas 200, 400, 401, 403 y 409; ningún endpoint devuelve estadísticas (FR-009); 200 con el administrador y 403 con un usuario común
-- [ ] T146 Seguir quickstart.md sección 7 en `http://localhost:8080/h2-console`: 96 equipos cruzados (SC-003a), los terminados sin estadísticas son solo los omitidos (SC-001), las filas del 1983600 coinciden con lo esperado, el muestreo de cruces no encuentra ninguno mal cruzado (SC-003) y ninguna cantidad baja después de otra sincronización (SC-008 y SC-010)
+- [X] T140 Seguir quickstart.md 2.2 con el token y el administrador exportados en la terminal (nunca escritos en un archivo): la aplicación termina de arrancar antes de que empiece la cadena; `GET /players` responde mientras corre; los dos informes quedan en el registro con `CATCH_UP`; la de WhoScored sin snapshot tarda menos de 60 minutos (SC-005); con su informe, `filas de PLAYER_MATCH_STATS / (filas + jugadores sin cruzar)` es al menos 0,95 (SC-002); y con su duración y la cantidad de líneas `Pedido a WhoScored`, `duración / pedidos × 48` da menos de 15 minutos (SC-004)
+- [X] T141 Seguir quickstart.md 2.3, 2.4 y 2.5: con las dos fuentes al día no corre nada; sin token se saltea Football-Data y WhoScored corre; con solo WhoScored vencida corre solo WhoScored (HU3, escenarios 3, 4 y 8)
+- [X] T142 Seguir quickstart.md 5.1 y 5.2 con la aplicación detenida: `./gradlew exportStatsSnapshot` genera backend/snapshot/whoscored-stats.jsonl con el encabezado del contrato y sin datos de usuarios (el `grep` da 0); una segunda exportación deja el diff vacío. Commitear el primer snapshot (paso 9 del plan)
+- [X] T143 Seguir quickstart.md 5.3: con la base apartada (`mv data data-respaldo`, que `.gitignore` ignora desde T003), arrancar y verificar que WhoScored carga casi todo desde el snapshot, sin pedir esas páginas, en menos de 15 minutos después de Football-Data (SC-006); probar también el snapshot renombrado (WARN de faltante) y volver a la base original
+- [X] T144 Seguir los escenarios HTTP de quickstart.md 4.1 a 4.3 con el administrador configurado y verificar cada resultado esperado
+- [X] T145 Seguir quickstart.md sección 6 en `http://localhost:8080/swagger-ui.html`: la etiqueta Sincronización con `POST /players/sync` y `POST /matches/stats/sync`, los dos con candado; el parámetro `league` y las respuestas 200, 400, 401, 403 y 409; ningún endpoint devuelve estadísticas (FR-009); 200 con el administrador y 403 con un usuario común
+- [X] T146 Seguir quickstart.md sección 7 en `http://localhost:8080/h2-console`: 96 equipos cruzados (SC-003a), los terminados sin estadísticas son solo los omitidos (SC-001), las filas del 1983600 coinciden con lo esperado, el muestreo de cruces no encuentra ninguno mal cruzado (SC-003) y ninguna cantidad baja después de otra sincronización (SC-008 y SC-010)
 - [X] T147 Actualizar README.md en la raíz del repositorio:
   - en "Cómo levantarlo": la sincronización de WhoScored (la cadena del lunes, la puesta al día al arrancar y `POST /matches/stats/sync` con el administrador), el snapshot y `./gradlew exportStatsSnapshot`; los enlaces a contracts/configuration.md y quickstart.md;
   - que la base local de la 005 **no** se borra;
   - en "Estructura", el contexto `performance` y `adapter/whoscored/`; en "Tests", que la suite no consulta WhoScored
+
+---
+
+## Fase 8: Ajuste del cruce de jugadores (SC-002)
+
+**Propósito**: T140 midió SC-002 contra el sitio real en 87,3%, por debajo del 95%. 1176
+apariciones de 301 jugadores no se cruzaron porque Football-Data y WhoScored escriben distinto su
+nombre, aunque estaban en el equipo correcto del catálogo. Además, WhoScored informa la edad del
+día en que se sirve la página, no la del partido. Esta fase implementa FR-019b y FR-019c (spec,
+Session 2026-10-15; research D14; data-model "Cruces").
+
+**Orden**: T140 se marca con la medición de T156. T142, T143 y T146 van después de T156, para
+que el primer snapshot y las verificaciones de la base tengan los cruces nuevos. T141, T144 y
+T145 no dependen de esta fase.
+
+**Tests**: las clases de test de esta fase son nuevas o de esta feature, y solo suman métodos.
+`PlayerCrossingTest` no cambia y tiene que seguir en verde con la tolerancia de edad. Si un test
+existente falla, se arregla el código.
+
+### Implementación y tests del ajuste
+
+- [X] T148 [P] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/NormalizedName.java agregar `List<String> words()`, `String lastWord()` y `String compact()` (data-model.md, "Nombres"). Un nombre vacío da una lista vacía, una última palabra vacía y una forma compacta vacía. Agregar métodos a `NormalizedNameTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/NormalizedNameTest.java: `"N'Diaye"` da las palabras `n` y `diaye`, la última palabra `diaye` y la forma compacta `ndiaye`; `"Lee Kang-In"` da `lee`, `kang` e `in`; el nombre vacío
+- [X] T149 [P] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/CatalogPlayers.java agregar `List<Player> inTeam(Team)`: los jugadores cuyo equipo actual es ese, activos o inactivos, con los cruces que confirmó `confirm` (data-model.md). Agregar métodos a `CatalogPlayersTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/CatalogPlayersTest.java: trae solo los del equipo; después de `confirm`, el cruzado viene con su id de WhoScored
+- [X] T150 Crear el enum `NameMatchLevel` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/NameMatchLevel.java (research D14; data-model.md) (depende de T148):
+  - los seis niveles en orden: `SAME_WORDS`, `CONTAINED_WORDS`, `SAME_SURNAME`, `SAME_COMPACT`, `SIMILAR_SURNAME` y `WORD_PREFIX`, cada uno con `boolean matches(NormalizedName reported, NormalizedName catalog)`, simétrico;
+  - las constantes públicas `SIMILAR_SURNAME_MIN_LENGTH = 5`, `SIMILAR_SURNAME_MAX_CHANGES = 2` y `WORD_PREFIX_MIN_LENGTH = 4`, y la privada `MAX_PERMUTED_WORDS = 4`: con más palabras, `SAME_COMPACT` compara la forma compacta solo en el orden original;
+  - la distancia de Levenshtein y las permutaciones de palabras como métodos privados, sin dependencias nuevas;
+  - escribir `NameMatchLevelTest` (clase nueva) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/NameMatchLevelTest.java: por nivel, el ejemplo real de research D14 coincide y uno parecido no (por ejemplo, en `SAME_SURNAME`, `Álex Baena` y `Alejandro Baena` sí, y `Álex Baena` y `Álex Remiro` no); en `SIMILAR_SURNAME`, tres cambios o un apellido de cuatro letras no coinciden; en `WORD_PREFIX`, una palabra de tres letras no; y cada nivel da lo mismo con los nombres invertidos
+- [X] T151 Ajustar `PlayerCrossing` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerCrossing.java (FR-019b y FR-019c; research D14) (depende de T149 y T150):
+  - la misma edad acepta que la que surge de la fecha de nacimiento el día del partido sea la informada o una menos, en el desempate entre homónimos, en FR-019a y en los niveles. Sin fecha de nacimiento, o sin edad en la aparición, nunca es de la misma edad;
+  - si FR-019 y FR-019a no encuentran a nadie, se prueban los niveles de `NameMatchLevel` en orden sobre `catalog.inTeam(equipo del lado)`, solo con los candidatos elegibles (FR-022) y de la misma edad. Con uno, se cruza; con más de uno, `AMBIGUOUS` sin bajar de nivel; si ningún nivel encuentra a nadie, `NOT_FOUND`;
+  - crear el record `NameCross(String reportedName, Player player, NameMatchLevel level)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/NameCross.java y agregar `List<NameCross> nameCrosses()`, con el jugador ya cruzado;
+  - actualizar el Javadoc de la clase;
+  - `PlayerCrossingTest` no cambia y tiene que seguir en verde;
+  - escribir `PlayerCrossingNameLevelsTest` (clase nueva) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerCrossingNameLevelsTest.java, con un catálogo propio armado con los ejemplos reales de research D14:
+    - un caso por nivel que cruza y deja su `NameCross` con ese nivel (HU1, escenario 21);
+    - con la edad distinta, o sin fecha de nacimiento, no cruza y queda `NOT_FOUND`;
+    - dos candidatos de la misma edad en un nivel dan `AMBIGUOUS`, aunque un nivel siguiente tenga uno solo (HU1, escenario 22);
+    - el nombre exacto en el equipo le gana a un nivel, y un transferido que se encuentra por FR-019a no se cruza con un parecido de su equipo viejo;
+    - un jugador ya cruzado con otro id, o ya elegido en el mismo partido, no es candidato de ningún nivel;
+    - un jugador que cumplió años después del partido se reconoce en el desempate, en FR-019a y en los niveles (HU1, escenario 23)
+- [X] T152 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueStatsSync.java guardar los `NameCross` que deja `prepare` para cada partido y agregar `List<NameCross> nameCrossesOf(Match)` (data-model.md) (depende de T151). Agregar métodos a `LeagueStatsSyncTest` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueStatsSyncTest.java: un partido preparado con un jugador cruzado por nombre trae su `NameCross`; uno sin cruces por nombre, la lista vacía
+- [X] T153 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncService.java, después de guardar un partido scrapeado, dejar un INFO por cada `NameCross` de `sync.nameCrossesOf(match)`: `{liga}: jugador cruzado por nombre (nivel {número}, {NIVEL}): '{nombre de WhoScored}' → '{nombre del catálogo}' ({equipo}), partido {id de Football-Data}.` Si el partido no se pudo guardar, no se escribe ninguno (FR-019b) (depende de T152). Agregar un método a `StatsSyncControllerIT` en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java: un jugador que WhoScored informa con otro nombre (`Tarkowski` para `James Tarkowski`) queda cruzado y con su fila, y el registro tiene su línea con el nivel 2
+- [X] T154 [P] En specs/006-scraping-whoscored/quickstart.md: en la sección 2.2, cómo calcular SC-002 con el informe y que las líneas `jugador cruzado por nombre` muestran los cruces de los niveles; en la sección 7, sumar al muestreo de SC-003 diez cruces por nombre de los niveles 4 a 6, elegidos de esas líneas
+- [X] T155 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+
+### Confirmación por la fecha de nacimiento (FR-019d)
+
+La primera medición de T156 (2026-10-15) dio SC-002 en 97,5%, pero de doce cruces dudosos
+verificados contra la página de cada jugador en WhoScored, uno estaba mal: `Mathis Saka` con
+`Mathis Amougou`, cruzados por el nivel 6 solo por el nombre de pila (spec, Session 2026-10-15;
+research D14 y D28). T157 a T163 cierran ese hueco; después se repite T156.
+
+- [X] T157 [P] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/NameMatchLevel.java, `WORD_PREFIX` deja de coincidir cuando los dos nombres tienen más de una palabra y la única coincidencia es entre sus primeras palabras (data-model.md); un nombre de una sola palabra sigue en la regla general. En backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/NameMatchLevelTest.java, **con el sí del equipo** (es un test de T150), la fila `WORD_PREFIX | Abdul Fatawu | Abdul Issahaku` pasa de las que coinciden a las que no, y se suman `WORD_PREFIX | Kiko Femenía | Femenía Far` a las que coinciden y `WORD_PREFIX | Mathis Saka | Mathis Amougou` a las que no
+- [X] T158 Crear el record `BirthDateCross(String reportedName, Player player, LocalDate birthDate)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/BirthDateCross.java y ajustar `PlayerCrossing` (FR-019d; research D14; data-model.md) (depende de T157):
+  - el constructor nuevo `(CatalogPlayers, Match, ReportedMatchStats, Map<String, LocalDate> birthDates)`; el de tres argumentos pasa un mapa vacío, así ningún test existente cambia;
+  - si después de FR-019 a FR-019b el jugador queda `NOT_FOUND` o `AMBIGUOUS` y el mapa trae su fecha: el único elegible de su equipo con exactamente esa fecha de nacimiento, o, si en el equipo no hay ninguno, el único elegible de todo el catálogo con esa fecha y el mismo nombre normalizado. Con uno, se cruza y deja su `BirthDateCross`; si no, queda con su motivo;
+  - `List<BirthDateCross> birthDateCrosses()` y `List<String> needsBirthDate()`: los ids de WhoScored de los que quedaron sin cruzar y no tenían fecha en el mapa;
+  - en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerCrossingNameLevelsTest.java, **con el sí del equipo** (es un test de T151), el ejemplo del nivel 6 pasa a ser `Kiko Femenía` con `Femenía Far`;
+  - escribir `PlayerCrossingBirthDateTest` (clase nueva) en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerCrossingBirthDateTest.java:
+    - `Moustapha Mbow` con la fecha de `Mamadou Mbow` se cruza con él y deja su `BirthDateCross` (HU1, escenario 24);
+    - `Mathis Saka` y `Mathis Amougou`, del mismo equipo y la misma edad, con fechas distintas, no se cruzan (HU1, escenario 25);
+    - sin fecha en el mapa, el jugador sin cruzar figura en `needsBirthDate()` y el cruzado por nombre no;
+    - dos elegibles del equipo con la misma fecha no se cruzan; un jugador del catálogo sin fecha de nacimiento nunca es candidato;
+    - dos homónimos ambiguos por edad se resuelven por la fecha; un transferido se encuentra en todo el catálogo por fecha y nombre;
+    - un jugador ya cruzado o ya elegido en el partido no es candidato
+- [X] T159 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueStatsSync.java agregar `birthDatesNeeded(Match, Optional<ReportedMatchStats>, CatalogPlayers)`, que no cambia nada de la liga; `prepare` con el mapa de fechas, con la versión de tres argumentos pasando uno vacío; y `birthDateCrossesOf(Match)` (data-model.md) (depende de T158). Agregar métodos a `LeagueStatsSyncTest`: `birthDatesNeeded` devuelve el id del jugador desconocido y nada para un partido que se omitiría; después de `birthDatesNeeded`, el resultado de la liga no cambió; `prepare` con su fecha lo cruza y deja el `BirthDateCross`
+- [X] T160 [P] En el adapter (research D28; contracts/whoscored-pages.md, "Página de un jugador"):
+  - `WhoScoredPages.playerPath(String playerId)`, que da `/players/{id}/show`;
+  - `WhoScoredClient.fetchIfAvailable(String path, Function<String, Optional<T>> extractor)`: el mismo ritmo y el mismo reintento que `fetch`, pero después del segundo rechazo un WARN `No se pudo leer la página {ruta} de WhoScored: se sigue sin ella.` y vacío, sin lanzar nada;
+  - crear `PlayerProfileExtractor` (`@Component`) en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/adapter/whoscored/PlayerProfileExtractor.java: vacío (rechazo) sin ningún `info-label`; si no, la fecha del `<i>` que sigue a `Age: `, o ninguna si falta o no se puede leer;
+  - `WhoScoredAdapter.fetchPlayerBirthDate(String playerWhoscoredId)`: `Optional<LocalDate>`, vacío si la página no llegó o no trae la fecha;
+  - crear la fixture backend/src/test/resources/whoscored/player-profile.html con el bloque del contrato, y escribir `PlayerProfileExtractorTest` (clase nueva): lee `20-01-2006`; sin `Age:` no hay fecha y no es rechazo; sin `info-label` es rechazo;
+  - agregar métodos a `WhoScoredAdapterTest`: la fecha de una página de jugador; con dos rechazos seguidos devuelve vacío, deja los dos WARN y no lanza; respeta la pausa de 4 s; una página sin la edad no se reintenta
+- [X] T161 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncService.java, al scrapear un partido: pedir `sync.birthDatesNeeded`, pedir con `adapter.fetchPlayerBirthDate` las fechas que no estén en un mapa de la corrida (que guarda también las vacías, así cada jugador se pide una sola vez), y pasar las que llegaron a `prepare`. Después de guardar el partido, un INFO por cada `BirthDateCross`: `{liga}: jugador cruzado por fecha de nacimiento ({dd/MM/yyyy}): '{nombre de WhoScored}' → '{nombre del catálogo}' ({equipo}), partido {id de Football-Data}.` (FR-019d) (depende de T159 y T160). Agregar métodos a `StatsSyncServiceTest` (clase de esta feature): solo se piden las páginas de los que quedarían sin cruzar; un mismo jugador en dos partidos de la corrida se pide una sola vez; una página de jugador vacía no corta la corrida. Agregar un método a `StatsSyncControllerIT`: un jugador con otro nombre y la fecha de uno del catálogo queda cruzado, con su fila y su línea en el registro
+- [X] T162 [P] En specs/006-scraping-whoscored/quickstart.md: en la sección 2.2, las líneas `jugador cruzado por fecha de nacimiento` y las páginas de jugador entre los pedidos; en la sección 7, sumar al muestreo de SC-003 cinco cruces por fecha de nacimiento
+- [X] T163 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+
+### Candidatos de otro equipo, transferidos con otro nombre y nombre completo (FR-019a y FR-019d)
+
+Antes de repetir T156 se revisaron los 97 jugadores que la primera medición dejó sin cruzar
+(spec, Session 2026-10-15; research D14 y D28). 83 no están en el plantel de Football-Data, pero
+aparecieron tres huecos de la regla: el `Vitinha` del Genoa se cruzó por nombre y edad con el del
+PSG del catálogo, que después quedó sin cruzar en seis partidos; `José María Giménez`, transferido
+y con otro nombre en el catálogo, no se cruzó aunque tiene la misma fecha; y `Rafita` tiene en el
+catálogo una fecha de relleno (01/01/2004). T164 a T172 los resuelven; después se repite T156.
+
+**Tests que cambian, con el sí del equipo**: el cruce por nombre y edad en otro equipo deja de
+cruzar sin la fecha, y la página de jugador pasa a traer también el nombre completo. Cambian solo
+estos métodos, y solo como dice su tarea:
+
+- `PlayerCrossingTest.elTransferidoSeEncuentraEnTodoElCatalogoPorNombreYEdad` (T167);
+- `PlayerCrossingNameLevelsTest.unTransferidoSeEncuentraPorNombreExactoAntesQueUnParecidoDeSuEquipoViejo` y `enTodoElCatalogoSeReconoceAlTransferidoQueCumplioAniosDespuesDelPartido` (T167);
+- el método privado `crossing` de `PlayerCrossingBirthDateTest` (T167);
+- `LeagueStatsSyncTest.prepareConLaFechaDeNacimientoCruzaAlJugadorYDejaElCruce` (T168);
+- los tres métodos de `PlayerProfileExtractorTest` que esperan un `PlayerProfileDto` y los cuatro de `WhoScoredAdapterTest` que piden `fetchPlayerBirthDate` (T169);
+- `StatsSyncServiceTest.soloSePidenLasPaginasDeLosJugadoresQueQuedanSinCruzar`, `unMismoJugadorEnDosPartidosDeLaCorridaSePideUnaSolaVez` y `unaPaginaDeJugadorVaciaNoCortaLaCorrida`, y `StatsSyncControllerIT.unJugadorConOtroNombreYLaFechaDeUnoDelCatalogoQuedaCruzadoYElRegistroLoDice` (T170).
+
+Cualquier otro test existente que falle se arregla en el código.
+
+- [X] T164 [P] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/NormalizedName.java agregar `boolean isWithin(NormalizedName fullName)` (FR-019d; data-model.md, "Nombres"): cada palabra de este nombre es una palabra distinta de `fullName`, o el comienzo de una si tiene al menos `NameMatchLevel.WORD_PREFIX_MIN_LENGTH` letras; primero la palabra igual y después una que empiece con ella; un nombre vacío nunca está dentro. Agregar métodos a `NormalizedNameTest`: `Rafa Garrido` está dentro de `Rafael Garrido Hierro`, `Diogo Sousa` dentro de `Diogo Lobão de Sousa` y `Manu Hernando` dentro de `José Manuel Hernando Riol`; `Pablo García` no está dentro de `Mauro Echegoyen García`; una palabra de tres letras solo vale entera (`Edu` no está dentro de `Eduardo Camavinga`); una palabra del nombre completo no se usa dos veces (`Garrido Garrido` no está dentro de `Rafael Garrido`); un nombre vacío no está dentro de ninguno
+- [X] T165 [P] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/CatalogPlayers.java agregar `List<Player> bornOn(LocalDate)`: los jugadores con esa fecha de nacimiento, de cualquier equipo, activos o inactivos, con los cruces que confirmó `confirm` (data-model.md). Agregar métodos a `CatalogPlayersTest`: trae los de esa fecha de dos equipos distintos y un inactivo; nunca trae a uno sin fecha; después de `confirm`, el jugador viene con su id de WhoScored
+- [X] T166 [P] Crear los records `ReportedPlayerProfile(LocalDate birthDate, String fullName)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/ReportedPlayerProfile.java y `FullNameCross(String reportedName, String fullName, Player player)` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/FullNameCross.java, con su Javadoc (data-model.md)
+- [X] T167 Ajustar `PlayerCrossing` en backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerCrossing.java (FR-019a y FR-019d; research D14; data-model.md) (depende de T164, T165 y T166):
+  - el constructor de cuatro argumentos recibe `Map<String, ReportedPlayerProfile> profiles` en lugar del mapa de fechas; el de tres argumentos sigue y pasa un mapa vacío;
+  - FR-019a: si hay candidatos en otro equipo por nombre y edad, no se cruza ni se prueban los niveles: queda `NOT_CONFIRMED` con uno y `AMBIGUOUS` con más, y entra en `needsBirthDate()` si no tiene página;
+  - FR-019d, con la fecha de la página y entre los elegibles: (1) los de su equipo con esa fecha; (2) si no hay ninguno, `catalog.bornOn(fecha)` de otros equipos cuyo nombre coincide con el de WhoScored por `SAME_WORDS`, `CONTAINED_WORDS` o `SAME_SURNAME`, o está dentro del nombre completo; (3) si tampoco, los de su equipo nacidos el mismo año cuyo nombre está dentro del nombre completo. Con uno se cruza; con más de uno queda su motivo sin pasar al paso siguiente. Los pasos 1 y 2 dejan un `BirthDateCross` y el 3, un `FullNameCross`;
+  - agregar `List<FullNameCross> fullNameCrosses()` y actualizar el Javadoc de la clase;
+  - **con el sí del equipo**: en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerCrossingTest.java, `elTransferidoSeEncuentraEnTodoElCatalogoPorNombreYEdad` pasa a crear la `PlayerCrossing` con la página de Wissa con su fecha, y sigue esperando el cruce; en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerCrossingNameLevelsTest.java, `unTransferidoSeEncuentraPorNombreExactoAntesQueUnParecidoDeSuEquipoViejo` pasa la página de Yoane Wissa con su fecha y sigue esperando a Yoane, y `enTodoElCatalogoSeReconoceAlTransferidoQueCumplioAniosDespuesDelPartido` espera, sin página, que quede `NOT_CONFIRMED` (se lo reconoce como candidato) en lugar del cruce; en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerCrossingBirthDateTest.java, el método privado `crossing` arma una `ReportedPlayerProfile` sin nombre completo por cada fecha, y sus métodos de test no cambian;
+  - agregar métodos a `PlayerCrossingBirthDateTest` (clase de esta feature):
+    - dos `Vitinha` de la misma edad, uno del catálogo en otro equipo: sin página, el del partido queda `NOT_CONFIRMED`, sin cruzar y en `needsBirthDate()`; con una página de otra fecha, tampoco se cruza; y nunca se cruza con un compañero de su edad con el mismo apellido (HU1, escenario 27);
+    - un transferido con la página de su misma fecha se cruza y deja su `BirthDateCross` (HU1, escenario 9);
+    - `José María Giménez` con la fecha de `José Giménez`, de otro equipo, se cruza; con esa fecha y un nombre sin relación, no (HU1, escenario 28);
+    - `Rafita` con el nombre completo `Rafael Garrido Hierro` y el 09/11/2004 se cruza con `Rafa Garrido` de su equipo, nacido el 01/01/2004, y deja su `FullNameCross` (HU1, escenario 29); con otro año, o sin nombre completo en la página, no; con dos compañeros del mismo año dentro del nombre completo, no;
+    - el paso 1 le gana al 2: con alguien de su equipo con esa fecha, no se cruza con el de otro equipo; con dos de otros equipos en el paso 2, no se cruza ni pasa al paso 3
+- [X] T168 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueStatsSync.java, `prepare` recibe el mapa de `ReportedPlayerProfile` (la versión de tres argumentos sigue y pasa uno vacío) y se agrega `fullNameCrossesOf(Match)` (data-model.md) (depende de T167). **Con el sí del equipo**, en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/LeagueStatsSyncTest.java, `prepareConLaFechaDeNacimientoCruzaAlJugadorYDejaElCruce` pasa la fecha de Barry dentro de una `ReportedPlayerProfile` sin nombre completo. Agregar un método a `LeagueStatsSyncTest`: `prepare` con una página con el nombre completo deja el `FullNameCross` del partido
+- [X] T169 [P] En el adapter (research D28; contracts/whoscored-pages.md, "Página de un jugador") (depende de T166):
+  - `PlayerProfileDto` pasa a `(LocalDate birthDate, String fullName)`;
+  - `PlayerProfileExtractor` lee además el texto que sigue a `Full Name: ` hasta el `</div>`, sin los espacios de los bordes, con los espacios seguidos reducidos a uno y las entidades decodificadas con `HtmlUtils.htmlUnescape`; sin la etiqueta, o con el texto vacío, el nombre completo es nulo y no es un rechazo;
+  - `WhoScoredAdapter.fetchPlayerProfile(String playerWhoscoredId)` reemplaza a `fetchPlayerBirthDate`: `Optional<ReportedPlayerProfile>`, vacío si la página no llegó;
+  - **con el sí del equipo**: en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/adapter/whoscored/PlayerProfileExtractorTest.java, los tres métodos que esperan un `PlayerProfileDto` lo esperan con el nombre completo (`Diogo Lobão de Sousa` en la fixture, nulo en los demás); en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/adapter/whoscored/WhoScoredAdapterTest.java, los cuatro métodos de la página de jugador piden `fetchPlayerProfile` y esperan la `ReportedPlayerProfile`, con lo mismo que verificaban;
+  - agregar métodos a `PlayerProfileExtractorTest`: una página sin `Full Name` trae la fecha y ningún nombre completo; las entidades se decodifican (`N&#39;Diaye` da `N'Diaye`) y los espacios seguidos se reducen. Agregar un método a `WhoScoredAdapterTest`: la página de la fixture da la fecha y el nombre completo
+- [X] T170 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncService.java (FR-019d) (depende de T168 y T169):
+  - el mapa de la corrida guarda `Optional<ReportedPlayerProfile>` de `adapter.fetchPlayerProfile`, también los vacíos, y `prepare` recibe las páginas que llegaron;
+  - un `BirthDateCross` cuyo jugador no es de ninguno de los dos equipos del partido deja `{liga}: jugador cruzado por fecha de nacimiento en otro equipo ({dd/MM/yyyy}): '{nombre de WhoScored}' → '{nombre del catálogo}' ({equipo del catálogo}), partido {id de Football-Data}.`; los demás, la línea de T161;
+  - un INFO por cada `FullNameCross`: `{liga}: jugador cruzado por nombre completo y año de nacimiento ({yyyy}): '{nombre de WhoScored}' ('{nombre completo}') → '{nombre del catálogo}' ({equipo}), partido {id de Football-Data}.`;
+  - **con el sí del equipo**: en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/sync/StatsSyncServiceTest.java, `soloSePidenLasPaginasDeLosJugadoresQueQuedanSinCruzar`, `unMismoJugadorEnDosPartidosDeLaCorridaSePideUnaSolaVez` y `unaPaginaDeJugadorVaciaNoCortaLaCorrida` piden `fetchPlayerProfile` en lugar de `fetchPlayerBirthDate`, con la fecha dentro de una `ReportedPlayerProfile`; en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/StatsSyncControllerIT.java, `unJugadorConOtroNombreYLaFechaDeUnoDelCatalogoQuedaCruzadoYElRegistroLoDice`, igual;
+  - agregar métodos a `StatsSyncServiceTest`: un candidato de otro equipo por nombre y edad pide su página aunque los niveles lo cruzarían; un transferido cruzado por la fecha deja la línea `en otro equipo`. Agregar un método a `StatsSyncControllerIT`: un jugador con el mismo nombre y la misma edad que uno del catálogo de otro equipo, con otra fecha en su página, figura en el informe como `NOT_CONFIRMED` y el del catálogo sigue sin cruzar
+- [X] T171 [P] En specs/006-scraping-whoscored/quickstart.md: en la sección 2.2, las líneas `jugador cruzado por fecha de nacimiento en otro equipo` y `jugador cruzado por nombre completo y año de nacimiento`; en la sección 7, sumar al muestreo de SC-003 todas las líneas de esos dos tipos
+- [X] T172 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+
+### Relación de nombre en el paso 1 de FR-019d
+
+La segunda medición de T156 (2026-10-15) dio SC-002 en 97,8%, pero cruzó a `Riccardo Ciervo`
+con `Ignace Van Der Brempt`, un compañero del Sassuolo nacido el mismo día, antes de buscarlo en
+el Cagliari, donde lo tiene el catálogo (spec, Session 2026-10-15; research D14). El paso 1 pasa a exigir alguna relación de nombre.
+También se corrigió el caso de `Vitinha`: el del Genoa está en el catálogo como `Vitor Oliveira`.
+T173 a T176 cierran ese hueco; después se repite T156.
+
+**Tests que cambian, con el sí del equipo**: un cruce por la fecha en el equipo sin ninguna
+relación de nombre deja de hacerse. Cambian solo estos métodos, y solo como dice su tarea:
+
+- `PlayerCrossingBirthDateTest.unApodoSinNingunaPalabraEnComunSeCruzaPorLaFechaDeNacimiento`, `unJugadorYaElegidoEnElPartidoNoEsCandidato` y `laFechaEnSuEquipoLeGanaALaFechaEnOtroEquipo` (T174);
+- `LeagueStatsSyncTest.prepareConLaFechaDeNacimientoCruzaAlJugadorYDejaElCruce`, `StatsSyncServiceTest.soloSePidenLasPaginasDeLosJugadoresQueQuedanSinCruzar` y `StatsSyncControllerIT.unJugadorConOtroNombreYLaFechaDeUnoDelCatalogoQuedaCruzadoYElRegistroLoDice` (T175).
+
+Cualquier otro test existente que falle se arregla en el código.
+
+- [X] T173 [P] En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/NormalizedName.java agregar `boolean sharesWordWith(NormalizedName other)`: los dos nombres tienen una palabra igual de al menos `NameMatchLevel.WORD_PREFIX_MIN_LENGTH` letras (data-model.md, "Nombres"). Agregar métodos a `NormalizedNameTest`: `Abdul Fatawu` y `Abdul Issahaku` comparten una palabra; `Mousa Al Tamari` y `Musa Al Taamari` no, porque `al` es corta; `Riccardo Ciervo` e `Ignace Van Der Brempt` no; un nombre vacío no comparte ninguna
+- [X] T174 En backend/src/main/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerCrossing.java, el paso 1 de FR-019d solo toma a los de su equipo con esa fecha que tienen una relación de nombre con el de WhoScored: `sharesWordWith`, `matches` de algún `NameMatchLevel` sin la condición de la edad, o el nombre del catálogo `isWithin` el nombre completo; si no queda ninguno, sigue el paso 2 (research D14; data-model.md) (depende de T173). Actualizar el Javadoc de la clase.
+  - **con el sí del equipo**, en backend/src/test/java/ar/edu/unq/desapp/futbolmarket/modelo/sync/PlayerCrossingBirthDateTest.java: `unApodoSinNingunaPalabraEnComunSeCruzaPorLaFechaDeNacimiento` pasa una página con el nombre completo `Rafael Garrido Ruiz`, y sigue esperando el cruce y su `BirthDateCross`; en `unJugadorYaElegidoEnElPartidoNoEsCandidato`, el primer jugador de WhoScored pasa a llamarse `Rafael` en lugar de `Rafita`; en `laFechaEnSuEquipoLeGanaALaFechaEnOtroEquipo`, el compañero nacido el mismo día pasa a llamarse `Vitinha Costa`;
+  - agregar métodos a `PlayerCrossingBirthDateTest`: un jugador que no está en el catálogo y un compañero sin ninguna relación de nombre, nacidos el mismo día, no se cruzan (`Riccardo Ciervo` e `Ignace Van Der Brempt`; HU1, escenario 30); con la misma fecha se cruzan los que solo comparten el nombre de pila (`Abdul Fatawu` y `Abdul Issahaku`), los que coinciden por un nivel sin la misma edad (`Mousa Al Tamari` y `Musa Al Taamari`) y el que está dentro del nombre completo (`Pote`, `Pedro António Pereira Gonçalves`, y `Pedro Gonçalves`)
+- [X] T175 **Con el sí del equipo**, en los tests en los que `Titi` se cruzaba con Thierno Barry solo por la fecha, la página de Titi trae además el nombre completo `Thierno Barry Diallo`, y siguen esperando el mismo cruce, el mismo `BirthDateCross` y la misma línea en el registro: `LeagueStatsSyncTest.prepareConLaFechaDeNacimientoCruzaAlJugadorYDejaElCruce`, `StatsSyncServiceTest.soloSePidenLasPaginasDeLosJugadoresQueQuedanSinCruzar` y `StatsSyncControllerIT.unJugadorConOtroNombreYLaFechaDeUnoDelCatalogoQuedaCruzadoYElRegistroLoDice` (depende de T174)
+- [X] T176 Correr `./gradlew build` en backend/ y verificar `BUILD SUCCESSFUL`
+
+### Medición final
+
+- [X] T156 Volver a medir SC-002 contra el sitio real sobre la base local (depende de T176):
+  - con la aplicación detenida, borrar las filas de `PLAYER_MATCH_STATS`, desmarcar todos los partidos, borrar la fila `WHOSCORED` de `LAST_FULL_SYNCS` y **borrar los ids de WhoScored de los jugadores**, así cada cruce sale de la regla nueva. Los cruces de equipos y partidos se conservan;
+  - arrancar con el registro en `build/`: con la de Football-Data al día, corre solo la puesta al día de WhoScored (quickstart.md 2.5), con las páginas de jugador de FR-019d;
+  - mientras corre, `GET /players` responde enseguida (FR-046);
+  - al terminar, `filas de PLAYER_MATCH_STATS / (filas + jugadores sin cruzar)` da al menos 0,95, lo más cerca posible de 1 (SC-002); los cruces dudosos de la primera medición, verificados en el navegador, quedan como corresponde (`Mathis Saka` sin cruzar, los otros once cruzados); el `Vitinha` del catálogo queda cruzado con el del PSG (384887) y `Vitor Oliveira` con el del Genoa (407949), `José María Giménez` queda cruzado en los partidos del Atlético y `Rafita` (508349) con `Rafa Garrido`; `Riccardo Ciervo` queda cruzado con el del Cagliari por el paso 2 e `Ignace Van Der Brempt` con el suyo, y `Youssef Enriquez` y `Yeremay Hernández` quedan sin cruzar; y una muestra de las líneas `jugador cruzado por nombre` de los niveles 4 a 6 y `jugador cruzado por fecha de nacimiento`, y todas las de `en otro equipo` y `nombre completo y año de nacimiento`, revisadas en el navegador, no tienen ningún cruce equivocado (SC-003);
+  - con esta medición se marca también T140
+  - resultado (2026-10-15, research D14, "Evidencia de la medición final"): 295 partidos en 2143 s, sin corte ni rechazos; SC-002 en 97,7% (9077 filas y 213 apariciones sin cruzar); ningún cruce equivocado conocido
+
+**Checkpoint**: SC-002 se cumple contra el sitio real. Se retoma la Fase 7 desde T141.
 
 ---
 
@@ -746,6 +911,16 @@ puesta al día completa, porque necesita una base sin estadísticas de la Premie
 - **HU4 (Fase 6)**: T134 y T135 dependen de T117 (HU1); T136 depende de T131 (HU3).
 - **Cierre (Fase 7)**: depende de todas las historias. T139 va antes de T140 (la prueba con pocas
   páginas necesita una base sin estadísticas de la Premier), y T142 antes de T143.
+- **Ajuste del cruce de jugadores (Fase 8)**: nace de la medición de T140 y depende de todas las
+  historias. T140 se marca con T156. T142, T143 y T146 van después de T156; T141, T144 y T145
+  no dependen de la Fase 8. Dentro de la fase: T148 y T149 juntos, T150 después de T148, T151
+  después de T149 y T150, y T152 y T153 en orden; T154 en paralelo con cualquiera. La
+  confirmación por fecha de nacimiento va después de T155: T157 y T160 juntos, T158 después de
+  T157, T159 después de T158, T161 después de T159 y T160, T162 en paralelo con cualquiera, y
+  T163. Los candidatos de otro equipo y el nombre completo van después de T163: T164, T165 y
+  T166 juntos, T167 después de los tres, T168 después de T167, T169 después de T166, T170
+  después de T168 y T169, T171 en paralelo con cualquiera, y T172. La relación de nombre del
+  paso 1 va después de T172: T173, T174, T175 y T176 en orden; después, T156.
 
 ```text
 Fase 1 ─► Fase 2 (2A ─► 2B ─► 2C ─► 2D ─► 2E ─► 2F) ─► HU1 ─┬─► HU2 ───────┐

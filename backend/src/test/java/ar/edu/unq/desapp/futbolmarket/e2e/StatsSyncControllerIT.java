@@ -3,6 +3,7 @@ package ar.edu.unq.desapp.futbolmarket.e2e;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotFixtures.snapshot;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.ARSENAL;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BARRY;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BARRY_APPEARANCE;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BETO;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BRENTFORD;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BRENTFORD_WS;
@@ -101,6 +102,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.performance.ReportedMatchStats;
 import ar.edu.unq.desapp.futbolmarket.modelo.performance.Side;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.season.Season;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.ReportedPlayerProfile;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsSnapshot;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.ExternalSourceException;
@@ -167,6 +169,8 @@ class StatsSyncControllerIT {
     private static final int CURRENT_MATCHDAY = 8;
     private static final int EVERTON_BRENTFORD_END_MINUTE = 94;
     private static final int BARRY_MINUTES = 24;
+    private static final String HOMONYM_WHOSCORED_ID = "407946";
+    private static final int HOMONYM_ENTERED_AT = 85;
 
     private static final Match EVERTON_MAN_UTD = matchBetween(seasonMatches(), EVERTON, MAN_UTD);
     private static final Match EVERTON_BRENTFORD = matchBetween(seasonMatches(), EVERTON, BRENTFORD);
@@ -813,6 +817,83 @@ class StatsSyncControllerIT {
     }
 
     /**
+     * WhoScored informa a James Tarkowski solo por su apellido: lo cruza el nivel 2 de FR-019b, que
+     * deja su línea en el registro.
+     */
+    @Test
+    void unJugadorConOtroNombreEnWhoScoredQuedaCruzadoYElRegistroDiceConQueNivel(CapturedOutput output)
+            throws Exception {
+        given(whoScoredAdapter.fetchMatchStats(EVERTON_MAN_UTD_WS_ID)).willReturn(Optional.of(
+                withRenamedAppearance(EVERTON_MAN_UTD_STATS, TARKOWSKI_APPEARANCE.whoscoredId(), "Tarkowski")));
+
+        JsonNode premier = body(synchronizeAs(adminToken)).get("leagues").get(0);
+        List<PlayerMatchStats> stats = statsRepository.findAll();
+
+        assertThat(premier.get("uncrossedPlayers").values()).isEmpty();
+        assertThat(playerRepository.findByExternalId(TARKOWSKI.externalId())).hasValueSatisfying(
+                player -> assertThat(player.whoscoredId()).isEqualTo(TARKOWSKI_APPEARANCE.whoscoredId()));
+        assertThat(rowOf(stats, EVERTON_MAN_UTD, TARKOWSKI).minutesPlayed()).isEqualTo(END_MINUTE);
+        assertThat(output.getAll().lines().filter(line -> line.contains("jugador cruzado por nombre")).toList())
+                .singleElement()
+                .satisfies(line -> assertThat(line).contains("INFO",
+                        "PREMIER: jugador cruzado por nombre (nivel 2, CONTAINED_WORDS): 'Tarkowski'",
+                        "'James Tarkowski' (Everton FC), partido " + EVERTON_MAN_UTD.externalId() + "."));
+    }
+
+    /**
+     * WhoScored informa a Thierno Barry con un apodo que no comparte nada con su nombre: lo cruza la
+     * fecha de nacimiento de su página (FR-019d), que deja su línea en el registro.
+     */
+    @Test
+    void unJugadorConOtroNombreYLaFechaDeUnoDelCatalogoQuedaCruzadoYElRegistroLoDice(CapturedOutput output)
+            throws Exception {
+        given(whoScoredAdapter.fetchMatchStats(EVERTON_MAN_UTD_WS_ID)).willReturn(Optional.of(
+                withRenamedAppearance(EVERTON_MAN_UTD_STATS, BARRY_APPEARANCE.whoscoredId(), "Titi")));
+        given(whoScoredAdapter.fetchPlayerProfile(BARRY_APPEARANCE.whoscoredId()))
+                .willReturn(Optional.of(new ReportedPlayerProfile(BARRY.dateOfBirth(), "Thierno Barry Diallo")));
+
+        JsonNode premier = body(synchronizeAs(adminToken)).get("leagues").get(0);
+        List<PlayerMatchStats> stats = statsRepository.findAll();
+
+        assertThat(premier.get("uncrossedPlayers").values()).isEmpty();
+        assertThat(playerRepository.findByExternalId(BARRY.externalId())).hasValueSatisfying(
+                player -> assertThat(player.whoscoredId()).isEqualTo(BARRY_APPEARANCE.whoscoredId()));
+        assertThat(rowOf(stats, EVERTON_MAN_UTD, BARRY).minutesPlayed()).isEqualTo(BARRY_MINUTES);
+        assertThat(output.getAll().lines()
+                .filter(line -> line.contains("jugador cruzado por fecha de nacimiento")).toList())
+                .singleElement()
+                .satisfies(line -> assertThat(line).contains("INFO",
+                        "PREMIER: jugador cruzado por fecha de nacimiento (21/10/2002): 'Titi'",
+                        "'Thierno Barry' (Everton FC), partido " + EVERTON_MAN_UTD.externalId() + "."));
+    }
+
+    /**
+     * Otro "Yoane Wissa", de la misma edad que el del Brentford del catálogo, entra para el Everton
+     * en el Everton - Manchester United, que se procesa antes que el Everton - Brentford. Su página
+     * trae otra fecha: no se queda con el del catálogo, que después se cruza con su propio id
+     * (FR-019a; HU1, escenario 27).
+     */
+    @Test
+    void unHomonimoDeOtroEquipoConOtraFechaQuedaSinConfirmarYNoSeQuedaConElDelCatalogo() throws Exception {
+        ReportedAppearance homonym = new ReportedAppearance(HOMONYM_WHOSCORED_ID, WISSA.name(), ageOf(WISSA),
+                Side.HOME, false, HOMONYM_ENTERED_AT, null, MetricCounts.empty(), null, false);
+        given(whoScoredAdapter.fetchMatchStats(EVERTON_MAN_UTD_WS_ID))
+                .willReturn(Optional.of(withAppearance(EVERTON_MAN_UTD_STATS, homonym)));
+        given(whoScoredAdapter.fetchPlayerProfile(HOMONYM_WHOSCORED_ID))
+                .willReturn(Optional.of(new ReportedPlayerProfile(WISSA.dateOfBirth().plusMonths(1), null)));
+
+        JsonNode premier = body(synchronizeAs(adminToken)).get("leagues").get(0);
+
+        assertThat(premier.get("uncrossedPlayers").values()).singleElement().satisfies(uncrossed -> {
+            assertThat(uncrossed.get("whoscoredId").asString()).isEqualTo(HOMONYM_WHOSCORED_ID);
+            assertThat(uncrossed.get("team").asString()).isEqualTo(EVERTON.name());
+            assertThat(uncrossed.get("reason").asString()).isEqualTo("NOT_CONFIRMED");
+        });
+        assertThat(playerRepository.findByExternalId(WISSA.externalId())).hasValueSatisfying(
+                player -> assertThat(player.whoscoredId()).isEqualTo(WISSA_APPEARANCE.whoscoredId()));
+    }
+
+    /**
      * La temporada de la Premier, el Everton, el Manchester United y el Brentford cruzados con sus
      * jugadores, y los tres partidos con su id de WhoScored.
      */
@@ -873,6 +954,18 @@ class StatsSyncControllerIT {
         return new ReportedMatchStats(EVERTON_BRENTFORD_WS_ID, true, EVERTON_WS.whoscoredId(),
                 BRENTFORD_WS.whoscoredId(), EVERTON_BRENTFORD_END_MINUTE,
                 List.of(PICKFORD_APPEARANCE, TARKOWSKI_APPEARANCE, WISSA_APPEARANCE), List.of(), List.of());
+    }
+
+    private static ReportedMatchStats withRenamedAppearance(ReportedMatchStats stats, String whoscoredId,
+                                                            String name) {
+        List<ReportedAppearance> appearances = stats.appearances().stream()
+                .map(appearance -> !appearance.whoscoredId().equals(whoscoredId) ? appearance
+                        : new ReportedAppearance(appearance.whoscoredId(), name, appearance.age(), appearance.side(),
+                                appearance.starter(), appearance.enteredAt(), appearance.leftAt(),
+                                appearance.sourceCounts(), appearance.rating(), appearance.manOfTheMatch()))
+                .toList();
+        return new ReportedMatchStats(stats.whoscoredId(), stats.finished(), stats.homeTeamWhoscoredId(),
+                stats.awayTeamWhoscoredId(), stats.endMinute(), appearances, stats.goals(), stats.cards());
     }
 
     private static ReportedMatchStats withAppearance(ReportedMatchStats stats, ReportedAppearance appearance) {

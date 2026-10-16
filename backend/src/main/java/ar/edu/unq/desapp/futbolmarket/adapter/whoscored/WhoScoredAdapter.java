@@ -3,6 +3,7 @@ package ar.edu.unq.desapp.futbolmarket.adapter.whoscored;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import ar.edu.unq.desapp.futbolmarket.adapter.whoscored.dto.FixtureRowDto;
@@ -11,6 +12,7 @@ import ar.edu.unq.desapp.futbolmarket.adapter.whoscored.dto.TournamentFixturesDt
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.performance.ReportedMatchStats;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.ReportedFixture;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.ReportedPlayerProfile;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.ReportedTeam;
 
 /**
@@ -24,15 +26,25 @@ public class WhoScoredAdapter {
     private final FixtureMatchesExtractor fixtureMatchesExtractor;
     private final MatchCentreExtractor matchCentreExtractor;
     private final WhoScoredMapper mapper;
+    private final PlayerProfileExtractor playerProfileExtractor;
 
     public WhoScoredAdapter(WhoScoredClient client, TournamentFixturesExtractor tournamentFixturesExtractor,
                             FixtureMatchesExtractor fixtureMatchesExtractor, MatchCentreExtractor matchCentreExtractor,
                             WhoScoredMapper mapper) {
+        this(client, tournamentFixturesExtractor, fixtureMatchesExtractor, matchCentreExtractor, mapper,
+                new PlayerProfileExtractor());
+    }
+
+    @Autowired
+    public WhoScoredAdapter(WhoScoredClient client, TournamentFixturesExtractor tournamentFixturesExtractor,
+                            FixtureMatchesExtractor fixtureMatchesExtractor, MatchCentreExtractor matchCentreExtractor,
+                            WhoScoredMapper mapper, PlayerProfileExtractor playerProfileExtractor) {
         this.client = client;
         this.tournamentFixturesExtractor = tournamentFixturesExtractor;
         this.fixtureMatchesExtractor = fixtureMatchesExtractor;
         this.matchCentreExtractor = matchCentreExtractor;
         this.mapper = mapper;
+        this.playerProfileExtractor = playerProfileExtractor;
     }
 
     /**
@@ -61,5 +73,15 @@ public class WhoScoredAdapter {
         Optional<MatchCentreDto> matchCentre =
                 client.fetch(WhoScoredPages.match(matchWhoscoredId), matchCentreExtractor::extract);
         return matchCentre.map(data -> mapper.toMatchStats(matchWhoscoredId, data));
+    }
+
+    /**
+     * La fecha de nacimiento y el nombre completo de la página del jugador, para resolver un cruce
+     * (FR-019d). Vacía si la página no llegó ni en el reintento, que no corta la corrida; si llegó,
+     * cada dato que no trae es {@code null}.
+     */
+    public Optional<ReportedPlayerProfile> fetchPlayerProfile(String playerWhoscoredId) {
+        return client.fetchIfAvailable(WhoScoredPages.playerPath(playerWhoscoredId), playerProfileExtractor::extract)
+                .map(profile -> new ReportedPlayerProfile(profile.birthDate(), profile.fullName()));
     }
 }

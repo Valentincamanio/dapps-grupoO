@@ -170,12 +170,38 @@ Qué verificar:
 
    Los números son ilustrativos. Sin snapshot, la primera vez tarda unos 47 minutos (SC-005:
    menos de 60).
+
+   **SC-002**: sumar los jugadores sin cruzar de las cinco líneas de liga y calcular
+   `filas de PLAYER_MATCH_STATS / (filas + jugadores sin cruzar)` (la cuenta de filas está en la
+   sección 7). Tiene que dar al menos 0,95. Cada jugador que se cruzó por un nivel de nombre
+   (FR-019b) deja una línea con el nivel y los dos nombres, para poder revisarlo:
+
+   ```text
+   INFO  ... StatsSyncService   : LA_LIGA: jugador cruzado por nombre (nivel 3, SAME_SURNAME): 'Álex Baena' → 'Alejandro Baena' (Club Atlético de Madrid), partido 564630.
+   ```
+
+   Y cada jugador que se cruzó con su página de WhoScored (FR-019d) deja otra: con la fecha si
+   la fecha lo cruzó, con `en otro equipo` si el del catálogo es de un equipo que no jugó ese
+   partido (un transferido), y con el año y el nombre completo si lo cruzó el nombre completo:
+
+   ```text
+   INFO  ... StatsSyncService   : PREMIER: jugador cruzado por fecha de nacimiento (21/10/2002): 'Titi' → 'Thierno Barry' (Everton FC), partido 537812.
+   INFO  ... StatsSyncService   : LA_LIGA: jugador cruzado por fecha de nacimiento en otro equipo (20/01/1995): 'José María Giménez' → 'José Giménez' (RC Deportivo La Coruña), partido 564612.
+   INFO  ... StatsSyncService   : LA_LIGA: jugador cruzado por nombre completo y año de nacimiento (2004): 'Rafita' ('Rafael Garrido Hierro') → 'Rafa Garrido' (Málaga CF), partido 564640.
+   ```
+
+   Un jugador que tiene en otro equipo un candidato con su nombre y su edad, y cuya página no
+   lo confirma, figura entre los sin cruzar con `NOT_CONFIRMED` (FR-019a).
 4. Cada pedido a WhoScored deja una línea INFO, y cada rechazo, un WARN con su ruta y el
-   reintento:
+   reintento. Entre los pedidos están también las páginas de jugador (`/players/{id}/show`), una
+   por cada jugador que los nombres dejaron sin cruzar y una sola vez por corrida, con la misma
+   pausa. Si una no llega ni en el reintento, se sigue sin ella y no hay corte:
 
    ```text
    INFO  ... WhoScoredClient    : Pedido a WhoScored: /matches/1983619/live (200, 1180 KB; pausa previa de 4 s).
+   INFO  ... WhoScoredClient    : Pedido a WhoScored: /players/402197/show (200, 96 KB; pausa previa de 4 s).
    WARN  ... WhoScoredClient    : WhoScored rechazó la página /matches/1983620/live (403, 5 KB): se reintenta en 30 s.
+   WARN  ... WhoScoredClient    : No se pudo leer la página /players/402198/show de WhoScored: se sigue sin ella.
    ```
 
 ### 2.3 Arranque con las dos fuentes al día
@@ -447,6 +473,51 @@ WHERE M.WHOSCORED_ID IS NOT NULL ORDER BY RAND() LIMIT 10;
 Abrir cada uno en el navegador, sin apurar el ritmo (`/players/{id}` y `/matches/{id}/live`), y
 comparar el nombre y el equipo del jugador, y los equipos y la fecha del partido. Resultado
 esperado: ninguno mal cruzado.
+
+Sumar al muestreo diez cruces por nombre de los niveles 4 a 6, que son los menos seguros,
+elegidos de las líneas `jugador cruzado por nombre` del registro:
+
+```bash
+grep -E "jugador cruzado por nombre \(nivel [456]," build/<registro>.log | shuf -n 10
+```
+
+Para cada uno, abrir la página del partido de la línea y verificar que el jugador de WhoScored
+es el del catálogo (mismo equipo, misma edad y nombre compatible). Resultado esperado: ninguno
+mal cruzado (SC-003).
+
+Sumar también cinco cruces por fecha de nacimiento (FR-019d), elegidos de las líneas
+`jugador cruzado por fecha de nacimiento` del registro:
+
+```bash
+grep "jugador cruzado por fecha de nacimiento" build/<registro>.log | shuf -n 5
+```
+
+Para cada uno, buscar el jugador del catálogo:
+
+```sql
+SELECT P.NAME, T.NAME AS TEAM, P.DATE_OF_BIRTH, P.WHOSCORED_ID
+FROM PLAYERS P JOIN TEAMS T ON T.ID = P.TEAM_ID WHERE P.NAME = '<nombre del catálogo>';
+```
+
+Abrir su página de WhoScored (`/players/{WHOSCORED_ID}/show`) y la del partido de la línea, y
+verificar que es el mismo jugador: la fecha de nacimiento de la página es la del catálogo y la de
+la línea, y juega en ese equipo. Resultado esperado: ninguno mal cruzado (SC-003).
+
+Revisar además **todas** las líneas de cruces con otro equipo y por nombre completo, que son
+pocas y las menos comunes:
+
+```bash
+grep -E "fecha de nacimiento en otro equipo|nombre completo y año de nacimiento" build/<registro>.log
+```
+
+Con la misma consulta y la página del jugador:
+
+- en una línea `en otro equipo`, la fecha de la página es la del catálogo y el jugador es el del
+  catálogo, aunque en el partido haya jugado para otro equipo (un traspaso de la temporada);
+- en una línea de `nombre completo`, el nombre completo de la página contiene el nombre del
+  catálogo, el año de la página es el de la fecha del catálogo, y juega en ese equipo.
+
+Resultado esperado: ninguno mal cruzado (SC-003).
 
 ## 8. Cobertura de los criterios de éxito
 

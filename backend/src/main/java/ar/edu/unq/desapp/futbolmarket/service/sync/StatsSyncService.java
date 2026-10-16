@@ -1,7 +1,9 @@
 package ar.edu.unq.desapp.futbolmarket.service.sync;
 
 import java.time.Clock;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,15 +18,22 @@ import ar.edu.unq.desapp.futbolmarket.adapter.whoscored.WhoScoredAdapter;
 import ar.edu.unq.desapp.futbolmarket.config.WhoScoredProperties;
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.match.Match;
+import ar.edu.unq.desapp.futbolmarket.modelo.performance.ReportedMatchStats;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.CatalogInvariantException;
 import ar.edu.unq.desapp.futbolmarket.modelo.season.CurrentSeasons;
 import ar.edu.unq.desapp.futbolmarket.modelo.season.Season;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.BirthDateCross;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.BlockedPage;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.CatalogPlayers;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.FullNameCross;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.LeagueStatsStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.LeagueStatsSync;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.MatchStatsLoad;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.NameCross;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.NameMatchLevel;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.PageKind;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.ReportedPlayerProfile;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotLoad;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.SnapshotRead;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsSnapshot;
@@ -57,6 +66,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class StatsSyncService {
     private static final Logger LOGGER = LoggerFactory.getLogger(StatsSyncService.class);
+    private static final DateTimeFormatter BIRTH_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final String OTHER_TEAM = " en otro equipo";
 
     private final WhoScoredAdapter adapter;
     private final StatsWriteService writeService;
@@ -101,7 +112,8 @@ public class StatsSyncService {
         CurrentSeasons seasons = CurrentSeasons.of(seasonRepository.findAll());
         Map<League, LeagueStatsSync> leagues = new LinkedHashMap<>();
         run.leagues().forEach(league -> leagues.put(league, loadSnapshot(league, seasons, read.snapshot(), catalog)));
-        leagues.forEach((league, sync) -> scrapeLeague(run, league, sync, catalog));
+        Map<String, Optional<ReportedPlayerProfile>> profiles = new HashMap<>();
+        leagues.forEach((league, sync) -> scrapeLeague(run, league, sync, catalog, profiles));
         StatsSyncReport report = run.finish(clock.instant());
         reportLogger.log(report);
         report.lastFullSync().ifPresent(lastFullSyncRepository::save);
@@ -153,7 +165,8 @@ public class StatsSyncService {
      * Fase 2. Si la corrida ya se cortó, la liga no se alcanza y no se pide nada. Un bloqueo corta la
      * liga en curso y la corrida entera (FR-044 y FR-045).
      */
-    private void scrapeLeague(StatsSyncRun run, League league, LeagueStatsSync sync, CatalogPlayers catalog) {
+    private void scrapeLeague(StatsSyncRun run, League league, LeagueStatsSync sync, CatalogPlayers catalog,
+                              Map<String, Optional<ReportedPlayerProfile>> profiles) {
         if (run.isCut()) {
             run.record(sync.result(LeagueStatsStatus.NOT_REACHED));
             return;
@@ -162,7 +175,7 @@ public class StatsSyncService {
             discover(league, sync);
             sync.closeDiscovery();
             for (Match match : sync.matchesToScrape()) {
-                scrapeMatch(league, sync, match, catalog);
+                scrapeMatch(league, sync, match, catalog, profiles);
             }
             run.record(sync.result(LeagueStatsStatus.PROCESSED));
         } catch (SourceBlockedException e) {
@@ -192,10 +205,13 @@ public class StatsSyncService {
     /**
      * Un valor imposible de la fuente omite el partido; se captura solo acá (research D18).
      */
-    private void scrapeMatch(League league, LeagueStatsSync sync, Match match, CatalogPlayers catalog) {
+    private void scrapeMatch(League league, LeagueStatsSync sync, Match match, CatalogPlayers catalog,
+                             Map<String, Optional<ReportedPlayerProfile>> profiles) {
         Optional<MatchStatsLoad> load;
         try {
-            load = sync.prepare(match, adapter.fetchMatchStats(match.whoscoredId()), catalog);
+            Optional<ReportedMatchStats> reported = adapter.fetchMatchStats(match.whoscoredId());
+            List<String> needed = sync.birthDatesNeeded(match, reported, catalog);
+            load = sync.prepare(match, reported, catalog, profilesOf(needed, profiles));
         } catch (CatalogInvariantException e) {
             LOGGER.warn("{}: WhoScored informó un valor imposible para el partido {}: {}", league,
                     match.externalId(), e.getMessage());
@@ -205,14 +221,71 @@ public class StatsSyncService {
         load.ifPresent(prepared -> save(league, sync, prepared, catalog));
     }
 
+    /**
+     * Las páginas de jugador de los que los nombres no cruzan o no confirman (FR-019d). Cada jugador
+     * se pide una sola vez por corrida: el mapa guarda también las que no llegaron.
+     */
+    private Map<String, ReportedPlayerProfile> profilesOf(List<String> needed,
+                                                          Map<String, Optional<ReportedPlayerProfile>> requested) {
+        Map<String, ReportedPlayerProfile> known = new HashMap<>();
+        for (String playerWhoscoredId : needed) {
+            requested.computeIfAbsent(playerWhoscoredId, adapter::fetchPlayerProfile)
+                    .ifPresent(profile -> known.put(playerWhoscoredId, profile));
+        }
+        return known;
+    }
+
     private void save(League league, LeagueStatsSync sync, MatchStatsLoad load, CatalogPlayers catalog) {
         try {
             writeService.saveMatchStats(load);
             catalog.confirm(load.crossedPlayers());
             sync.recordScraped(load);
+            logNameCrosses(league, load.match(), sync.nameCrossesOf(load.match()));
+            logBirthDateCrosses(league, load.match(), sync.birthDateCrossesOf(load.match()));
+            logFullNameCrosses(league, load.match(), sync.fullNameCrossesOf(load.match()));
         } catch (DataAccessException e) {
             LOGGER.warn("{}: no se pudo guardar el partido {}.", league, load.match().externalId(), e);
             sync.recordWriteFailure(load.match());
+        }
+    }
+
+    /**
+     * Cada cruce hecho con la página del jugador queda en el registro para poder revisarlo
+     * (FR-019d), y el de un jugador del catálogo que no es de ninguno de los dos equipos del
+     * partido, un transferido, lo dice. Solo se escribe con el partido ya guardado.
+     */
+    private static void logBirthDateCrosses(League league, Match match, List<BirthDateCross> crosses) {
+        for (BirthDateCross cross : crosses) {
+            String otherTeam = playsIn(match, cross.player()) ? "" : OTHER_TEAM;
+            LOGGER.info("{}: jugador cruzado por fecha de nacimiento{} ({}): '{}' → '{}' ({}), partido {}.", league,
+                    otherTeam, BIRTH_DATE_FORMAT.format(cross.birthDate()), cross.reportedName(),
+                    cross.player().name(), cross.player().team().name(), match.externalId());
+        }
+    }
+
+    private static void logFullNameCrosses(League league, Match match, List<FullNameCross> crosses) {
+        for (FullNameCross cross : crosses) {
+            LOGGER.info("{}: jugador cruzado por nombre completo y año de nacimiento ({}): '{}' ('{}') → '{}' ({}), "
+                            + "partido {}.", league, cross.player().dateOfBirth().getYear(), cross.reportedName(),
+                    cross.fullName(), cross.player().name(), cross.player().team().name(), match.externalId());
+        }
+    }
+
+    private static boolean playsIn(Match match, Player player) {
+        String team = player.team().externalId();
+        return team.equals(match.homeTeam().externalId()) || team.equals(match.awayTeam().externalId());
+    }
+
+    /**
+     * Cada cruce hecho por un nivel de nombre queda en el registro para poder revisarlo (FR-019b).
+     * Solo se escribe con el partido ya guardado.
+     */
+    private static void logNameCrosses(League league, Match match, List<NameCross> crosses) {
+        for (NameCross cross : crosses) {
+            NameMatchLevel level = cross.level();
+            LOGGER.info("{}: jugador cruzado por nombre (nivel {}, {}): '{}' → '{}' ({}), partido {}.", league,
+                    level.ordinal() + 1, level, cross.reportedName(), cross.player().name(),
+                    cross.player().team().name(), match.externalId());
         }
     }
 

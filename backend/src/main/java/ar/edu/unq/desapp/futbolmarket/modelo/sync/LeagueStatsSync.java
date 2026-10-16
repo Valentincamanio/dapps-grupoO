@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,6 +42,9 @@ public final class LeagueStatsSync {
     private final Set<String> requestedPages = new HashSet<>();
     private final Map<String, SkippedStatsMatch> skippedMatches = new LinkedHashMap<>();
     private final List<UncrossedPlayer> uncrossedPlayers = new ArrayList<>();
+    private final Map<String, List<NameCross>> nameCrossesByMatch = new HashMap<>();
+    private final Map<String, List<BirthDateCross>> birthDateCrossesByMatch = new HashMap<>();
+    private final Map<String, List<FullNameCross>> fullNameCrossesByMatch = new HashMap<>();
     private final Map<SnapshotSkipReason, Integer> skippedSnapshotEntries = new EnumMap<>(SnapshotSkipReason.class);
     private List<UncrossedTeam> uncrossedTeams = List.of();
     private int matchesFromSnapshot;
@@ -199,6 +203,15 @@ public final class LeagueStatsSync {
      */
     public Optional<MatchStatsLoad> prepare(Match match, Optional<ReportedMatchStats> reported,
                                             CatalogPlayers catalog) {
+        return prepare(match, reported, catalog, Map.of());
+    }
+
+    /**
+     * Como {@link #prepare(Match, Optional, CatalogPlayers)}, con las páginas de jugador, por id de
+     * WhoScored, para los que los nombres no cruzan (FR-019d).
+     */
+    public Optional<MatchStatsLoad> prepare(Match match, Optional<ReportedMatchStats> reported,
+                                            CatalogPlayers catalog, Map<String, ReportedPlayerProfile> profiles) {
         Match current = matches.getOrDefault(match.externalId(), match);
         if (reported.isEmpty() || !reported.get().finished()) {
             skip(current, StatsSkipReason.NOT_FINISHED_IN_SOURCE);
@@ -210,13 +223,56 @@ public final class LeagueStatsSync {
             return Optional.empty();
         }
         Match loaded = current.markStatsLoaded();
-        PlayerCrossing crossing = new PlayerCrossing(catalog, loaded, stats);
+        PlayerCrossing crossing = new PlayerCrossing(catalog, loaded, stats, profiles);
         List<PlayerMatchStats> playerStats = new ArrayList<>();
         for (ReportedAppearance appearance : stats.onPitch()) {
             crossing.cross(appearance).ifPresent(player -> playerStats.add(stats.toStats(appearance, player, loaded)));
         }
         uncrossedPlayers.addAll(crossing.uncrossed());
+        nameCrossesByMatch.put(loaded.externalId(), crossing.nameCrosses());
+        birthDateCrossesByMatch.put(loaded.externalId(), crossing.birthDateCrosses());
+        fullNameCrossesByMatch.put(loaded.externalId(), crossing.fullNameCrosses());
         return Optional.of(new MatchStatsLoad(loaded, crossing.newlyCrossed(), playerStats, LoadSource.SCRAPING));
+    }
+
+    /**
+     * Los ids de WhoScored de los jugadores del partido que los nombres dejarían sin cruzar: los que
+     * conviene confirmar con su página de jugador antes de {@link #prepare} (FR-019d). No cambia nada
+     * de la liga. Vacío si el partido se omitiría.
+     */
+    public List<String> birthDatesNeeded(Match match, Optional<ReportedMatchStats> reported,
+                                         CatalogPlayers catalog) {
+        Match current = matches.getOrDefault(match.externalId(), match);
+        if (reported.isEmpty() || !reported.get().finished() || !reported.get().isFor(current)) {
+            return List.of();
+        }
+        PlayerCrossing crossing = new PlayerCrossing(catalog, current, reported.get());
+        reported.get().onPitch().forEach(crossing::cross);
+        return crossing.needsBirthDate();
+    }
+
+    /**
+     * Los cruces por fecha de nacimiento que dejó {@link #prepare} para el partido, con el mismo uso
+     * que {@link #nameCrossesOf}. Vacío si no hubo.
+     */
+    public List<BirthDateCross> birthDateCrossesOf(Match match) {
+        return birthDateCrossesByMatch.getOrDefault(match.externalId(), List.of());
+    }
+
+    /**
+     * Los cruces por nombre completo y año de nacimiento que dejó {@link #prepare} para el partido,
+     * con el mismo uso que {@link #nameCrossesOf}. Vacío si no hubo.
+     */
+    public List<FullNameCross> fullNameCrossesOf(Match match) {
+        return fullNameCrossesByMatch.getOrDefault(match.externalId(), List.of());
+    }
+
+    /**
+     * Los cruces por nivel de nombre que dejó {@link #prepare} para el partido, para que el servicio
+     * los escriba en el registro al guardarlo (FR-019b). Vacío si no hubo.
+     */
+    public List<NameCross> nameCrossesOf(Match match) {
+        return nameCrossesByMatch.getOrDefault(match.externalId(), List.of());
     }
 
     public void recordScraped(MatchStatsLoad load) {

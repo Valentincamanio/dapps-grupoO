@@ -156,10 +156,25 @@ Una última completa está vencida si `now − finishedAt` es mayor que `maxAge`
 `ofTeam(String)`. Aplican NFD, quitan las marcas, reemplazan las letras que NFD no descompone,
 pasan a minúsculas y dejan solo letras y dígitos separados por un espacio. `ofTeam` además quita
 las palabras de club (`fc`, `afc`, `cf`, `sc`, ...). La lista completa está en
-[research.md](./research.md) D12.
+[research.md](./research.md) D12. Para los niveles de cruce de jugadores (FR-019b) suma:
+
+- `words()`: las palabras del nombre, en orden (`"n diaye"` da `n` y `diaye`);
+- `lastWord()`: la última palabra, que se toma como apellido;
+- `compact()`: el nombre sin separadores (`"n diaye"` da `ndiaye`).
+- `isWithin(NormalizedName fullName)`: si cada palabra de este nombre es una palabra distinta de
+  `fullName`, o el comienzo de una si tiene al menos `NameMatchLevel.WORD_PREFIX_MIN_LENGTH` (4)
+  letras (FR-019d). Primero busca la palabra igual y después una que empiece con ella, siempre
+  entre las que no usó otra palabra. Un nombre vacío nunca está dentro (`"rafa garrido"` está
+  dentro de `"rafael garrido hierro"`; `"pablo garcia"` no está dentro de
+  `"mauro echegoyen garcia"`).
+- `sharesWordWith(NormalizedName other)`: si los dos nombres tienen una palabra igual de al menos
+  `NameMatchLevel.WORD_PREFIX_MIN_LENGTH` (4) letras (`"abdul fatawu"` y `"abdul issahaku"` sí;
+  `"musa al taamari"` y `"mousa al tamari"` no, porque `al` tiene dos). Es una de las relaciones
+  de nombre del paso 1 de FR-019d.
 
 | Tipo | Definición |
 |---|---|
+| `ReportedPlayerProfile` | Record `(LocalDate birthDate, String fullName)`: lo que trae la página de un jugador de WhoScored (FR-019d; [research.md](./research.md) D28). Cualquiera de los dos es nulo si la página no lo trae. |
 | `ReportedTeam` | Record `(String whoscoredId, String name)`: un equipo de la página de la liga o de una fila de fixtures. |
 | `ReportedFixture` | Record `(String whoscoredId, LocalDate date, String homeTeamWhoscoredId, String homeTeamName, String awayTeamWhoscoredId, String awayTeamName, boolean finished)`. El adapter ya filtró el torneo; la fecha es la del sitio. |
 
@@ -197,18 +212,56 @@ con su equipo.
 - `byExternalId(String)`: por id de Football-Data. Lo usa `SnapshotLoad`, porque las filas del
   snapshot ubican al jugador así.
 - `inTeam(Team, NormalizedName)`: los jugadores cuyo equipo actual es ese y tienen ese nombre.
+- `inTeam(Team)`: todos los jugadores cuyo equipo actual es ese, para los niveles de FR-019b.
 - `named(NormalizedName)`: todos los jugadores con ese nombre.
+- `bornOn(LocalDate)`: todos los jugadores con esa fecha de nacimiento, de cualquier equipo,
+  activos o inactivos, para el paso 2 de FR-019d. Los que no tienen fecha nunca aparecen.
 - `confirm(List<Player> crossed)`: actualiza el índice con los cruces de un partido ya confirmado
   en la base.
 
 **PlayerCrossing**: cruza los jugadores de WhoScored de un partido (FR-019 a FR-022;
-[research.md](./research.md) D14). Se crea con `(CatalogPlayers catalog, Match match, ReportedMatchStats reported)`.
+[research.md](./research.md) D14). Se crea con `(CatalogPlayers catalog, Match match, ReportedMatchStats reported, Map<String, ReportedPlayerProfile> profiles)`:
+`profiles` son las páginas de jugador que trajo WhoScored, por id de WhoScored del jugador
+(FR-019d). El constructor de tres argumentos sigue y pasa un mapa vacío.
 
 | Método | Regla |
 |---|---|
-| `cross(ReportedAppearance)` | `Optional<Player>`. Primero por `whoscoredId` (FR-020). Si no, entre los del equipo del catálogo de ese lado, con el mismo nombre normalizado, desempatando por edad el día del partido (FR-019). Si no hay ninguno, en todo el catálogo por nombre normalizado y misma edad, solo si hay uno único (FR-019a). Nunca devuelve un jugador que ya tiene otro id de WhoScored ni uno ya elegido en el mismo partido (FR-022). |
+| `cross(ReportedAppearance)` | `Optional<Player>`. Primero por `whoscoredId` (FR-020). Si no, entre los del equipo del catálogo de ese lado, con el mismo nombre normalizado, desempatando por edad (FR-019). Si no hay ninguno, busca en todo el catálogo por nombre normalizado y misma edad (FR-019a): si hay alguno, no lo cruza ni prueba los niveles, y el jugador queda `NOT_CONFIRMED` con un candidato y `AMBIGUOUS` con más, para que lo resuelva la página. Si no hay ninguno, en el equipo por los niveles de `NameMatchLevel`, en orden, con la misma edad: con un candidato se cruza y con más de uno queda `AMBIGUOUS` sin bajar de nivel (FR-019b). Si con todo eso queda `NOT_FOUND`, `AMBIGUOUS` o `NOT_CONFIRMED` y `profiles` trae su página con la fecha, prueba en orden los pasos de FR-019d entre los elegibles: (1) los de su equipo con exactamente esa fecha y una relación de nombre con el de WhoScored: `sharesWordWith`, `matches` de algún `NameMatchLevel` (sin la edad) o el del catálogo `isWithin` el nombre completo; (2) si el paso 1 no encuentra ninguno, `catalog.bornOn(fecha)` fuera de su equipo cuyo nombre coincide con el de WhoScored por `SAME_WORDS`, `CONTAINED_WORDS` o `SAME_SURNAME`, o está dentro del nombre completo (`isWithin`); (3) si tampoco, los de su equipo nacidos el mismo año cuyo nombre está dentro del nombre completo. Con uno se cruza; con más de uno queda con su motivo sin pasar al paso siguiente; con ninguno en los tres, también. Nunca devuelve un jugador que ya tiene otro id de WhoScored ni uno ya elegido en el mismo partido (FR-022). |
 | `newlyCrossed()` | Los jugadores que quedaron cruzados en este partido, con `crossWith`. |
+| `nameCrosses()` | `NameCross` por cada cruce de este partido hecho por un nivel de FR-019b. |
+| `birthDateCrosses()` | `BirthDateCross` por cada cruce de este partido hecho por los pasos 1 y 2 de FR-019d. |
+| `fullNameCrosses()` | `FullNameCross` por cada cruce de este partido hecho por el paso 3 de FR-019d. |
+| `needsBirthDate()` | Los ids de WhoScored de los jugadores que quedaron sin cruzar (incluidos los `NOT_CONFIRMED` de FR-019a) y no tenían página en `profiles`: los que conviene resolver con su página de jugador. |
 | `uncrossed()` | `UncrossedPlayer` por cada jugador que entró y no se pudo cruzar (FR-021). |
+
+**La misma edad** (FR-019c): WhoScored informa la del día en que se sirve la página. Un jugador
+del catálogo es de la misma edad si `Player.ageOn(match.utcDay())` es la informada o una menos.
+Sin fecha de nacimiento, o sin edad en la aparición, nunca es de la misma edad.
+
+**NameMatchLevel**: enum con los niveles de FR-019b, en el orden en que se prueban. Cada uno tiene
+`matches(NormalizedName reported, NormalizedName catalog)`, simétrico ([research.md](./research.md) D14).
+
+| Nivel | Constante | Coinciden si |
+|---|---|---|
+| 1 | `SAME_WORDS` | tienen las mismas palabras, en cualquier orden |
+| 2 | `CONTAINED_WORDS` | todas las palabras de uno están en el otro |
+| 3 | `SAME_SURNAME` | tienen la misma `lastWord()` |
+| 4 | `SAME_COMPACT` | alguna permutación de las palabras de uno (hasta 4 palabras) da la `compact()` del otro, o una `compact()` contiene a la otra, si esa tiene al menos `WORD_PREFIX_MIN_LENGTH` (4) letras |
+| 5 | `SIMILAR_SURNAME` | sus `lastWord()` tienen al menos `SIMILAR_SURNAME_MIN_LENGTH` (5) letras y una distancia de Levenshtein de a lo sumo `SIMILAR_SURNAME_MAX_CHANGES` (2) |
+| 6 | `WORD_PREFIX` | una palabra de uno es el comienzo de una del otro, las dos de al menos `WORD_PREFIX_MIN_LENGTH` (4) letras, salvo que los dos tengan más de una palabra y la única coincidencia sea entre sus primeras palabras (el nombre de pila solo no alcanza) |
+
+**NameCross**: record `(String reportedName, Player player, NameMatchLevel level)`: un cruce hecho
+por un nivel, para el registro. `player` ya viene con `crossWith`.
+
+**BirthDateCross**: record `(String reportedName, Player player, LocalDate birthDate)`: un cruce
+hecho por la fecha de nacimiento de la página del jugador (FR-019d, pasos 1 y 2), para el
+registro. `player` ya viene con `crossWith`, y su equipo puede no ser uno de los del partido (el
+paso 2, un transferido). La página la trae `WhoScoredAdapter.fetchPlayerProfile`
+([research.md](./research.md) D28).
+
+**FullNameCross**: record `(String reportedName, String fullName, Player player)`: un cruce hecho
+por el nombre completo y el año de nacimiento (FR-019d, paso 3), para el registro. `player` ya
+viene con `crossWith`; el año sale de su fecha de nacimiento.
 
 **MatchStatsLoad**: lo que se guarda de un partido en una transacción.
 
@@ -277,7 +330,10 @@ tiene temporada en el catálogo: entonces no hay pendientes.
 | `confirmTeams(List<Team>)` y `confirmMatches(List<Match>)` | Toma los guardados como estado actual. |
 | `closeDiscovery()` | Omite los pendientes que siguen sin id: `UNCROSSED_TEAM` si les falta un equipo cruzado y `NOT_IN_SOURCE` si no (FR-014 y FR-018). |
 | `matchesToScrape()` | Los pendientes con id, en orden de fecha. |
-| `prepare(Match, Optional<ReportedMatchStats>, CatalogPlayers)` | `Optional<MatchStatsLoad>` con origen `SCRAPING`. Vacío y omitido con `NOT_FINISHED_IN_SOURCE` si no hay datos o no está terminado, y con `NOT_IN_SOURCE` si los equipos no coinciden. Si no, corre `PlayerCrossing` y arma las estadísticas de los que entraron. Los jugadores sin cruzar van al informe (FR-021). |
+| `birthDatesNeeded(Match, Optional<ReportedMatchStats>, CatalogPlayers)` | Los ids de WhoScored de los jugadores del partido que quedarían sin cruzar con los nombres (`PlayerCrossing.needsBirthDate()`), sin cambiar nada de la liga. Vacío si el partido se omitiría (sin datos, sin terminar o con otros equipos). |
+| `prepare(Match, Optional<ReportedMatchStats>, CatalogPlayers, Map<String, ReportedPlayerProfile> profiles)` | `Optional<MatchStatsLoad>` con origen `SCRAPING`. Vacío y omitido con `NOT_FINISHED_IN_SOURCE` si no hay datos o no está terminado, y con `NOT_IN_SOURCE` si los equipos no coinciden. Si no, corre `PlayerCrossing` con las páginas de jugador y arma las estadísticas de los que entraron. Los jugadores sin cruzar van al informe (FR-021). La versión de tres argumentos sigue y pasa un mapa vacío. |
+| `nameCrossesOf(Match)` | Los `NameCross` que dejó `prepare` para ese partido, para que el servicio los escriba en el registro al guardarlo. Vacío si no hubo. |
+| `birthDateCrossesOf(Match)` y `fullNameCrossesOf(Match)` | Los `BirthDateCross` y los `FullNameCross` que dejó `prepare` para ese partido, con el mismo uso. |
 | `recordScraped(MatchStatsLoad)`, `recordWriteFailure(Match)` y `recordInvalidSource(Match)` | El segundo omite con `WRITE_FAILED` y el tercero con `INVALID_IN_SOURCE` (un valor imposible de la fuente, [research.md](./research.md) D18). |
 | `result(LeagueStatsStatus)` | `LeagueStatsResult` de la liga. |
 
@@ -318,7 +374,7 @@ el scraping no llegó, con lo que haya cargado del snapshot.
 | `StatsSkipReason` | Enum `UNCROSSED_TEAM`, `NOT_IN_SOURCE`, `NOT_FINISHED_IN_SOURCE`, `INVALID_IN_SOURCE` o `WRITE_FAILED` ([research.md](./research.md) D13). |
 | `UncrossedTeam` | Record `(String teamExternalId, String name, CrossFailure reason)`: un equipo del catálogo. |
 | `UncrossedPlayer` | Record `(String whoscoredId, String name, String teamName, String matchExternalId, CrossFailure reason)`: su nombre, su equipo y el partido (FR-021). |
-| `CrossFailure` | Enum `NOT_FOUND`, `AMBIGUOUS` o `NOT_CONFIRMED` (este último, solo para equipos). |
+| `CrossFailure` | Enum `NOT_FOUND`, `AMBIGUOUS` o `NOT_CONFIRMED`. Un equipo queda `NOT_CONFIRMED` si su calendario no coincide (FR-017); un jugador, si tenía un único candidato en otro equipo por nombre y edad y la fecha de su página no lo confirmó (FR-019a). |
 | `PageKind` | Enum `LEAGUE`, `TEAM_FIXTURES` o `MATCH`. |
 | `BlockedPage` | Record `(PageKind kind, String whoscoredId, String path)`. |
 | `RunCut` | Record `(BlockedPage page, League league, String matchExternalId)`. `matchExternalId` es el id de Football-Data del partido, si la página era la de un partido. |
@@ -485,7 +541,8 @@ Ningún repository de esta feature borra datos (SC-008).
 | FR-013 y SC-008 | `MatchStatsLoad` y `StatsWriteService.saveMatchStats`, una transacción por partido (D18) |
 | FR-014 y FR-015 | `LeagueStatsSync.matchCrosses()`, `closeDiscovery()` y `prepare`, con `StatsSkipReason` (D13) |
 | FR-016, FR-017, FR-017a, FR-018, SC-003 y SC-003a | `TeamCrossing`, `NormalizedName`, `Team.crossWith` y `ux_teams_whoscored_id` (D12) |
-| FR-019, FR-019a, FR-020, FR-021, FR-022 y SC-002 | `PlayerCrossing`, `CatalogPlayers`, `Player.crossWith`, `Player.ageOn` y `ux_players_whoscored_id` (D14) |
+| FR-019, FR-019a, FR-019b, FR-019c, FR-020, FR-021, FR-022 y SC-002 | `PlayerCrossing`, `NameMatchLevel`, `NameCross`, `NormalizedName`, `CatalogPlayers`, `Player.crossWith`, `Player.ageOn` y `ux_players_whoscored_id` (D14) |
+| FR-019d y SC-003 | `PlayerCrossing` (páginas de jugador), `ReportedPlayerProfile`, `BirthDateCross`, `FullNameCross`, `NormalizedName.isWithin`, `NormalizedName.sharesWordWith`, `CatalogPlayers.bornOn`, `LeagueStatsSync.birthDatesNeeded`, `WhoScoredAdapter.fetchPlayerProfile`, `WhoScoredClient.fetchIfAvailable` y `PlayerProfileExtractor` (D14 y D28) |
 | FR-023, FR-029 y FR-032 | `StatsSnapshot.of`, el formato de [contracts/snapshot-format.md](./contracts/snapshot-format.md) y `backend/snapshot/whoscored-stats.jsonl`. La base sigue en `backend/data/`, que está en `.gitignore`. |
 | FR-024, FR-025, FR-026 y SC-006 | `SnapshotLoad` y la fase 1 de `StatsSyncService` (D18 y D20) |
 | FR-027 | `StatsSnapshotRepository.read()`, `SnapshotRead` y el WARN de `StatsSyncService` |

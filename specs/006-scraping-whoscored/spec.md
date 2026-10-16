@@ -83,6 +83,66 @@ dia:
   transcurrido desde el inicio del partido, con lo agregado en los dos tiempos. Reemplaza
   al reloj de 90 minutos sin agregado del primer borrador.
 
+### Session 2026-10-15
+
+Decisiones del equipo despues de la primera sincronizacion completa contra el sitio real
+(293 partidos de las cinco ligas):
+
+- Q: Que pasa con un jugador cuyo nombre se escribe distinto en Football-Data y en
+  WhoScored, como "Sivera" y "Antonio Sivera", "Kang-in Lee" y "Lee Kang-In" o "Alejandro
+  Baena" y "Alex Baena"? -> A: Si la regla estricta no encuentra a nadie, se lo busca en
+  su equipo con seis niveles de comparacion de nombres, cada vez mas flexibles, y en cada
+  nivel solo cuenta un candidato unico de la misma edad (FR-019b). Con la regla estricta
+  sola, esa corrida cruzo el 87,3% de los jugadores que entraron a la cancha, por debajo
+  del 95% de SC-002: 1176 apariciones de 301 jugadores no tenian el mismo nombre en las
+  dos fuentes, aunque estaban en el equipo correcto del catalogo. Se descarto cruzar por
+  descarte (el unico jugador sin cruzar del equipo con esa edad), porque muchos de los que
+  quedan no estan en el catalogo y se cruzarian con otro jugador.
+- Q: Que edad informa WhoScored de cada jugador? -> A: La del dia en que se consulta la
+  pagina, no la del dia del partido (verificado el 2026-10-15). Como la temporada dura
+  menos de un ano, la edad que surge de la fecha de nacimiento el dia del partido es esa
+  o una menos, y se aceptan las dos (FR-019c).
+- Q: Que pasa con un cruce que solo coincide en el nombre de pila? -> A: No alcanza. Con los
+  niveles, la medicion siguiente cruzo el 97,5% de los jugadores que entraron, pero de doce
+  cruces dudosos verificados contra la fecha de nacimiento de la pagina de cada jugador en
+  WhoScored, uno estaba mal: "Mathis Saka" con "Mathis Amougou", dos jugadores distintos del
+  mismo equipo que solo comparten el nombre de pila y la edad. Los otros once eran el mismo
+  jugador con otro nombre en cada fuente ("Diogo Sousa" es Diogo Lobao de Sousa). El nivel 6
+  deja de cruzar por el nombre de pila solo, y un jugador que los niveles no resuelven se
+  confirma con la fecha de nacimiento exacta de su pagina en WhoScored (FR-019d). Se
+  descarto quitar esos cruces sin confirmarlos, porque se perdian diez cruces correctos.
+- Q: Alcanzan el nombre y la edad para cruzar a un jugador con uno de otro equipo (FR-019a)?
+  -> A: No. Revisando los 97 jugadores que esa medicion dejo sin cruzar, el "Vitinha" del
+  Paris Saint-Germain quedo sin cruzar en seis partidos aunque el catalogo lo tiene: otro
+  "Vitinha", el del Genoa, de la misma edad, se proceso antes y se cruzo con el del Paris
+  Saint-Germain por FR-019a. Los dos tienen 26 anos, pero nacieron el 15/03/2000 y el
+  13/02/2000, y el catalogo tiene al del Genoa como "Vitor Oliveira" (la medicion siguiente
+  lo cruzo con el por la fecha). Un candidato de otro equipo se confirma con la fecha de
+  nacimiento exacta de la pagina del jugador, y mientras tanto el jugador no pasa a los
+  niveles de su equipo. Reemplaza la decision de cruzar al transferido solo por nombre y edad.
+- Q: Que pasa con un jugador que cambio de equipo y figura con otro nombre en cada fuente?
+  -> A: Se cruza con el de otro equipo que tiene exactamente su fecha de nacimiento si los
+  nombres coinciden por los niveles 1 a 3 (FR-019d). "Jose Maria Gimenez" jugo para el
+  Atletico de Madrid antes de pasar al Deportivo de La Coruna, donde el catalogo lo tiene como
+  "Jose Gimenez"; los dos nacieron el 20/01/1995.
+- Q: Que pasa con un jugador cuya fecha de nacimiento en el catalogo no es la exacta? -> A: Se
+  cruza con el de su equipo nacido el mismo ano si su nombre del catalogo esta dentro del nombre
+  completo de su pagina de WhoScored (FR-019d). "Rafita" es "Rafael Garrido Hierro", nacido el
+  09/11/2004; el catalogo lo tiene como "Rafa Garrido", con el 01/01/2004. En el catalogo hay 19
+  jugadores nacidos un 1 de enero, cuando por azar se esperan unos 7. De los 97 sin cruzar, 83
+  no tienen a nadie con un nombre parecido en el catalogo: salvo apodos como "Rafita", no estan
+  en el plantel de Football-Data y siguen sin poder cruzarse (FR-021).
+- Q: Alcanza la fecha de nacimiento exacta para cruzar con un jugador del mismo equipo cuyo
+  nombre no tiene nada que ver? -> A: No. Con la confirmacion por la pagina, la medicion
+  siguiente cruzo el 97,8% de los jugadores que entraron, pero cruzo a "Riccardo Ciervo" con
+  "Ignace Van Der Brempt": dos jugadores del Sassuolo nacidos el mismo dia (01/04/2002). El
+  catalogo tiene a Ciervo en el Cagliari, adonde paso despues. El paso 1 de FR-019d exige
+  ademas alguna relacion de nombre: una palabra en comun, un nivel de FR-019b o el nombre del
+  catalogo dentro del nombre completo. Con eso, la medicion siguiente (97,7%) cruzo a Ciervo
+  con el del Cagliari por el paso 2 y a Van Der Brempt con el suyo. Se pierden dos cruces
+  probablemente correctos de apodos sin ninguna relacion ("Youssef Enriquez" con "Yusi" y
+  "Yeremay Hernandez" con "Peke"), pero SC-003 no admite ningun cruce equivocado.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Estadisticas de los partidos terminados (Priority: P1)
@@ -138,7 +198,8 @@ valor por si sola: la cotizacion ya tiene datos de rendimiento.
 9. **Given** un jugador que en agosto jugo para el Brentford y que el catalogo ya tiene en
    el Tottenham, **When** se procesa un partido de agosto del Brentford, **Then** no hay
    candidato en el Brentford **And** se lo cruza con el jugador del Tottenham porque es el
-   unico del catalogo con el mismo nombre normalizado y la misma edad.
+   unico del catalogo con el mismo nombre normalizado y la misma edad **And** su pagina de
+   jugador en WhoScored trae su misma fecha de nacimiento.
 10. **Given** un jugador cruzado en un partido anterior, **When** aparece en otro partido,
     **Then** se lo reconoce por su identificador de WhoScored, sin volver a comparar
     nombres.
@@ -170,6 +231,36 @@ valor por si sola: la cotizacion ya tiene datos de rendimiento.
     motivo y los equipos y jugadores sin cruzar.
 20. **Given** un disparo manual de cualquiera de las dos fuentes, **When** termina,
     **Then** no se dispara la sincronizacion de la otra.
+21. **Given** un jugador que WhoScored informa como "Antonio Sivera" y que el catalogo
+    tiene como "Sivera" en el mismo equipo y con la misma edad, **When** se procesa su
+    partido, **Then** se lo cruza con ese jugador del catalogo.
+22. **Given** un jugador de WhoScored con el mismo apellido que dos jugadores sin cruzar
+    de su equipo y de su misma edad, **When** se procesa su partido, **Then** no se cruza
+    **And** figura en el informe como ambiguo.
+23. **Given** un jugador que cumplio anos despues de un partido que se procesa mas tarde,
+    **When** WhoScored informa su edad nueva, **Then** se lo reconoce igual por su edad.
+24. **Given** un jugador cuyo nombre en WhoScored no coincide con ninguno de su equipo en el
+    catalogo, **When** su pagina de jugador en WhoScored trae la misma fecha de nacimiento que
+    un unico jugador sin cruzar de su equipo con el que tiene alguna relacion de nombre, como
+    "Moustapha Mbow" y "Mamadou Mbow", **Then** se lo cruza con ese jugador.
+25. **Given** dos jugadores del mismo equipo que solo comparten el nombre de pila y la edad,
+    **When** sus fechas de nacimiento son distintas, **Then** no se cruzan **And** el de
+    WhoScored figura en el informe.
+26. **Given** la pagina de un jugador que WhoScored no entrega ni en el reintento, **When**
+    se procesa su partido, **Then** el jugador queda sin cruzar **And** la corrida sigue.
+27. **Given** dos jugadores de WhoScored de equipos distintos con el mismo nombre y la misma
+    edad, y solo uno de ellos en el catalogo, **When** se procesa un partido del que no esta,
+    **Then** no se cruza con el del catalogo, porque su fecha de nacimiento es otra, **And**
+    tampoco con un parecido de su equipo **And** figura en el informe como no confirmado.
+28. **Given** un jugador que cambio de equipo y figura con otro nombre en cada fuente,
+    como "Jose Maria Gimenez" y "Jose Gimenez", **When** su pagina de jugador trae la misma
+    fecha de nacimiento que el del catalogo, **Then** se lo cruza con el.
+29. **Given** un jugador cuya fecha de nacimiento en el catalogo no es la exacta, **When**
+    su pagina de jugador trae un nombre completo que contiene su nombre del catalogo y el mismo
+    ano de nacimiento, **Then** se lo cruza con el jugador de su equipo.
+30. **Given** un jugador de WhoScored que no esta en el catalogo y un companero de su equipo,
+    sin ninguna relacion de nombre, nacido el mismo dia, **When** se procesa su partido,
+    **Then** no se cruza con el companero **And** figura en el informe.
 
 ---
 
@@ -357,7 +448,18 @@ corrida siguiente sigue con los pendientes.
 - Un jugador pasa de un equipo a otro de las cinco ligas durante la temporada: el catalogo
   lo tiene en su equipo actual y WhoScored lo informa en el anterior en los partidos
   viejos. Como en ese equipo no hay candidato, se lo busca en todo el catalogo por nombre
-  normalizado y edad, y se cruza si hay uno unico.
+  normalizado y edad, y se cruza con el unico que tiene exactamente la fecha de nacimiento de
+  su pagina de jugador. Si en cada fuente figura con otro nombre, se lo cruza igual con el que
+  tiene esa fecha si los nombres coinciden por los niveles 1 a 3.
+- Dos jugadores de WhoScored de equipos distintos tienen el mismo nombre y la misma edad
+  ("Vitinha" del Genoa y del Paris Saint-Germain): uno no se cruza con el del catalogo que
+  tiene ese nombre en otro equipo, porque su fecha de nacimiento es distinta, ni con un
+  parecido de su propio equipo. Si el catalogo lo tiene con otro nombre ("Vitor Oliveira"),
+  se cruza con el por la fecha; si no lo tiene, queda sin cruzar como no confirmado.
+- Un jugador nacio el mismo dia que un companero de su equipo ("Riccardo Ciervo" e "Ignace
+  Van Der Brempt", del Sassuolo): sin ninguna relacion de nombre, la fecha sola no los cruza.
+  Si el catalogo lo tiene en otro equipo, como a Ciervo en el Cagliari, se lo cruza con ese
+  por el paso 2 de FR-019d.
 - Un jugador que dejo las cinco ligas antes de que se creara la base no esta en el
   catalogo: no se puede cruzar, se saltea y va al informe.
 - Un jugador inactivo que sigue en el catalogo (dejo las cinco ligas despues de creada la
@@ -373,6 +475,27 @@ corrida siguiente sigue con los pendientes.
   catalogo, o con los de ninguno: queda sin cruzar y sus partidos van al informe.
 - Un mismo jugador del catalogo nunca queda cruzado con dos identificadores de WhoScored,
   ni un identificador de WhoScored con dos jugadores del catalogo.
+- Un jugador figura con otro nombre en cada fuente: nombre corto o completo, otro orden,
+  un apodo, otra transliteracion, apostrofos o guiones. Si la regla estricta no lo
+  encuentra, se lo busca en su equipo por niveles cada vez mas flexibles, siempre con la
+  misma edad; si en un nivel hay mas de un candidato, no se cruza y va al informe.
+- Un jugador cumple anos entre el partido y la sincronizacion: WhoScored ya informa la
+  edad nueva, y se lo reconoce igual.
+- Un juvenil o un refuerzo reciente todavia no esta en el plantel de Football-Data: no
+  esta en el catalogo, asi que no se cruza y va al informe. Nunca se lo cruza por
+  descarte con otro jugador del equipo.
+- Un jugador figura con un nombre que no se parece en nada en cada fuente (un apodo, o
+  "Moustapha Mbow" y "Mamadou Mbow"): si su pagina de jugador en WhoScored trae la misma
+  fecha de nacimiento que un unico jugador sin cruzar de su equipo, se lo cruza con el.
+- Dos jugadores del mismo equipo comparten el nombre de pila y la edad: el nombre de pila
+  solo no los cruza; los distingue la fecha de nacimiento de la pagina del jugador.
+- La fecha de nacimiento del catalogo no es la exacta (un 1 de enero de relleno): ni la
+  fecha ni a veces la edad coinciden con las de WhoScored. Si la pagina del jugador trae su
+  nombre completo, y el nombre del catalogo esta dentro de el, se lo cruza con el jugador de su
+  equipo nacido el mismo ano ("Rafita", "Rafael Garrido Hierro", y "Rafa Garrido").
+- La pagina de un jugador no trae el nombre completo: solo se usa su fecha de nacimiento.
+- La pagina de un jugador en WhoScored falla siempre: ese jugador queda sin cruzar en cada
+  corrida, pero la corrida no se corta.
 - Un suplente entra en el tiempo agregado del segundo tiempo: tiene estadisticas, con los
   minutos desde que entra hasta el final, agregado incluido.
 - Un jugador sale en el tiempo agregado del primer tiempo: sus minutos incluyen lo que se
@@ -503,12 +626,76 @@ corrida siguiente sigue con los pendientes.
 
 - **FR-019**: Un jugador de WhoScored MUST buscarse primero entre los jugadores del
   catalogo del mismo equipo en ese partido, comparando el nombre normalizado. Si hay mas
-  de un candidato, MUST desempatar la edad o la fecha de nacimiento; si sigue siendo
-  ambiguo, MUST NOT cruzarse.
+  de un candidato, MUST desempatar la edad (FR-019c); si sigue siendo ambiguo, MUST NOT
+  cruzarse.
 - **FR-019a**: Si no hay ningun candidato en ese equipo, el jugador MUST buscarse entre
   todos los jugadores del catalogo, activos o inactivos, con el mismo nombre normalizado y
-  la misma edad, y MUST cruzarse solo si hay uno unico. Asi se cruza a un jugador que
-  cambio de equipo dentro de las cinco ligas en los partidos que jugo con el anterior.
+  la misma edad (FR-019c). El nombre y la edad no alcanzan para cruzarlo con un jugador de
+  otro equipo, porque dos jugadores distintos pueden compartirlos ("Vitinha" del Genoa y
+  "Vitinha" del Paris Saint-Germain, los dos de 26 anos). Si hay alguno, el jugador MUST NOT
+  buscarse por los niveles de FR-019b y MUST confirmarse con la fecha de nacimiento de su
+  pagina de jugador (FR-019d). Sin confirmar, queda sin cruzar como no confirmado si el
+  candidato era uno, y como ambiguo si eran mas. Asi se cruza a un jugador que cambio de
+  equipo dentro de las cinco ligas en los partidos que jugo con el anterior.
+- **FR-019b**: Si con FR-019 y FR-019a no hay ningun candidato, el jugador MUST buscarse
+  entre los jugadores del mismo equipo que todavia no tienen identificador de WhoScored
+  ni fueron elegidos para otro jugador del partido, con estos niveles en orden:
+  1. las mismas palabras, en otro orden ("Lee Kang-In" y "Kang-in Lee");
+  2. todas las palabras de un nombre estan en el otro ("Antonio Sivera" y "Sivera");
+  3. el mismo apellido, que es la ultima palabra ("Alex Baena" y "Alejandro Baena");
+  4. el mismo nombre escrito sin espacios, guiones ni apostrofos, en cualquier orden de
+     sus palabras, o uno de al menos cuatro letras contenido en el otro escrito asi
+     ("Ndicka" y "N'Dicka", "Gavi" y "Pablo Gavira");
+  5. el apellido con a lo sumo dos letras distintas, si los dos tienen al menos cinco
+     ("Yarmoliuk" y "Yarmolyuk");
+  6. una palabra de un nombre es el comienzo de una del otro, las dos de al menos cuatro
+     letras ("Chupe" y "Chupete", "Kiko Femenia" y "Femenia Far"), salvo que los dos
+     nombres tengan mas de una palabra y la unica coincidencia sea la primera palabra de
+     los dos: el nombre de pila solo no alcanza ("Mathis Saka" y "Mathis Amougou" no
+     coinciden).
+
+  En cada nivel solo cuentan los candidatos de la misma edad (FR-019c). Con uno, el
+  jugador MUST cruzarse con el; con mas de uno, MUST NOT cruzarse ni pasar al nivel
+  siguiente. El registro MUST dejar cada cruce hecho por estos niveles, con el nivel y los
+  dos nombres, para poder revisarlo.
+- **FR-019c**: La edad que informa WhoScored es la del dia en que se consulta la pagina.
+  Un jugador del catalogo MUST considerarse de la misma edad si la que surge de su fecha
+  de nacimiento el dia del partido es esa o una menos. Un jugador sin fecha de nacimiento,
+  o uno de WhoScored sin edad, nunca es de la misma edad.
+- **FR-019d**: Si con FR-019 a FR-019b el jugador queda sin cruzar, por no encontrado, por
+  ambiguo o por no confirmado, el sistema MUST pedir una vez su pagina de jugador en
+  WhoScored y leer su fecha de nacimiento y, si la trae, su nombre completo. Los candidatos
+  son los jugadores del catalogo sin cruzar y no elegidos para otro jugador del partido, y
+  el sistema MUST probar estos pasos en orden:
+  1. los de su equipo con exactamente esa fecha de nacimiento y alguna relacion de nombre:
+     comparten una palabra de al menos cuatro letras, coinciden por alguno de los niveles de
+     FR-019b (sin la condicion de la edad), o el nombre del catalogo esta dentro del nombre
+     completo. Dos jugadores del mismo equipo pueden nacer el mismo dia ("Riccardo Ciervo" e
+     "Ignace Van Der Brempt", del Sassuolo, nacidos el 01/04/2002);
+  2. si el paso 1 no encuentra ninguno, los de otros equipos, activos o inactivos, con
+     exactamente esa fecha y un nombre que coincide con el de WhoScored por los niveles 1 a 3
+     de FR-019b (el primero incluye el nombre igual) o que esta dentro del nombre completo.
+     Asi se cruza al que cambio de equipo aunque cada fuente escriba distinto su nombre
+     ("Jose Maria Gimenez" y "Jose Gimenez", nacidos el 20/01/1995);
+  3. si tampoco hay ninguno, los de su equipo nacidos el mismo ano cuyo nombre esta dentro
+     del nombre completo. Asi se cruza al que tiene en el catalogo una fecha que no es la
+     exacta ("Rafita", nombre completo "Rafael Garrido Hierro", nacido el 09/11/2004, y "Rafa
+     Garrido", con el 01/01/2004 en el catalogo).
+
+  Un nombre del catalogo esta dentro del nombre completo si cada una de sus palabras es una
+  palabra distinta del nombre completo, o el comienzo de una si tiene al menos cuatro letras
+  ("Rafa Garrido" esta dentro de "Rafael Garrido Hierro"; "Pablo Garcia" no esta dentro de
+  "Mauro Echegoyen Garcia"). Con un candidato en un paso, el jugador MUST cruzarse con el;
+  con mas de uno, MUST NOT cruzarse ni pasar al paso siguiente. Con ninguno en los tres, o
+  si la pagina no trae la fecha, MUST NOT cruzarse y queda con su motivo.
+  - La pagina de cada jugador MUST pedirse a lo sumo una vez por corrida, con el mismo
+    ritmo que las demas (FR-042) y un unico reintento (FR-043).
+  - Si la pagina no llega ni en el reintento, o no trae la fecha de nacimiento, el jugador
+    queda sin cruzar y la corrida MUST seguir: a diferencia de FR-044, una pagina de
+    jugador no corta la corrida.
+  - El registro MUST dejar cada cruce hecho con la pagina del jugador, con los dos nombres
+    y: en los pasos 1 y 2, la fecha, y si el jugador del catalogo es de otro equipo, que lo
+    es; en el paso 3, el ano y el nombre completo.
 - **FR-020**: Una vez cruzado, el sistema MUST guardar el identificador de WhoScored del
   jugador y MUST reconocerlo por el en los partidos siguientes, sin volver a comparar
   nombres.
@@ -591,7 +778,8 @@ corrida siguiente sigue con los pendientes.
   reintentarse una sola vez, despues de esperar al menos 30 segundos.
 - **FR-044**: Si el reintento tambien falla, el sistema MUST tomarlo como un bloqueo: MUST
   cortar la corrida entera, en todas las ligas que faltaban, y MUST NOT hacer ningun otro
-  pedido a WhoScored en esa corrida.
+  pedido a WhoScored en esa corrida. La pagina de un jugador es la excepcion (FR-019d): si
+  WhoScored esta bloqueando, el corte llega con la pagina siguiente de un partido.
 - **FR-045**: Ante un corte, el sistema MUST conservar todo lo ya guardado; los partidos
   que faltan MUST quedar pendientes para la proxima corrida, que MUST seguir donde quedo
   esta.
@@ -736,9 +924,18 @@ corrida siguiente sigue con los pendientes.
   varia de un partido a otro, y un jugador que no completo el partido puede sumar mas de
   90. Como aplica la cotizacion el umbral del enunciado ("jugar menos de 90 minutos") lo
   define la Entrega 2.
-- WhoScored informa la edad de cada jugador del partido y el catalogo tiene la fecha de
-  nacimiento; el desempate dentro del equipo y la busqueda en todo el catalogo comparan
-  la edad que surge de esa fecha el dia del partido.
+- WhoScored informa la edad de cada jugador del partido el dia en que se consulta la
+  pagina, y el catalogo tiene la fecha de nacimiento; las comparaciones por edad aceptan
+  la que surge de esa fecha el dia del partido o una mas (FR-019c).
+- Los nombres de los jugadores tambien difieren entre las fuentes (nombre corto o
+  completo, apodos, transliteraciones). FR-019b define los niveles de comparacion. Los
+  jugadores que no estan en el plantel de Football-Data no se pueden cruzar.
+- La pagina de cada jugador en WhoScored muestra su fecha de nacimiento completa, que
+  confirma un cruce cuando los nombres no alcanzan (FR-019d), y muchas veces su nombre
+  completo (verificado el 2026-10-15: lo traen "Rafita" y los dos "Vitinha", y no lo traen
+  "Riccardo Ciervo" ni "Youssef Enriquez"). Pedirla solo para los que quedan sin cruzar
+  y para los que tienen un candidato en otro equipo suma alrededor de cien paginas la
+  primera vez y pocas despues.
 - El entorno de tests no consulta WhoScored real: los tests usan un WhoScored simulado, y
   la puesta al dia al arrancar no corre en ese entorno salvo que un test la habilite a
   proposito, con el mismo criterio que la 005 aplica a su credencial.

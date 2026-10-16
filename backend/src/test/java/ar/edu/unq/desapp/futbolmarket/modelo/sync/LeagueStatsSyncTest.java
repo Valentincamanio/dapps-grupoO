@@ -1,6 +1,8 @@
 package ar.edu.unq.desapp.futbolmarket.modelo.sync;
 
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.ARSENAL;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BARRY;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BARRY_APPEARANCE;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BRENTFORD;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.EVERTON;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.EVERTON_MAN_UTD_STATS;
@@ -9,6 +11,8 @@ import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.LIVERPOOL
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.MAN_UTD;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.MAN_UTD_WS;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.SEASON;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.TARKOWSKI;
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.TARKOWSKI_APPEARANCE;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.TOTTENHAM;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.crossed;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.crossedSeasonMatches;
@@ -41,6 +45,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.performance.PlayerMatchStats;
 import ar.edu.unq.desapp.futbolmarket.modelo.performance.ReportedAppearance;
 import ar.edu.unq.desapp.futbolmarket.modelo.performance.ReportedMatchStats;
 import ar.edu.unq.desapp.futbolmarket.modelo.performance.Side;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.season.Season;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
 
@@ -284,6 +289,97 @@ class LeagueStatsSyncTest {
                         EVERTON_MAN_UTD_ID, CrossFailure.NOT_FOUND));
     }
 
+    /**
+     * WhoScored informa a James Tarkowski solo por su apellido.
+     */
+    @Test
+    void prepareDejaLosCrucesPorNombreDelPartido() {
+        LeagueStatsSync sync = syncWithEvertonManUtdCrossed();
+        ReportedMatchStats withShortName = withRenamedAppearance(EVERTON_MAN_UTD_STATS,
+                TARKOWSKI_APPEARANCE.whoscoredId(), "Tarkowski");
+
+        sync.prepare(evertonManUtd(), Optional.of(withShortName), catalog);
+
+        assertThat(sync.nameCrossesOf(evertonManUtd())).containsExactly(new NameCross("Tarkowski",
+                TARKOWSKI.crossWith(TARKOWSKI_APPEARANCE.whoscoredId()), NameMatchLevel.CONTAINED_WORDS));
+    }
+
+    /**
+     * WhoScored informa a Thierno Barry con un apodo que no tiene ninguna palabra en común con su
+     * nombre.
+     */
+    @Test
+    void birthDatesNeededDevuelveLosQueLosNombresDejanSinCruzarSinCambiarLaLiga() {
+        LeagueStatsSync sync = syncWithEvertonManUtdCrossed();
+        ReportedMatchStats withNickname = withRenamedAppearance(EVERTON_MAN_UTD_STATS,
+                BARRY_APPEARANCE.whoscoredId(), "Titi");
+
+        List<String> needed = sync.birthDatesNeeded(evertonManUtd(), Optional.of(withNickname), catalog);
+
+        assertThat(needed).containsExactly(BARRY_APPEARANCE.whoscoredId());
+        LeagueStatsResult result = sync.result(LeagueStatsStatus.PROCESSED);
+        assertThat(result.uncrossedPlayers()).isEmpty();
+        assertThat(result.skippedMatches()).isEmpty();
+        assertThat(sync.pendingMatches()).contains(evertonManUtd());
+    }
+
+    @Test
+    void birthDatesNeededNoPideNadaParaUnPartidoQueSeOmitiria() {
+        LeagueStatsSync sync = syncWithEvertonManUtdCrossed();
+
+        List<String> needed = sync.birthDatesNeeded(evertonManUtd(), Optional.empty(), catalog);
+
+        assertThat(needed).isEmpty();
+        assertThat(sync.result(LeagueStatsStatus.PROCESSED).skippedMatches()).isEmpty();
+    }
+
+    @Test
+    void prepareConLaFechaDeNacimientoCruzaAlJugadorYDejaElCruce() {
+        LeagueStatsSync sync = syncWithEvertonManUtdCrossed();
+        ReportedMatchStats withNickname = withRenamedAppearance(EVERTON_MAN_UTD_STATS,
+                BARRY_APPEARANCE.whoscoredId(), "Titi");
+
+        Optional<MatchStatsLoad> load = sync.prepare(evertonManUtd(), Optional.of(withNickname), catalog,
+                Map.of(BARRY_APPEARANCE.whoscoredId(),
+                        new ReportedPlayerProfile(BARRY.dateOfBirth(), "Thierno Barry Diallo")));
+
+        Player crossed = BARRY.crossWith(BARRY_APPEARANCE.whoscoredId());
+        assertThat(load).hasValueSatisfying(prepared -> assertThat(prepared.crossedPlayers()).contains(crossed));
+        assertThat(sync.birthDateCrossesOf(evertonManUtd()))
+                .containsExactly(new BirthDateCross("Titi", crossed, BARRY.dateOfBirth()));
+        assertThat(sync.result(LeagueStatsStatus.PROCESSED).uncrossedPlayers()).isEmpty();
+    }
+
+    /**
+     * La página trae otra fecha del mismo año y un nombre completo que contiene el del catálogo.
+     */
+    @Test
+    void prepareConElNombreCompletoDeLaPaginaDejaElCruceDelPartido() {
+        LeagueStatsSync sync = syncWithEvertonManUtdCrossed();
+        ReportedMatchStats withNickname = withRenamedAppearance(EVERTON_MAN_UTD_STATS,
+                BARRY_APPEARANCE.whoscoredId(), "Titi");
+        ReportedPlayerProfile profile = new ReportedPlayerProfile(BARRY.dateOfBirth().withDayOfYear(1),
+                "Thierno Barry Diallo");
+
+        sync.prepare(evertonManUtd(), Optional.of(withNickname), catalog,
+                Map.of(BARRY_APPEARANCE.whoscoredId(), profile));
+
+        Player crossed = BARRY.crossWith(BARRY_APPEARANCE.whoscoredId());
+        assertThat(sync.fullNameCrossesOf(evertonManUtd()))
+                .containsExactly(new FullNameCross("Titi", "Thierno Barry Diallo", crossed));
+        assertThat(sync.birthDateCrossesOf(evertonManUtd())).isEmpty();
+    }
+
+    @Test
+    void unPartidoSinCrucesPorNombreNoTieneNinguno() {
+        LeagueStatsSync sync = syncWithEvertonManUtdCrossed();
+
+        sync.prepare(evertonManUtd(), Optional.of(EVERTON_MAN_UTD_STATS), catalog);
+
+        assertThat(sync.nameCrossesOf(evertonManUtd())).isEmpty();
+        assertThat(sync.nameCrossesOf(matchBetween(crossedSeasonMatches(), MAN_UTD, EVERTON))).isEmpty();
+    }
+
     @Test
     void recordSnapshotCuentaLoCargadoYSacaEsosPartidosDeLosPendientes() {
         LeagueStatsSync sync = new LeagueStatsSync(LEAGUE, SEASON, seasonMatches());
@@ -358,6 +454,18 @@ class LeagueStatsSyncTest {
     private static SkippedStatsMatch skipped(StatsSkipReason reason) {
         Match match = evertonManUtd();
         return new SkippedStatsMatch(EVERTON_MAN_UTD_ID, "Everton FC", "Manchester United FC", match.utcDate(), reason);
+    }
+
+    private static ReportedMatchStats withRenamedAppearance(ReportedMatchStats reported, String whoscoredId,
+                                                            String name) {
+        List<ReportedAppearance> appearances = reported.appearances().stream()
+                .map(appearance -> !appearance.whoscoredId().equals(whoscoredId) ? appearance
+                        : new ReportedAppearance(appearance.whoscoredId(), name, appearance.age(), appearance.side(),
+                                appearance.starter(), appearance.enteredAt(), appearance.leftAt(),
+                                appearance.sourceCounts(), appearance.rating(), appearance.manOfTheMatch()))
+                .toList();
+        return new ReportedMatchStats(reported.whoscoredId(), reported.finished(), reported.homeTeamWhoscoredId(),
+                reported.awayTeamWhoscoredId(), reported.endMinute(), appearances, reported.goals(), reported.cards());
     }
 
     private static ReportedMatchStats withAppearance(ReportedMatchStats reported, ReportedAppearance appearance) {

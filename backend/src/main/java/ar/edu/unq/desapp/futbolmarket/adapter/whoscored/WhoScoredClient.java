@@ -53,20 +53,40 @@ public class WhoScoredClient {
      * El bloque de la página, leído por el extractor. Un extractor vacío es un rechazo.
      */
     public <T> T fetch(BlockedPage page, Function<String, Optional<T>> extractor) {
-        Attempt<T> first = request(page, extractor, awaitRequestInterval());
-        if (first.block().isPresent()) {
-            return first.block().get();
-        }
-        LOGGER.warn("WhoScored rechazó la página {} ({}, {} KB): se reintenta en {} s.", page.path(),
-                first.page().outcome(), first.page().sizeInKb(), seconds(properties.retryWait()));
-        sleeper.sleep(properties.retryWait());
-        Attempt<T> retry = request(page, extractor, properties.retryWait());
-        if (retry.block().isPresent()) {
-            return retry.block().get();
+        Attempt<T> attempt = withRetry(page.path(), extractor);
+        if (attempt.block().isPresent()) {
+            return attempt.block().get();
         }
         LOGGER.warn("WhoScored volvió a rechazar la página {} ({}, {} KB): se corta la corrida.", page.path(),
-                retry.page().outcome(), retry.page().sizeInKb());
+                attempt.page().outcome(), attempt.page().sizeInKb());
         throw new SourceBlockedException(page);
+    }
+
+    /**
+     * Como {@link #fetch}, con el mismo ritmo y el mismo reintento, para una página que no corta la
+     * corrida, como la de un jugador (FR-019d): si el reintento también falla, deja un WARN y
+     * devuelve vacío.
+     */
+    public <T> Optional<T> fetchIfAvailable(String path, Function<String, Optional<T>> extractor) {
+        Attempt<T> attempt = withRetry(path, extractor);
+        if (attempt.block().isEmpty()) {
+            LOGGER.warn("No se pudo leer la página {} de WhoScored: se sigue sin ella.", path);
+        }
+        return attempt.block();
+    }
+
+    /**
+     * El pedido y, si es un rechazo, la espera y el único reintento. Devuelve el último intento.
+     */
+    private <T> Attempt<T> withRetry(String path, Function<String, Optional<T>> extractor) {
+        Attempt<T> first = request(path, extractor, awaitRequestInterval());
+        if (first.block().isPresent()) {
+            return first;
+        }
+        LOGGER.warn("WhoScored rechazó la página {} ({}, {} KB): se reintenta en {} s.", path,
+                first.page().outcome(), first.page().sizeInKb(), seconds(properties.retryWait()));
+        sleeper.sleep(properties.retryWait());
+        return request(path, extractor, properties.retryWait());
     }
 
     /**
@@ -86,10 +106,10 @@ public class WhoScoredClient {
         return pause;
     }
 
-    private <T> Attempt<T> request(BlockedPage page, Function<String, Optional<T>> extractor, Duration pause) {
-        DownloadedPage downloaded = downloader.download(page.path());
+    private <T> Attempt<T> request(String path, Function<String, Optional<T>> extractor, Duration pause) {
+        DownloadedPage downloaded = downloader.download(path);
         lastResponseAt = clock.instant();
-        LOGGER.info("Pedido a WhoScored: {} ({}, {} KB; pausa previa de {} s).", page.path(), downloaded.outcome(),
+        LOGGER.info("Pedido a WhoScored: {} ({}, {} KB; pausa previa de {} s).", path, downloaded.outcome(),
                 downloaded.sizeInKb(), seconds(pause));
         T block = downloaded.isOk() ? extractor.apply(downloaded.body()).orElse(null) : null;
         return new Attempt<>(downloaded, block);

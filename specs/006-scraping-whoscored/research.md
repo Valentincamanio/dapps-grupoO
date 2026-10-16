@@ -307,6 +307,10 @@ señal principal.
     (`BlockedPage`: tipo, id de WhoScored y ruta). La corrida entera se corta (D18) y no hace
     ningún otro pedido.
   - `matchCentreData: null` no es un rechazo (D4).
+  - **La página de un jugador es la excepción** (FR-019d, D28): con el mismo ritmo y el mismo
+    reintento, si falla dos veces no se lanza nada y el jugador queda sin cruzar. Una página de
+    jugador rota (se vio una que respondía 502 siempre) cortaría todas las corridas; si
+    WhoScored está bloqueando de verdad, el corte llega con la página siguiente de un partido.
 - **Las esperas son inyectables**: `WhoScoredSleeper` (`void sleep(Duration)`) con
   `WhoScoredThreadSleeper` en producción y `RecordingWhoScoredSleeper` en test. Si el hilo se
   interrumpe (la aplicación se está apagando), se restaura la marca y se lanza
@@ -620,30 +624,252 @@ la página de la liga en la corrida, y cambia cada temporada.
 
 - `CatalogPlayers` es un índice en memoria de todos los jugadores del catálogo, activos o
   inactivos, con su equipo. Se carga una vez por corrida (unas 2.650 filas) y se indexa por id
-  de WhoScored, por equipo y nombre normalizado, y por nombre normalizado.
+  de WhoScored, por equipo y nombre normalizado, por nombre normalizado y por equipo (para los
+  niveles de FR-019b).
 - `PlayerCrossing`, para cada jugador de WhoScored que entró a la cancha:
   1. si algún jugador del catálogo ya tiene su id de WhoScored, es ese, sin mirar nombres ni
      equipo (FR-020);
   2. si no, los candidatos son los jugadores del equipo del catálogo cruzado con ese lado del
      partido que tienen el mismo nombre normalizado (FR-019). Con uno, es ese. Con más de uno,
-     desempata la edad: la que surge de la fecha de nacimiento el día del partido tiene que ser
-     la que informa WhoScored. Si sigue ambiguo, motivo `AMBIGUOUS`;
+     desempata la edad (FR-019c, abajo). Si sigue ambiguo, motivo `AMBIGUOUS`;
   3. si no hay candidatos en el equipo, se busca en todo el catálogo por nombre normalizado y
-     misma edad, y se cruza solo si hay uno único (FR-019a). Si no hay ninguno, motivo
-     `NOT_FOUND`; si hay más de uno, `AMBIGUOUS`;
-  4. nunca es candidato un jugador que ya tiene otro id de WhoScored, ni uno ya elegido para otro
+     misma edad (FR-019a). Si hay alguno, el nombre y la edad no alcanzan para cruzar con un
+     jugador de otro equipo: el jugador no pasa a los niveles y se confirma con la fecha de
+     nacimiento de su página (abajo). Sin confirmar, queda `NOT_CONFIRMED` si el candidato era
+     uno y `AMBIGUOUS` si eran más;
+  4. si tampoco hay ninguno, se busca en el equipo por niveles de nombre cada vez más
+     flexibles (FR-019b, abajo). Si ningún nivel encuentra a nadie, motivo `NOT_FOUND`;
+  5. nunca es candidato un jugador que ya tiene otro id de WhoScored, ni uno ya elegido para otro
      jugador del mismo partido (FR-022).
-- Un jugador sin fecha de nacimiento no participa de los desempates por edad.
+- **La edad** (FR-019c): WhoScored informa la del día en que se sirve la página, no la del día
+  del partido. Se verificó el 2026-10-15 en el partido 1983546 (21/08): Saka, van Ewijk y
+  Tchaouna, que cumplieron años en septiembre, figuran con 25, 26 y 23, uno más que ese día.
+  Como la temporada dura menos de un año, un jugador del catálogo es de la misma edad si la que
+  surge de su fecha de nacimiento el día del partido es la informada o una menos. Rige para el
+  desempate entre homónimos, para FR-019a y para los niveles. Un jugador sin fecha de
+  nacimiento, o una aparición sin edad, nunca es de la misma edad: no gana un desempate ni
+  entra en un nivel.
+- **Los niveles** (FR-019b), en este orden, sobre los jugadores del equipo que pueden ser
+  candidatos y son de la misma edad. Comparan los nombres normalizados (`NormalizedName`):
+  sus palabras y su forma compacta, que es el nombre sin separadores.
+
+  | Nivel | `NameMatchLevel` | Regla | Ejemplo real |
+  |---|---|---|---|
+  | 1 | `SAME_WORDS` | las mismas palabras, en otro orden | `Lee Kang-In` y `Kang-in Lee` |
+  | 2 | `CONTAINED_WORDS` | todas las palabras de un nombre están en el otro | `Antonio Sivera` y `Sivera` |
+  | 3 | `SAME_SURNAME` | la misma última palabra | `Álex Baena` y `Alejandro Baena` |
+  | 4 | `SAME_COMPACT` | la misma forma compacta en algún orden de las palabras, o una de al menos 4 letras contenida en la otra | `Ndicka` y `N'Dicka`, `Gavi` y `Pablo Gavira` |
+  | 5 | `SIMILAR_SURNAME` | últimas palabras de al menos 5 letras con a lo sumo 2 cambios (distancia de Levenshtein) | `Yarmoliuk` y `Yarmolyuk` |
+  | 6 | `WORD_PREFIX` | una palabra es el comienzo de otra, las dos de al menos 4 letras, salvo que los dos nombres tengan más de una palabra y la única coincidencia sea la primera de los dos | `Chupe` y `Chupete`, `Kiko Femenía` y `Femenía Far` |
+
+  En cada nivel, con un candidato se cruza; con más de uno el jugador queda `AMBIGUOUS` y no se
+  baja al nivel siguiente, porque uno más flexible elegiría entre candidatos que el anterior ya
+  no pudo distinguir. Los niveles solo corren si la regla estricta da `NOT_FOUND`: un homónimo
+  ambiguo sigue ambiguo.
+- **El registro de los cruces por nombre**: `PlayerCrossing` devuelve, además de los cruzados, un
+  `NameCross` por cada cruce hecho por un nivel (el nombre de WhoScored, el jugador y el nivel).
+  `StatsSyncService` deja un INFO por cada uno al guardar el partido, así un cruce dudoso se
+  puede revisar en el registro (SC-003). El modelo no escribe en el registro.
+- **La página del jugador** (FR-019d): si con todo lo anterior el jugador queda `NOT_FOUND`,
+  `AMBIGUOUS` o `NOT_CONFIRMED`, se resuelve con la fecha de nacimiento exacta y el nombre
+  completo de su página de jugador en WhoScored (D28). Es el último paso, y no un nivel más,
+  porque necesita una página:
+  1. `LeagueStatsSync.birthDatesNeeded` corre `PlayerCrossing` sin guardar nada y devuelve los
+     ids de WhoScored de los que quedarían sin cruzar;
+  2. el servicio pide esas páginas, una vez por jugador y corrida, y arma un mapa de id a
+     `ReportedPlayerProfile` (la fecha y el nombre completo, cualquiera de los dos puede faltar);
+  3. `prepare` corre `PlayerCrossing` con ese mapa. Para cada jugador sin cruzar cuya página
+     trajo la fecha, los candidatos son los elegibles (FR-022) del primero de estos pasos que
+     encuentre alguno:
+     1. los de su equipo con exactamente esa fecha y alguna **relación de nombre**: comparten
+        una palabra de al menos `WORD_PREFIX_MIN_LENGTH` (4) letras, coinciden por alguno de los
+        niveles sin la condición de la edad, o el nombre del catálogo está dentro del nombre
+        completo;
+     2. los de otros equipos con exactamente esa fecha y un nombre que coincide con el de
+        WhoScored por los niveles 1 a 3, o que está dentro del nombre completo (un transferido,
+        aunque cada fuente escriba distinto su nombre);
+     3. los de su equipo nacidos el mismo año cuyo nombre está dentro del nombre completo (una
+        fecha del catálogo que no es la exacta).
+
+     Con uno, se cruza; con más de uno, queda su motivo de antes sin pasar al paso siguiente;
+     con ninguno en los tres, también. Un nombre está **dentro del nombre completo** si cada
+     una de sus palabras es una palabra distinta del nombre completo, o el comienzo de una si
+     tiene al menos `WORD_PREFIX_MIN_LENGTH` (4) letras (`NormalizedName.isWithin`).
+  Cada cruce de los pasos 1 y 2 deja un `BirthDateCross` (el nombre de WhoScored, el jugador y
+  la fecha), y cada uno del paso 3, un `FullNameCross` (el nombre de WhoScored, el nombre
+  completo y el jugador). El servicio los escribe en el registro como los cruces por nombre, y
+  en un `BirthDateCross` agrega "en otro equipo" si el equipo del jugador del catálogo no es uno
+  de los dos del partido.
+- **El nombre de pila solo no alcanza**: el nivel 6 no cruza si los dos nombres tienen más de una
+  palabra y la única coincidencia es la primera de los dos. Esos jugadores quedan `NOT_FOUND` y
+  los resuelve la fecha de nacimiento, si coincide. Un nombre de una sola palabra (`Chupe`) no es
+  un nombre de pila suelto, y sigue en la regla general.
 - Un jugador sin cruzar se saltea y va al informe con su nombre, su equipo y el partido (FR-021).
   Nunca se crea un jugador.
 - El índice se actualiza con los cruces nuevos recién cuando el partido se confirmó en la base:
   si la escritura falla, no queda un cruce que no existe.
 
-**Justificación**: es la regla del spec. Cargar el catálogo entero es más barato que una consulta
-por nombre, y la comparación por nombre normalizado no se puede expresar en JPQL portable.
+**Evidencia de la fecha de nacimiento**: con los seis niveles, la medición del 2026-10-15 (295
+partidos) cruzó el 97,5%: 9062 filas y 228 apariciones sin cruzar, con 201 cruces por nombre. Se
+verificaron doce cruces dudosos (los del nivel 6 que solo compartían el nombre de pila y los del
+nivel 3 con nombres de pila sin relación) contra la fecha de nacimiento de la página de cada
+jugador en WhoScored:
 
-**Alternativa descartada**: **una columna con el nombre normalizado**: duplica un dato derivado y
-obliga a recalcularlo en cada sincronización con Football-Data.
+- once eran el mismo jugador con la misma fecha que Football-Data, aunque el nombre no se pareciera:
+  `Diogo Sousa` es Diogo Lobão de Sousa, `Manu Hernando` es José Manuel Hernando Riol, `Equi
+  Fernández` es el `Ignacio Fernández` del catálogo y `Moustapha Mbow` es su `Mamadou Mbow`;
+- uno estaba mal: `Mathis Saka` (20/09/2006) con `Mathis Amougou` (18/01/2006), del mismo equipo,
+  con el mismo nombre de pila y la misma edad.
+
+La fecha de nacimiento separa los dos casos sin perder los diez cruces correctos del nivel 6, y
+puede cruzar apodos que no comparten ninguna palabra con el nombre del catálogo.
+
+**Evidencia de la confirmación de los candidatos de otro equipo**: las 228 apariciones que esa
+medición dejó sin cruzar son 97 jugadores, todos `NOT_FOUND`. Comparados con el catálogo:
+
+- 83 no tienen a nadie con un nombre parecido (ni una palabra de al menos tres letras en común
+  en su equipo, ni un nombre contenido en el suyo en otro equipo): `Matteo Darmian`, `Mattia
+  Perin`, `Stephan El Shaarawy`, `Vincent Sierro` y la mayoría de los juveniles no están en el
+  plantel de Football-Data. Ningún cruce los alcanza (FR-021), salvo un apodo como `Rafita`;
+- 12 tienen a alguien con una palabra en común en su equipo, casi siempre otro jugador
+  (`Alex Marchal` y `Álex Remiro`), y 2 tienen en otro equipo a alguien con un nombre contenido
+  en el suyo.
+
+Tres de ellos mostraron huecos de la regla, verificados en sus páginas de WhoScored el
+2026-10-15:
+
+- **`Vitinha`** (Paris Saint-Germain, seis partidos): el catálogo tiene un solo `Vitinha`, el del
+  PSG (13/02/2000). WhoScored tiene dos de 26 años: el del PSG (`/players/384887`) y el del Genoa
+  (`/players/407949`, 15/03/2000, que en los partidos figura como `Vítinha`), al que el catálogo
+  tiene como `Vitor Oliveira`. La Serie A se procesa antes que la Ligue 1, así que el del Genoa
+  se cruzó primero por FR-019a con el `Vitinha` del catálogo, y desde ahí el del PSG no tuvo
+  candidato. Fue un cruce equivocado que el muestreo no vio, porque FR-019a no dejaba línea en el
+  registro. WhoScored tiene además otra página del del Genoa (`/players/407946`), sin nombre
+  completo, que no es la de los partidos.
+- **`José María Giménez`** (Atlético de Madrid, dos partidos): pasó al Deportivo de La Coruña,
+  donde el catálogo lo tiene como `José Giménez`, con la misma fecha (20/01/1995,
+  `/players/135914`). Fuera del equipo solo valía el nombre exacto.
+- **`Rafita`** (Málaga, ocho partidos): su página dice `Full Name: Rafael Garrido Hierro` y
+  09-11-2004 (`/players/508349`); el catálogo lo tiene como `Rafa Garrido` con el 01/01/2004. Ni
+  la fecha ni la edad coinciden (21 en WhoScored, 22 con esa fecha). En el catálogo hay 19
+  jugadores nacidos un 1 de enero, cuando por azar se esperan unos 7: Football-Data completa así
+  algunas fechas que no conoce.
+
+Con los tres pasos, los cruces de otro equipo pasan a tener la misma garantía que los de la
+fecha de nacimiento, y quedan en el registro.
+
+**Evidencia de la relación de nombre en el paso 1**: la medición siguiente (2026-10-15, 295
+partidos, 2151 s, sin corte) pidió 428 páginas, 133 de ellas de jugador, sin ningún rechazo, y
+cruzó el 97,8%: 9089 filas y 201 apariciones sin cruzar, todas `NOT_FOUND`. Dejó 188 cruces por
+nombre, 16 por fecha en el equipo, 21 por fecha en otro equipo y uno por nombre completo. Frente a
+la anterior, solo desapareció `Mathis Saka` con `Mathis Amougou`; los otros once dudosos siguen
+cruzados (`Junior Diaz` con `Michel Diaz` se verificó esta vez: 23/07/2003 en las dos fuentes).
+`Vitinha` quedó con el del PSG, `Vítinha` con `Vitor Oliveira`, `José María Giménez` con `José
+Giménez` y `Rafita` con `Rafa Garrido`. Los 21 de otro equipo tienen el mismo nombre y la misma
+fecha en las dos fuentes. De los 16 del equipo, verificados en las páginas de WhoScored:
+
+- uno estaba mal: `Riccardo Ciervo` con `Ignace Van Der Brempt`, del Sassuolo, nacidos los dos el
+  01/04/2002 (`/players/407149` es la página de Ciervo; Van Der Brempt es otro jugador). El
+  catálogo tiene a Ciervo en el Cagliari, adonde pasó después, pero el paso 1 tomó antes al único
+  compañero nacido ese día, y el Van Der Brempt de WhoScored quedó sin cruzar;
+- 13 tienen una palabra en común (`Abdul Fatawu` y `Abdul Issahaku`, `Lamine Fanne` y `Lamine
+  Dabo`), un nivel sin la edad (`Mousa Al Tamari` y `Musa Al Taamari`) o el nombre del catálogo
+  dentro del nombre completo (`Pote` es `Pedro António Pereira Gonçalves`, `Mezian Mesloub` es
+  `Mezian Mesloub Soares`);
+- 2 no tienen ninguna relación de nombre y su página no trae el nombre completo: `Youssef
+  Enriquez` con `Yusi` (6 filas) y `Yeremay Hernández` con `Peke` (7 filas). Son apodos y
+  probablemente el mismo jugador, pero no hay cómo confirmarlo con los datos de las páginas.
+
+Pedir una relación de nombre en el paso 1 descarta esos tres cruces.
+
+**Evidencia de la medición final**: con la relación de nombre, la medición del 2026-10-15 (295
+partidos, 2143 s, sin corte, 427 páginas, 132 de jugador, sin ningún rechazo) cruzó el **97,7%**:
+9077 filas y 213 apariciones sin cruzar, todas `NOT_FOUND`. Dejó 188 cruces por nombre, 13 por
+fecha en el equipo, 22 por fecha en otro equipo y uno por nombre completo. Frente a la anterior:
+
+- `Riccardo Ciervo` se cruzó por el paso 2 con el del catálogo en el Cagliari (mismo nombre y
+  misma fecha), y el `Ignace Van Der Brempt` de WhoScored, con el suyo del Sassuolo;
+- `Youssef Enriquez` (6 apariciones) y `Yeremay Hernández` (7) quedaron sin cruzar;
+- todo lo demás quedó igual: los once dudosos de la primera medición cruzados y `Mathis Saka`
+  sin cruzar, los dos `Vitinha`, `José María Giménez` y `Rafita` con los suyos.
+
+SC-002 se cumple y no queda ningún cruce equivocado conocido (SC-003).
+
+**Evidencia de los niveles**: la primera sincronización completa contra el sitio real (2026-10-15, 293
+partidos) cruzó con la regla estricta el 87,3% de los jugadores que entraron a la cancha: 8114
+filas y 1176 apariciones sin cruzar, de 301 jugadores, todas `NOT_FOUND`. Casi todos estaban en
+el equipo correcto del catálogo con otro nombre. Una simulación de los niveles sobre esos 301
+jugadores, sin el filtro de edad, resolvió:
+
+| Nivel | Jugadores | Apariciones |
+|---|---|---|
+| 1 | 6 | 34 |
+| 2 | 95 | 450 |
+| 3 | 65 | 308 |
+| 4 | 18 | 80 |
+| 5 | 3 | 19 |
+| 6 | 21 | 71 |
+| Sin resolver | 93 | 214 |
+
+Eso lleva SC-002 a cerca del 97,7%. Los que quedan son, sobre todo, juveniles y altas recientes
+que no están en el plantel de Football-Data, y apodos sin ninguna palabra en común con el nombre
+del catálogo (`Rafita`, `Vitinha`). El filtro de edad descarta los falsos positivos que mostró
+la simulación en los niveles 5 y 6, como `Yeremay Hernández` y `Álvaro Fernández`.
+
+**Justificación**: la regla estricta del spec original no alcanza con los datos reales. Los
+niveles van de la coincidencia más segura a la menos segura, siempre dentro del equipo, con la
+edad y con un candidato único, así un cruce flexible nunca elige entre dos posibles.
+Cargar el catálogo entero es más barato que una consulta por nombre, y la comparación por nombre
+normalizado no se puede expresar en JPQL portable.
+
+**Alternativas descartadas**:
+
+- **Una columna con el nombre normalizado**: duplica un dato derivado y obliga a recalcularlo en
+  cada sincronización con Football-Data.
+- **Cruzar por descarte**: el único jugador sin cruzar del equipo con esa edad, o con esa edad y
+  esa línea. Muchos de los que quedan sin cruzar no están en el catálogo, así que se cruzarían
+  con otro jugador, y eso rompe SC-003.
+- **Quitar del nivel 6 el nombre de pila sin confirmar nada**: evita el cruce equivocado, pero
+  pierde diez correctos (40 apariciones, SC-002 en 97,1%).
+- **Confirmar con la fecha de nacimiento todos los cruces flexibles**: los once verificados de
+  los niveles 3 y 6 eran correctos salvo el del nombre de pila, y confirmar los 200 cruces por
+  nombre sumaría unas 200 páginas por temporada sin una ganancia que lo justifique.
+- **Buscar parecidos en todo el catálogo**: un nombre parecido en otro equipo es mucho más
+  probable que sea otro jugador. Fuera del equipo, un nombre parecido solo cuenta junto con la
+  fecha de nacimiento exacta (FR-019d, paso 2).
+- **Cruzar al candidato de otro equipo por nombre y edad**: es lo que cruzó al `Vitinha` del
+  Genoa con el del PSG. Un nombre de una palabra y una edad los comparten muchos jugadores.
+- **La fecha sola en el paso 1**: en un plantel de 30 jugadores, que uno comparta la fecha con un
+  compañero pasa (`Riccardo Ciervo` e `Ignace Van Der Brempt`), y el paso 1 lo cruza con el
+  compañero antes de buscarlo en su equipo del catálogo. Pedir una relación de nombre pierde dos apodos sin ninguna palabra en común, que no
+  se pueden confirmar.
+- **Pedir en el paso 1 un nivel de nombre con su regla completa**: el nivel 6 no acepta el nombre
+  de pila solo, pero junto con la fecha exacta sí alcanza (`Abdul Fatawu` y `Abdul Issahaku`,
+  `Lamine Fanne` y `Lamine Dabo`). Por eso basta una palabra en común.
+- **Comparar el equipo actual de la página con el del catálogo**: la página dice el equipo de hoy,
+  no el del partido (`Riccardo Ciervo` ya figura en el Cagliari), y un compañero nacido el mismo
+  día sigue siendo del mismo equipo.
+- **Seguir con los niveles del equipo cuando el candidato de otro equipo no se confirma**: un
+  transferido que tiene en su equipo nuevo un compañero de su edad con el mismo apellido se
+  cruzaría con el compañero (`Yoane Wissa` y `Christian Wissa`). Sin los niveles, ese jugador
+  queda `NOT_CONFIRMED` y lo resuelve la fecha.
+- **Los niveles contra el nombre completo**: el nombre completo suele traer los dos apellidos,
+  y el nivel 3 compararía el segundo (`Mauro Echegoyen García` con un `Pablo García` del
+  equipo). Que el nombre del catálogo esté entero dentro del nombre completo es más estricto y
+  alcanza para los nombres cortos (`Rafa Garrido`, `Diogo Sousa`, `Manu Hernando`).
+- **La edad en el paso 3**: con una fecha de relleno, la edad puede diferir en uno (`Rafita`
+  tiene 21 en WhoScored y 22 con el 01/01/2004). El año es la parte de la fecha que se conserva.
+- **Cruzar toda la liga de una vez**: juntar las apariciones de todos sus partidos, o tomar los
+  jugadores del feed `statisticsfeed` de la liga, y cruzarlas juntas evitaría que el primero
+  que llega se quede con un jugador. Pero las estadísticas se guardan partido por partido para
+  que un corte no pierda lo hecho (FR-045 y SC-008), y el feed trae totales de la temporada,
+  tiene un filtro de mínimo de partidos (`isMinApp`) y exige un header propio del sitio o un
+  navegador real. Confirmar con la fecha a los candidatos de otro equipo resuelve el mismo problema sin
+  cambiar el flujo.
+- **Una tabla de apodos**: hay que mantenerla a mano, y FR-021 descarta el cruce manual.
+- **Comparar la edad el día de la corrida**: es la que informa WhoScored, pero obliga a pasar la
+  fecha de la corrida al modelo. Aceptar la del día del partido o una más da lo mismo dentro de
+  una temporada.
 
 ## D15. Modelo del rendimiento
 
@@ -1190,6 +1416,66 @@ cuello de botella es la pausa que exige el spec.
 - **Leer el HTML como flujo para no tenerlo entero en memoria**: 1,3 MB por página no justifica un
   parser incremental.
 
+**Medido el 2026-10-15**: con los equipos y partidos ya cruzados, la puesta al día de los 295
+partidos terminados pidió 296 páginas (una se reintentó por un 502) en 1737 s, unos 5,9 s por
+página. Las páginas de jugador de FR-019d suman alrededor de cien la primera vez (unos 10
+minutos) y pocas en las corridas siguientes, porque un jugador cruzado se reconoce por su id.
+
+## D28. Página de jugador: fecha de nacimiento y nombre completo
+
+**Decisión**:
+
+- **La página**: `/players/{id}/show`, unos 134 KB. La fecha de nacimiento viene en el HTML del
+  servidor, en el bloque de datos del jugador:
+  `<span class="info-label">Age: </span>20 years old (<i>20-01-2006</i>)`, con la fecha como
+  `dd-MM-yyyy`. No hay JSON-LD ni un bloque de script con la fecha (verificado el 2026-10-15).
+  En el mismo bloque, muchas páginas traen el nombre completo:
+  `<span class="info-label">Full Name: </span>Rafael Garrido Hierro`, hasta el `</div>`. Lo
+  traen `Rafita` (`/players/508349`) y los dos `Vitinha` (`/players/384887` y
+  `/players/407949`); no lo traen `Riccardo Ciervo` (`/players/407149`), `Youssef Enriquez`
+  (`/players/519969`) ni una página vieja del `Vitinha` del Genoa (`/players/407946`)
+  (verificado el 2026-10-15).
+- **La extracción**: `PlayerProfileExtractor` busca la etiqueta `Age: ` dentro del bloque
+  `info-label` y lee la fecha del `<i>` siguiente; y busca la etiqueta `Full Name: ` y lee el
+  texto que sigue hasta el `</div>`, sin los espacios de los bordes, con los espacios seguidos
+  reducidos a uno y las entidades HTML decodificadas (`HtmlUtils.htmlUnescape` de spring-web).
+  - Una página sin ningún `info-label` es un rechazo, como las demás páginas sin su bloque (D4).
+  - Una página con el bloque pero sin la edad, o con una fecha que no se puede leer, no es un
+    rechazo: el jugador no tiene fecha y no se reintenta.
+  - Sin `Full Name`, o con el texto vacío, el jugador no tiene nombre completo; tampoco es un
+    rechazo.
+- **El cliente**: `WhoScoredClient.fetchIfAvailable(String path, extractor)` aplica el mismo ritmo
+  y el mismo reintento que `fetch`, pero después del segundo rechazo deja un WARN y devuelve
+  vacío en lugar de lanzar `SourceBlockedException` (FR-019d y D6). Recibe la ruta y no una
+  `BlockedPage`, porque una página de jugador nunca es la de un corte: `PageKind` y el contrato
+  de la API no cambian. `WhoScoredPages.playerPath(id)` arma la ruta.
+- **El adapter**: `fetchPlayerProfile(String playerWhoscoredId)` devuelve
+  `Optional<ReportedPlayerProfile>`: vacío si la página no llegó; si llegó, el perfil con la
+  fecha y el nombre completo, cualquiera de los dos nulo si la página no lo trae.
+- **Una vez por jugador y corrida**: el servicio guarda en un mapa los perfiles ya pedidos,
+  también los que dieron vacío, así un jugador sin cruzar que juega varios partidos de la
+  corrida no se pide dos veces. Un jugador que se cruza con la página se reconoce después por su
+  id (FR-020) y no se vuelve a pedir en ninguna corrida.
+- **A quién se le pide**: a los que quedan sin cruzar después de los niveles y a los que tienen
+  un candidato en otro equipo por nombre y edad (FR-019a), que sin la fecha no se cruzan.
+
+**Justificación**: la fecha de nacimiento es el dato que distingue a dos jugadores del mismo
+equipo y la misma edad, y es la que se usó para verificar los cruces a mano. El nombre completo
+viene en la misma página y cubre las fechas del catálogo que no son exactas. Pedir la página
+solo para los que quedan sin cruzar o tienen un candidato de otro equipo mantiene el volumen
+bajo.
+
+**Alternativas descartadas**:
+
+- **Leer la fecha de la página del partido**: el bloque `matchCentreData` trae la edad, no la
+  fecha.
+- **Cortar la corrida si la página del jugador falla dos veces**: una página rota cortaría cada
+  corrida en el mismo jugador.
+- **Guardar la fecha de WhoScored en el catálogo**: es un dato que no se usa fuera del cruce, y
+  el jugador ya queda identificado por su id de WhoScored.
+- **Leer solo la fecha**: deja sin cruzar a los que tienen en el catálogo una fecha de relleno
+  (`Rafita`), y el nombre completo no cuesta un pedido más.
+
 ---
 
 ## Fuentes consultadas
@@ -1201,6 +1487,12 @@ cuello de botella es la pausa que exige el spec.
     `/livestatistics` del 1983559 (íconos de eventos clave con `data-event-satisfier-assist`);
   - `localization_debug.json`, con los rótulos de las columnas (`TackleWon` → "Tackles",
     `ChallengeLost` → "Drb").
+- **WhoScored**, verificado el 2026-10-15 con el navegador: la búsqueda de jugadores
+  (`/search/?t=...`) y las páginas de jugador de `Vitinha` (384887, 407946 y 407949), `Rafita`
+  (508349) y `José María Giménez` (135914), con su fecha de nacimiento y, cuando está, su nombre
+  completo; y, después de la segunda medición, las de `Riccardo Ciervo` (407149), `Yeremay
+  Hernández` (448011), `Youssef Enriquez` (519969), `Lamine Fanne` (538489), `Mezian Mesloub`
+  (622003), `Pote` (344378) y `Junior Diaz` (455459).
 - Lo verificado por Lucas el 2026-10-13 con `curl` y con Java, en el pedido de planificación:
   headers, 49 de 50 respuestas con datos, la señal de rechazo (un 403 de 5 a 6 KB en menos de
   0,3 s), tiempos y tamaños.

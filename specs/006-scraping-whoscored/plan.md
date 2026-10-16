@@ -358,7 +358,7 @@ Se revisaron [data-model.md](./data-model.md), [contracts/](./contracts/) y
 specs/006-scraping-whoscored/
 ├── spec.md                        # especificación (sin cambios en este plan)
 ├── plan.md                        # este archivo
-├── research.md                    # decisiones D1 a D27 y lo verificado contra WhoScored
+├── research.md                    # decisiones D1 a D28 y lo verificado contra WhoScored
 ├── data-model.md                  # modelo, persistencia, transiciones y trazabilidad
 ├── quickstart.md                  # guía de validación de punta a punta
 ├── contracts/

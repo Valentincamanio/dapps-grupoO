@@ -16,6 +16,7 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -42,6 +43,7 @@ import ar.edu.unq.desapp.futbolmarket.config.WhoScoredProperties.Snapshot;
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.performance.ReportedMatchStats;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.ReportedFixture;
+import ar.edu.unq.desapp.futbolmarket.modelo.sync.ReportedPlayerProfile;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.ReportedTeam;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.SourceBlockedException;
 import tools.jackson.databind.json.JsonMapper;
@@ -79,6 +81,9 @@ class WhoScoredAdapterTest {
     private static final Resource FIXTURES_EVERTON = page("fixtures-everton.html");
     private static final Resource LEAGUE_PREMIER = page("league-premier.html");
     private static final Resource REJECTED = page("rejected-403.html");
+    private static final Resource PLAYER_PROFILE = page("player-profile.html");
+    private static final String PLAYER_ID = "497764";
+    private static final String PLAYER_PATH = "/players/497764/show";
 
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
     private final RestClient.Builder builder = WhoScoredClientConfig.applyDefaults(RestClient.builder(), PROPERTIES);
@@ -228,6 +233,67 @@ class WhoScoredAdapterTest {
         assertThat(teams).extracting(ReportedTeam::whoscoredId).containsExactly("31", "15", "19", "23", "32");
         assertThat(fixtures).extracting(ReportedFixture::whoscoredId)
                 .containsExactly("1954001", "1983549", "1983560", "1983609");
+        assertThat(sleeper.sleeps()).containsExactly(REQUEST_INTERVAL);
+    }
+
+    @Test
+    void laFechaDeNacimientoSaleDeLaPaginaDelJugador() {
+        expect(PLAYER_PATH).andRespond(html(PLAYER_PROFILE));
+
+        Optional<ReportedPlayerProfile> profile = adapter.fetchPlayerProfile(PLAYER_ID);
+
+        server.verify();
+        assertThat(profile.map(ReportedPlayerProfile::birthDate)).contains(LocalDate.of(2006, 1, 20));
+    }
+
+    @Test
+    void laPaginaDelJugadorDaLaFechaYElNombreCompleto() {
+        expect(PLAYER_PATH).andRespond(html(PLAYER_PROFILE));
+
+        Optional<ReportedPlayerProfile> profile = adapter.fetchPlayerProfile(PLAYER_ID);
+
+        server.verify();
+        assertThat(profile).contains(new ReportedPlayerProfile(LocalDate.of(2006, 1, 20), "Diogo Lobão de Sousa"));
+    }
+
+    /**
+     * A diferencia de las demás páginas, la de un jugador no corta la corrida (FR-019d).
+     */
+    @Test
+    void dosRechazosDeLaPaginaDeUnJugadorDevuelvenVacioSinCortarLaCorrida(CapturedOutput output) {
+        expect(PLAYER_PATH).andRespond(html(REJECTED));
+        expect(PLAYER_PATH).andRespond(html(REJECTED));
+
+        Optional<ReportedPlayerProfile> profile = adapter.fetchPlayerProfile(PLAYER_ID);
+
+        server.verify();
+        assertThat(profile).isEmpty();
+        assertThat(sleeper.sleeps()).containsExactly(RETRY_WAIT);
+        assertThat(output).contains("WhoScored rechazó la página " + PLAYER_PATH,
+                "No se pudo leer la página " + PLAYER_PATH + " de WhoScored: se sigue sin ella.");
+    }
+
+    @Test
+    void unaPaginaDeJugadorSinLaEdadDevuelveVacioSinReintentar() {
+        expect(PLAYER_PATH).andRespond(withSuccess(
+                "<div><span class=\"info-label\">Name: </span>Diogo Sousa</div>", MediaType.TEXT_HTML));
+
+        Optional<ReportedPlayerProfile> profile = adapter.fetchPlayerProfile(PLAYER_ID);
+
+        server.verify();
+        assertThat(profile.map(ReportedPlayerProfile::birthDate)).isEmpty();
+        assertThat(sleeper.sleeps()).isEmpty();
+    }
+
+    @Test
+    void laPaginaDelJugadorRespetaLaPausaDeCuatroSegundos() {
+        expect(MATCH_PATH).andRespond(html(MATCH_1983600));
+        expect(PLAYER_PATH).andRespond(html(PLAYER_PROFILE));
+
+        adapter.fetchMatchStats(MATCH_ID);
+        adapter.fetchPlayerProfile(PLAYER_ID);
+
+        server.verify();
         assertThat(sleeper.sleeps()).containsExactly(REQUEST_INTERVAL);
     }
 

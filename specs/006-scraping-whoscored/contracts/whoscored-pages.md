@@ -46,14 +46,21 @@ fechas de la de Football-Data.
 | Equipos de la fecha en curso | Página de la liga (tabla de arriba) | JSON `tournamentfixtures` | unos 47 KB de JSON | Solo si la liga tiene pendientes y algún equipo sin cruzar ([research.md](../research.md) D11) |
 | Temporada de un equipo | `/teams/{id}/fixtures` | Array JS `fixtureMatches` | unos 106 KB | Una vez por corrida y equipo, mientras haga falta descubrir ids |
 | Estadísticas de un partido | `/matches/{id}/live` | JSON `matchCentreData` | 1,0 a 1,3 MB | Una vez por partido pendiente con id |
+| Fecha de nacimiento y nombre completo de un jugador | `/players/{id}/show` | Datos del jugador (`info-label`) | unos 134 KB | Solo para un jugador que queda sin cruzar después de los niveles de nombre, o que tiene un candidato en otro equipo por nombre y edad (FR-019a), una vez por corrida (FR-019d) |
 
-No se usan las páginas de jugador: cargan las estadísticas por JavaScript y serían 2.649 páginas.
+De la página de jugador solo se leen la fecha de nacimiento y el nombre completo, y solo para
+esos jugadores: sus estadísticas se cargan por JavaScript, y pedirla para todos serían 2.649
+páginas.
 Tampoco se usa el feed `statisticsfeed`, que exige un header propio del sitio.
 
 ### Página de la liga: bloque `tournamentfixtures`
 
 **Cómo se extrae**: se busca el `<script type="application/json" data-hypernova-key="tournamentfixtures">`,
 se quita el `<!--` del principio y el `-->` del final, y se lee el JSON.
+
+La misma clave aparece antes en el `<div data-hypernova-key="tournamentfixtures">` que el servidor
+ya dibujó con esos datos (verificado el 2026-10-15). Por eso se toma la primera aparición que está
+dentro de una etiqueta `<script>`, no la primera de la página.
 
 ```html
 <script type="application/json" data-hypernova-key="tournamentfixtures" data-hypernova-id="8c4e..."><!--{"createdAt":"2026-10-13T23:41:33Z","tournaments":[{"tournamentId":2,"stageId":25544,"regionId":252,"seasonName":"2026/2027","seasonId":11141,"matches":[{"stageId":25544,"id":1983609,"status":1,"startTime":"2026-10-17T12:30:00","homeTeamId":31,"homeTeamName":"Everton","homeRedCards":0,"awayTeamId":15,"awayTeamName":"Chelsea","awayRedCards":0,"startTimeUtc":"2026-10-17T11:30:00Z","homeScore":null,"awayScore":null,"bets":{...}}, ...]}], ...}--></script>
@@ -258,6 +265,46 @@ Eventos `Card` (17), por su `cardType.value`:
 
 Así, la doble amarilla cuenta como una amarilla y una roja (FR-007).
 
+### Página de un jugador: fecha de nacimiento y nombre completo
+
+**Cómo se extrae**: los dos datos vienen en el HTML del servidor, en el bloque de datos del
+jugador (verificado el 2026-10-15 en `/players/497764/show`, `/players/508349/show`,
+`/players/384887/show`, `/players/407949/show` y `/players/407149/show`). No hay JSON-LD ni un bloque de script con
+ellos.
+
+- **La fecha**: se busca la etiqueta `Age: ` de un `info-label` y se lee la fecha del `<i>` que
+  la sigue, en formato `dd-MM-yyyy`.
+- **El nombre completo**: se busca la etiqueta `Full Name: ` de un `info-label` y se lee el
+  texto que sigue hasta el `</div>`, sin los espacios de los bordes, con los espacios seguidos
+  reducidos a uno y las entidades HTML decodificadas. El HTML llega con los acentos tal cual
+  (`Vítor Machado Ferreira`). No todas las páginas lo traen: la de `Riccardo Ciervo`
+  (`/players/407149/show`) pasa de `Name` a `Current Team`.
+
+```html
+<div class="col12-lg-6 col12-m-6 col12-s-6 col12-xs-12">
+    <span class="info-label">Name: </span>Rafita
+</div>
+<div class="col12-lg-6 col12-m-6 col12-s-6 col12-xs-12">
+    <span class="info-label">Full Name: </span>Rafael Garrido Hierro
+</div>
+...
+<div class="col12-lg-6 col12-m-6 col12-s-6 col12-xs-12">
+    <span class="info-label">Age: </span>21 years old (<i>09-11-2004</i>)
+</div>
+```
+
+| Dato | Uso | Destino |
+|---|---|---|
+| La fecha del `<i>` que sigue a `Age: ` | Sí | La fecha de nacimiento de los pasos de FR-019d |
+| El texto que sigue a `Full Name: ` | Sí | El nombre completo de los pasos 2 y 3 de FR-019d |
+| `Name`, `Current Team`, `Shirt Number`, `Height`, `Nationality`, `Positions` y el resto | No | Se ignoran |
+
+- Una página sin ningún `info-label` es un rechazo, como una página de partido sin su bloque.
+- Una página con los datos del jugador pero sin la edad, o con una fecha que no se puede leer,
+  **no es un rechazo**: el jugador no tiene fecha y no se reintenta.
+- Una página sin `Full Name`, o con el texto vacío, **no es un rechazo**: el jugador no tiene
+  nombre completo.
+
 ## Señales de rechazo
 
 Una página es válida solo si responde 200 **y** trae su bloque. Cualquier otra cosa es un
@@ -265,18 +312,23 @@ rechazo:
 
 | Señal | Ejemplo | Efecto |
 |---|---|---|
-| 403 de unos 5 a 6 KB que llega en menos de 0,3 s | Visto por Lucas una vez en 50 pedidos; al reintentar, la misma página respondió 200 con datos | Rechazo |
+| 403 de unos 5 a 6 KB que llega en menos de 0,3 s | Visto una vez en 50 pedidos; al reintentar, la misma página respondió 200 con datos | Rechazo |
 | Otro status distinto de 200 | — | Rechazo |
 | Timeout o falla de red | — | Rechazo |
 | 200 sin el bloque esperado, o con un bloque que no se puede leer | Una página de "no existe" o de verificación | Rechazo |
 | 200 con `matchCentreData: null` | Partido sin jugar o recién terminado | **No es un rechazo**: el partido se omite y queda pendiente |
+| 200 de una página de jugador con sus datos pero sin la edad | Jugador sin fecha de nacimiento en WhoScored | **No es un rechazo**: el jugador queda sin fecha |
 
 Ante un rechazo:
 
 1. queda un WARN con la ruta, el status y el tamaño;
 2. se espera al menos 30 s y se reintenta una vez (FR-043);
 3. si el reintento también falla, es un bloqueo: la corrida se corta entera y no se hace ningún
-   otro pedido (FR-044).
+   otro pedido (FR-044);
+4. salvo en la página de un jugador: el jugador queda sin cruzar, queda un WARN y la corrida
+   sigue (FR-019d). Una página de jugador rota cortaría cada corrida en el mismo jugador; si
+   WhoScored está bloqueando, el corte llega con la página siguiente de un partido. Se vio una
+   página de jugador que respondía 502 siempre.
 
 La página de rechazo de los tests (`rejected-403.html`) es un HTML corto sin ninguno de los tres
 bloques.

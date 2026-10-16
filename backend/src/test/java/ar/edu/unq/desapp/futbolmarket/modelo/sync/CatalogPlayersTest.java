@@ -1,5 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.modelo.sync;
 
+import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.BRENTFORD;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.DANILO_ARSENAL;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.DANILO_LIVERPOOL;
 import static ar.edu.unq.desapp.futbolmarket.modelo.sync.StatsFixtures.EVERTON;
@@ -18,10 +19,13 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
 
 class CatalogPlayersTest {
 
     private static final String NDIAYE_WHOSCORED_ID = "393485";
+    private static final String OBRIEN_WHOSCORED_ID = "402040";
 
     @Test
     void buscaPorIdDeWhoScored() {
@@ -87,11 +91,71 @@ class CatalogPlayersTest {
     }
 
     @Test
+    void buscaTodosLosJugadoresDeUnEquipo() {
+        CatalogPlayers catalog = CatalogPlayers.of(players());
+
+        List<Player> inManUtd = catalog.inTeam(MAN_UTD);
+
+        assertThat(inManUtd).containsExactlyInAnyOrderElementsOf(players().stream()
+                .filter(player -> player.team().externalId().equals(MAN_UTD.externalId()))
+                .toList());
+    }
+
+    @Test
+    void despuesDeConfirmarElEquipoTraeAlJugadorCruzado() {
+        CatalogPlayers catalog = CatalogPlayers.of(players());
+        Player crossed = NDIAYE.crossWith(NDIAYE_WHOSCORED_ID);
+
+        catalog.confirm(List.of(crossed));
+
+        assertThat(catalog.inTeam(EVERTON)).contains(crossed).doesNotContain(NDIAYE);
+    }
+
+    @Test
     void unIdDeWhoScoredDesconocidoNoEncuentraANadie() {
         CatalogPlayers catalog = CatalogPlayers.of(players());
 
         Optional<Player> found = catalog.byWhoscoredId(NDIAYE_WHOSCORED_ID);
 
         assertThat(found).isEmpty();
+    }
+
+    /**
+     * O'Brien es del Everton; los otros dos nacieron el mismo día en otros equipos.
+     */
+    @Test
+    void buscaPorFechaDeNacimientoEnTodosLosEquiposConLosInactivos() {
+        Player sameDayInManUtd = bornOnObrienDay("9201", MAN_UTD);
+        Player inactiveInBrentford = bornOnObrienDay("9202", BRENTFORD).deactivate();
+        CatalogPlayers catalog = CatalogPlayers.of(Stream.concat(players().stream(),
+                Stream.of(sameDayInManUtd, inactiveInBrentford)).toList());
+
+        List<Player> born = catalog.bornOn(OBRIEN.dateOfBirth());
+
+        assertThat(born).containsExactlyInAnyOrder(OBRIEN, sameDayInManUtd, inactiveInBrentford);
+    }
+
+    @Test
+    void unJugadorSinFechaDeNacimientoNuncaAparecePorFecha() {
+        CatalogPlayers catalog = CatalogPlayers.of(players());
+
+        List<Player> born = catalog.bornOn(OBRIEN.dateOfBirth());
+
+        assertThat(born).doesNotContain(OBRIEN_WITHOUT_BIRTH_DATE);
+    }
+
+    @Test
+    void despuesDeConfirmarLaFechaTraeAlJugadorCruzado() {
+        CatalogPlayers catalog = CatalogPlayers.of(players());
+        Player crossed = OBRIEN.crossWith(OBRIEN_WHOSCORED_ID);
+
+        catalog.confirm(List.of(crossed));
+
+        assertThat(catalog.bornOn(OBRIEN.dateOfBirth())).containsExactly(crossed);
+    }
+
+    private static Player bornOnObrienDay(String externalId, Team team) {
+        return new Player(null, externalId, "Otro " + externalId, Position.DEFENDER, team, OBRIEN.dateOfBirth(), null,
+                true);
     }
 }

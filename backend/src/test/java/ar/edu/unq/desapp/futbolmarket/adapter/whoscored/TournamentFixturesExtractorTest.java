@@ -51,6 +51,35 @@ class TournamentFixturesExtractorTest {
         assertThat(fixtures).isEmpty();
     }
 
+    /**
+     * Como en la página real: la misma clave está antes en el {@code <div>} que el servidor ya
+     * dibujó, y otro script de hypernova va primero.
+     */
+    @Test
+    void conElContenedorDibujadoAntesDelScriptLeeElJsonDelScript() throws IOException {
+        String html = page("league-premier-rendered.html");
+
+        Optional<TournamentFixturesDto> fixtures = extractor.extract(html);
+
+        assertThat(fixtures).hasValueSatisfying(tournamentFixtures -> {
+            assertThat(tournamentFixtures.tournaments()).singleElement()
+                    .satisfies(tournament -> assertThat(tournament.tournamentId()).isEqualTo(2));
+            assertThat(tournamentFixtures.tournaments().getFirst().matches()).containsExactly(
+                    new TournamentMatchDto(31L, "Everton", 15L, "Chelsea"),
+                    new TournamentMatchDto(189L, "Brentford", 26L, "Liverpool"));
+        });
+    }
+
+    @Test
+    void unaClaveQueSoloEstaEnElContenedorEsUnRechazo() {
+        String html = "<div data-hypernova-key=\"tournamentfixtures\"><div>Brentford vs Liverpool</div></div>"
+                + "<script type=\"text/javascript\">var otro = 1;</script>";
+
+        Optional<TournamentFixturesDto> fixtures = extractor.extract(html);
+
+        assertThat(fixtures).isEmpty();
+    }
+
     private static String page(String name) throws IOException {
         return new ClassPathResource("whoscored/" + name).getContentAsString(StandardCharsets.UTF_8);
     }
