@@ -18,14 +18,22 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * El resultado se guarda en cuatro columnas sueltas y no en un {@code @Embeddable}: son menos
  * anotaciones para el mismo dato (research D16). {@code status} y {@code winner} son texto, como
- * {@code SeasonSQL.league}. El constructor lo genera Lombok porque son trece columnas.
+ * {@code SeasonSQL.league}. El constructor lo genera Lombok porque son quince columnas.
+ *
+ * <p>El id de WhoScored es único y nulo hasta el cruce (FR-015). {@code stats_loaded} tiene un
+ * default para que {@code ddl-auto: update} la agregue a una base de la 005 que ya tiene partidos:
+ * esas filas quedan sin estadísticas (research D17 de la 006).</p>
  */
 @Entity
-@Table(name = "matches", indexes = @Index(name = "ux_matches_external_id", columnList = "external_id", unique = true))
+@Table(name = "matches", indexes = {
+        @Index(name = "ux_matches_external_id", columnList = "external_id", unique = true),
+        @Index(name = "ux_matches_whoscored_id", columnList = "whoscored_id", unique = true)
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -33,6 +41,7 @@ public class MatchSQL {
     private static final int EXTERNAL_ID_LENGTH = 32;
     private static final int STATUS_LENGTH = 20;
     private static final int WINNER_LENGTH = 10;
+    private static final int WHOSCORED_ID_LENGTH = 32;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -76,4 +85,11 @@ public class MatchSQL {
 
     @Column(length = WINNER_LENGTH)
     private String winner;
+
+    @Column(name = "whoscored_id", length = WHOSCORED_ID_LENGTH)
+    private String whoscoredId;
+
+    @ColumnDefault("false")
+    @Column(name = "stats_loaded", nullable = false)
+    private boolean statsLoaded;
 }

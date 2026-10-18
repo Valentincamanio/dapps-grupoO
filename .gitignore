@@ -8,6 +8,7 @@ backend/out/
 
 # Base H2 local
 backend/data/
+backend/data-*/
 
 # Node
 frontend/node_modules/

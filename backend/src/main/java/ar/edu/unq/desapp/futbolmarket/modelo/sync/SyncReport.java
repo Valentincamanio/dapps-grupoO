@@ -41,4 +41,15 @@ public record SyncReport(SyncType type, SyncOrigin origin, Instant startedAt, In
         }
         return Optional.of(InactivationSkipReason.FAILED_LEAGUES);
     }
+
+    /**
+     * Solo una corrida completa sin ligas fallidas es la última completa exitosa de Football-Data
+     * (FR-047). Una de una sola liga nunca cuenta.
+     */
+    public Optional<LastFullSync> lastFullSync() {
+        if (type != SyncType.FULL || !failedLeagues().isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new LastFullSync(SyncSource.FOOTBALL_DATA, finishedAt));
+    }
 }

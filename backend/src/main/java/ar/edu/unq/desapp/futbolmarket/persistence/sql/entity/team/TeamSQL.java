@@ -16,15 +16,21 @@ import lombok.NoArgsConstructor;
 
 /**
  * Un equipo se reconoce por el id que le da la fuente y no por su nombre, que puede cambiar
- * (FR-006). Por eso {@code external_id} tiene un índice único con nombre fijo.
+ * (FR-006). Por eso {@code external_id} tiene un índice único con nombre fijo. El id de WhoScored
+ * también es único, pero nulo hasta que el equipo se cruza (FR-016): el índice admite varios
+ * {@code NULL}.
  */
 @Entity
-@Table(name = "teams", indexes = @Index(name = "ux_teams_external_id", columnList = "external_id", unique = true))
+@Table(name = "teams", indexes = {
+        @Index(name = "ux_teams_external_id", columnList = "external_id", unique = true),
+        @Index(name = "ux_teams_whoscored_id", columnList = "whoscored_id", unique = true)
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TeamSQL {
     private static final int EXTERNAL_ID_LENGTH = 32;
     private static final int CREST_LENGTH = 512;
+    private static final int WHOSCORED_ID_LENGTH = 32;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,11 +49,15 @@ public class TeamSQL {
     @Column(nullable = false)
     private League league;
 
-    public TeamSQL(Long id, String externalId, String name, String crest, League league) {
+    @Column(name = "whoscored_id", length = WHOSCORED_ID_LENGTH)
+    private String whoscoredId;
+
+    public TeamSQL(Long id, String externalId, String name, String crest, League league, String whoscoredId) {
         this.id = id;
         this.externalId = externalId;
         this.name = name;
         this.crest = crest;
         this.league = league;
+        this.whoscoredId = whoscoredId;
     }
 }

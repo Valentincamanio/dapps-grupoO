@@ -137,11 +137,16 @@ class JwtServiceTest {
                 Clock.fixed(instant, ZoneOffset.UTC));
     }
 
-    /** Cambia el último carácter de la firma, dejando intactos el header y el payload. */
+    /**
+     * Cambia el primer carácter de la firma, dejando intactos el header y el payload. El último no
+     * sirve: sus dos bits finales son relleno de base64url, y cambiar {@code A} por {@code B} (o
+     * viceversa) puede dejar los mismos bytes y una firma válida.
+     */
     private String tamperSignature(String token) {
-        char last = token.charAt(token.length() - 1);
-        char replacement = last == 'A' ? 'B' : 'A';
-        return token.substring(0, token.length() - 1) + replacement;
+        int signatureStart = token.lastIndexOf('.') + 1;
+        char first = token.charAt(signatureStart);
+        char replacement = first == 'A' ? 'B' : 'A';
+        return token.substring(0, signatureStart) + replacement + token.substring(signatureStart + 1);
     }
 
     private Jws<Claims> parse(String token) {
