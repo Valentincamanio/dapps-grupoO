@@ -1,6 +1,7 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.repository.match;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.match.Match;
+import ar.edu.unq.desapp.futbolmarket.modelo.match.MatchStatus;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.match.MatchMapper;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.match.MatchSQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.match.MatchSQLDAO;
@@ -54,6 +55,14 @@ public class MatchRepository {
     @Transactional(readOnly = true)
     public List<Match> findAllWithStats() {
         return toMatches(matchDAO.findAllByStatsLoadedTrue());
+    }
+
+    /**
+     * Los partidos terminados, de cualquier temporada, con su temporada y sus dos equipos.
+     */
+    @Transactional(readOnly = true)
+    public List<Match> findAllFinished() {
+        return toMatches(matchDAO.findAllByStatus(MatchStatus.FINISHED.name()));
     }
 
     @Transactional

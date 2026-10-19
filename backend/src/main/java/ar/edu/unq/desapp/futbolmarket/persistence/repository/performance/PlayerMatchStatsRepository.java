@@ -7,6 +7,7 @@ import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.performance.Pla
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -36,6 +37,16 @@ public class PlayerMatchStatsRepository {
     @Transactional(readOnly = true)
     public List<PlayerMatchStats> findAll() {
         return toStats(statsDAO.findAll());
+    }
+
+    /**
+     * Las estadísticas de los partidos jugados desde {@code fromInclusive} hasta antes de
+     * {@code toExclusive}, con las mismas asociaciones que {@link #findAll()}. El extremo final
+     * queda afuera para que un partido no caiga en dos semanas.
+     */
+    @Transactional(readOnly = true)
+    public List<PlayerMatchStats> findAllByMatchBetween(Instant fromInclusive, Instant toExclusive) {
+        return toStats(statsDAO.findAllByMatchUtcDateBetween(fromInclusive, toExclusive));
     }
 
     private List<PlayerMatchStats> toStats(List<PlayerMatchStatsSQL> stats) {

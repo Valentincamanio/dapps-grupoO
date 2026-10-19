@@ -60,9 +60,13 @@ constructor compacto).
 ### 2.3 `StrategyVersion`
 
 ```java
-record StrategyVersion(Long id, int version, BigDecimal scaleFactor, BigDecimal minimumValue,
-                       WeightSet defaultWeights, Map<Position, WeightSet> positionWeights, Instant createdAt)
+record StrategyVersion(Long id, Long strategyId, String name, int version, BigDecimal scaleFactor,
+                       BigDecimal minimumValue, WeightSet defaultWeights,
+                       Map<Position, WeightSet> positionWeights, Instant createdAt)
 ```
+
+`strategyId` (el id de la v1) y `name` van en la versión para armar `ref()` sin volver al catálogo
+(T011). `id`, `strategyId` y `createdAt` son nulos hasta que la versión se guarda.
 
 Inmutable. Constantes con nombre: `DEFAULT_SCALE_FACTOR = 10`, `DEFAULT_MINIMUM_VALUE = 10,00`,
 `MIN_ALLOWED_MINIMUM = 0,01`.
@@ -96,7 +100,7 @@ nuevo más qué versiones hay que insertar y qué marca `active` hay que mover).
 | `create(name, factor?, minimum?, defaultWeights, positionWeights)` | Nombre obligatorio y único sin distinguir mayúsculas ni espacios de los extremos. Crea la versión 1, **inactiva**. Factor y mínimo omitidos → los por defecto | `InvalidStrategyNameException` (400), `DuplicateStrategyNameException` (409) |
 | `newVersion(strategyId, factor?, minimum?, defaultWeights, positionWeights)` | Crea la versión siguiente (n+1). El nombre no se edita. Factor y mínimo omitidos → **los de la versión anterior**. Si la estrategia es la activa, la versión nueva pasa a ser la activa; si no, queda inactiva | `StrategyNotFoundException` (404) |
 | `activate(strategyId)` | Deja activa la **versión más reciente** de esa estrategia y desactiva la anterior. Activar la ya activa no cambia nada | `StrategyNotFoundException` (404) |
-| `activeVersion()` | La única versión activa (FR-030). El constructor exige que haya exactamente una | `StrategyInvariantException` |
+| `activeVersion()` | La única versión activa (FR-030). El constructor exige que haya exactamente una, salvo en el catálogo vacío; la primera estrategia creada en un catálogo vacío queda activa (lo usa la semilla) | `StrategyInvariantException` |
 | `isActive(strategyId)` | Si esa estrategia es la activa (decide si la opción de recotización aplica) | |
 
 No existe borrar, desactivar sin activar otra ni activar una versión vieja (FR-030, Fuera de

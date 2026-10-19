@@ -19,4 +19,11 @@ public interface MatchSQLDAO extends JpaRepository<MatchSQL, Long> {
 
     @EntityGraph(attributePaths = {"season", "homeTeam", "awayTeam"})
     List<MatchSQL> findAllByStatsLoadedTrue();
+
+    /**
+     * Recibe el estado como texto porque la columna {@code status} es texto: con un
+     * {@code MatchStatus} Hibernate rechaza el tipo al enlazar el parámetro.
+     */
+    @EntityGraph(attributePaths = {"season", "homeTeam", "awayTeam"})
+    List<MatchSQL> findAllByStatus(String status);
 }
