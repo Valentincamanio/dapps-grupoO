@@ -69,6 +69,11 @@ public class SecurityConfig {
      * rol: sin credencial responden 401 y un {@code USER} recibe 403, los dos antes del controller
      * (research D15 de la 005 y D24). Las reglas son por método, así que {@code GET /players/**}
      * sigue público.</p>
+     *
+     * <p>Lo mismo vale para la administración de cotizaciones (research D22 de la 007): el recálculo
+     * y la simulación ({@code POST /quotes/**}) y todas las operaciones de estrategias, también las
+     * lecturas ({@code /strategies/**}), son de {@code ADMIN}. Las consultas de cotizaciones viven
+     * bajo {@code GET /players/**} y quedan públicas por la regla de {@link #publicEndpoints()}.</p>
      */
     @Bean
     public SecurityFilterChain apiFilterChain(HttpSecurity http, RequestMatcher publicEndpoints,
@@ -87,6 +92,8 @@ public class SecurityConfig {
                         .requestMatchers(publicEndpoints).permitAll()
                         .requestMatchers(pathPattern(HttpMethod.POST, "/players/sync")).hasRole(Role.ADMIN.name())
                         .requestMatchers(pathPattern(HttpMethod.POST, "/matches/stats/sync")).hasRole(Role.ADMIN.name())
+                        .requestMatchers(pathPattern(HttpMethod.POST, "/quotes/**")).hasRole(Role.ADMIN.name())
+                        .requestMatchers(pathPattern("/strategies/**")).hasRole(Role.ADMIN.name())
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(jsonAuthenticationEntryPoint)
