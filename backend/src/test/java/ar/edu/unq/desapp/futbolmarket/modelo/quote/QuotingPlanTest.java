@@ -139,6 +139,19 @@ class QuotingPlanTest {
         assertThat(plan.decisions()).extracting(WeekDecision::isPending).containsExactly(false, false, true);
     }
 
+    @Test
+    void laPrimeraSemanaConEstadisticasEsLaDelPartidoMasTempranoQueYaLasTiene() {
+        var matches = List.of(withStats(W3), withoutStats(W1), withStats(W2));
+
+        assertThat(QuotingPlan.firstWeekWithStats(matches)).contains(W2);
+    }
+
+    @Test
+    void sinPartidosConEstadisticasNoHayPrimeraSemana() {
+        assertThat(QuotingPlan.firstWeekWithStats(List.of(withoutStats(W1)))).isEmpty();
+        assertThat(QuotingPlan.firstWeekWithStats(List.of())).isEmpty();
+    }
+
     private static Match withStats(QuoteWeek week) {
         return QuoteFixtures.finishedMatch("w-" + week.monday(), week, EVERTON, MAN_UTD, 1, 0);
     }

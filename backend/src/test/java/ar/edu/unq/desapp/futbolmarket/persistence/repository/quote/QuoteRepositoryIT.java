@@ -32,6 +32,7 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -125,6 +126,45 @@ class QuoteRepositoryIT {
     }
 
     @Test
+    void laUltimaAntesDeUnaSemanaEsLaDeMayorVigenciaDeLasSemanasAnterioresIncluidaUnaRecotizada() {
+        Team manUtd = teamRepository.save(new Team(null, "66", "Manchester United FC", null, League.PREMIER, "32"));
+        Player zirkzee = playerRepository.save(new Player("8137", "Joshua Zirkzee", Position.FORWARD, manUtd));
+        QuoteWeek next = WEEK.next();
+        Quote requoted = new Quote(null, ndiaye.id(), WEEK, WEEK.end().plusSeconds(3600), new BigDecimal("104.00"),
+                new BigDecimal("100.00"), new BigDecimal("0.400000"), QuoteType.REQUOTED, strategyA);
+        quoteRepository.saveAll(List.of(initial(ndiaye.id()), calculated(ndiaye.id(), WEEK, "103.00", "100.00"),
+                requoted, initial(zirkzee.id()), calculated(zirkzee.id(), WEEK, "99.00", "100.00"),
+                calculated(zirkzee.id(), next, "98.00", "99.00")));
+
+        Map<Long, Quote> lastBeforeNext = quoteRepository.findLastBeforeWeek(next);
+        Map<Long, Quote> lastBeforeWeek = quoteRepository.findLastBeforeWeek(WEEK);
+
+        assertThat(lastBeforeNext).containsOnlyKeys(ndiaye.id(), zirkzee.id());
+        assertThat(lastBeforeNext.get(ndiaye.id()).type()).isEqualTo(QuoteType.REQUOTED);
+        assertThat(lastBeforeNext.get(ndiaye.id()).value()).isEqualTo(new BigDecimal("104.00"));
+        assertThat(lastBeforeNext.get(zirkzee.id()).value()).isEqualTo(new BigDecimal("99.00"));
+        assertThat(lastBeforeNext.get(zirkzee.id()).strategy()).isEqualTo(strategyA);
+        assertThat(lastBeforeWeek).isEmpty();
+    }
+
+    @Test
+    void laUltimaSemanaCalculadaEsLaMayorConUnaCalculadaYSinNingunaNoHay() {
+        assertThat(quoteRepository.findLastCalculatedWeek()).isEmpty();
+        QuoteWeek next = WEEK.next();
+        quoteRepository.saveAll(List.of(initial(ndiaye.id()), calculated(ndiaye.id(), WEEK, "103.00", "100.00"),
+                calculated(ndiaye.id(), next, "101.00", "103.00")));
+
+        assertThat(quoteRepository.findLastCalculatedWeek()).contains(next);
+    }
+
+    @Test
+    void unaInicialSolaNoCuentaComoSemanaCalculada() {
+        quoteRepository.saveAll(List.of(initial(ndiaye.id())));
+
+        assertThat(quoteRepository.findLastCalculatedWeek()).isEmpty();
+    }
+
+    @Test
     void elRepositoryNoExponeNingunMetodoParaModificarNiBorrar() {
         List<String> publicMethods = Arrays.stream(QuoteRepository.class.getDeclaredMethods())
                 .filter(method -> Modifier.isPublic(method.getModifiers()))
@@ -140,6 +180,11 @@ class QuoteRepositoryIT {
     private Quote initial(long playerId) {
         return new Quote(null, playerId, WEEK, WEEK.start(), Quote.INITIAL_VALUE, null, ZERO_SCORE,
                 QuoteType.INITIAL, strategyA);
+    }
+
+    private Quote calculated(long playerId, QuoteWeek week, String value, String baseValue) {
+        return new Quote(null, playerId, week, week.end(), new BigDecimal(value), new BigDecimal(baseValue),
+                ZERO_SCORE, QuoteType.CALCULATED, strategyA);
     }
 
     /**

@@ -1,6 +1,8 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.repository.quote;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.Quote;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteType;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteWeek;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.quote.QuoteMapper;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.quote.QuoteSQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.player.PlayerSQLDAO;
@@ -10,6 +12,10 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Guarda y lee cotizaciones. A propósito no tiene ningún método de actualización ni de borrado:
@@ -41,6 +47,25 @@ public class QuoteRepository {
                         strategyDAO.getReferenceById(quote.strategy().versionId())))
                 .toList();
         return toQuotes(quoteDAO.saveAll(rows));
+    }
+
+    /**
+     * La base de cada jugador para cotizar la semana (research D9): por id de jugador, su última
+     * cotización de las semanas anteriores, incluidas las recotizadas. Quien no figura no tiene
+     * ninguna.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Quote> findLastBeforeWeek(QuoteWeek week) {
+        return toQuotes(quoteDAO.findLastOfEachPlayerBefore(week.monday())).stream()
+                .collect(Collectors.toUnmodifiableMap(Quote::playerId, Function.identity()));
+    }
+
+    /**
+     * La última semana cotizada: la mayor con una cotización {@code CALCULATED}.
+     */
+    @Transactional(readOnly = true)
+    public Optional<QuoteWeek> findLastCalculatedWeek() {
+        return Optional.ofNullable(quoteDAO.findLastWeekStartOfType(QuoteType.CALCULATED)).map(QuoteWeek::new);
     }
 
     private List<Quote> toQuotes(List<QuoteSQL> rows) {

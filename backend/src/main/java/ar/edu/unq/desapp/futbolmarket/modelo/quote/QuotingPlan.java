@@ -3,6 +3,7 @@ package ar.edu.unq.desapp.futbolmarket.modelo.quote;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -61,6 +62,18 @@ public record QuotingPlan(List<WeekDecision> decisions) {
             decisions.add(decision);
         }
         return new QuotingPlan(decisions);
+    }
+
+    /**
+     * La semana del partido terminado más temprano que ya tiene estadísticas: desde ahí se cotiza
+     * cuando todavía no hay ninguna cotización (research D11).
+     */
+    public static Optional<QuoteWeek> firstWeekWithStats(List<Match> finishedMatches) {
+        return finishedMatches.stream()
+                .filter(Match::statsLoaded)
+                .map(Match::utcDate)
+                .min(Comparator.naturalOrder())
+                .map(QuoteWeek::containing);
     }
 
     /**
