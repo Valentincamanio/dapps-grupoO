@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -49,6 +50,9 @@ class QuoteAdminAccessIT {
     private static final String ADMIN_PASSWORD = "Admin_" + UUID.randomUUID();
 
     private static final String RECALCULATE_PATH = "/quotes/recalculate";
+    private static final String SIMULATE_PATH = "/quotes/simulate";
+    private static final String SIMULATION_REQUEST = """
+            {"parameters": {"defaultWeights": {"GOALS": 0.50, "RATING": 0.50}}}""";
     private static final String API_KEY_PATH = "/auth/me/api-key";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String API_KEY_HEADER = "X-API-Key";
@@ -169,6 +173,33 @@ class QuoteAdminAccessIT {
         assertThat(report.get("nothingToQuote").asBoolean()).isTrue();
         assertThat(report.get("quotedWeeks").values()).isEmpty();
         assertThat(database.quoteCount()).isEqualTo(2L * PLAYERS);
+    }
+
+    @Test
+    void simularSinCredencialResponde401() throws Exception {
+        MvcTestResult result = mvc.post().uri(SIMULATE_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(SIMULATION_REQUEST)
+                .exchange();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+        assertThat(body(result).get("message").asString()).isEqualTo(MISSING_CREDENTIAL_MESSAGE);
+        assertThat(database.quoteCount()).isZero();
+    }
+
+    @Test
+    void simularComoUsuarioComunResponde403() throws Exception {
+        TestUser user = helper.registerUser();
+
+        MvcTestResult result = mvc.post().uri(SIMULATE_PATH)
+                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + helper.login(user))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(SIMULATION_REQUEST)
+                .exchange();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(body(result).get("message").asString()).isEqualTo(FORBIDDEN_MESSAGE);
+        assertThat(database.quoteCount()).isZero();
     }
 
     private String adminToken() throws Exception {

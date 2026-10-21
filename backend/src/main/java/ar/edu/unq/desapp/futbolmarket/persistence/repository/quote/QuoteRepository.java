@@ -111,6 +111,17 @@ public class QuoteRepository {
     }
 
     /**
+     * La cotización actual de cada jugador, para compararla con la simulada (research D19): por id
+     * de jugador, la de mayor vigencia, también la de un jugador inactivo. Quien no figura no tiene
+     * ninguna.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Quote> findLatestByPlayer() {
+        return toQuotes(quoteDAO.findLatestOfEachPlayer()).stream()
+                .collect(Collectors.toUnmodifiableMap(Quote::playerId, Function.identity()));
+    }
+
+    /**
      * La cotización que regía justo antes de ese instante: la última con vigencia anterior a él.
      * Con el comienzo del día siguiente es "la que regía al final del día" (FR-043).
      */

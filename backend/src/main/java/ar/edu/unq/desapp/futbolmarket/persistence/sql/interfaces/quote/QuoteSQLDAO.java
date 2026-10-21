@@ -76,6 +76,15 @@ public interface QuoteSQLDAO extends JpaRepository<QuoteSQL, Long> {
     List<QuoteSQL> findCurrentOf(@Param("playerIds") Collection<Long> playerIds);
 
     /**
+     * La cotización actual de cada jugador que tiene alguna, activo o no: la de mayor vigencia.
+     */
+    @Query("""
+            select q from QuoteSQL q join fetch q.strategy
+            where q.validFrom = (select max(other.validFrom) from QuoteSQL other where other.player = q.player)
+            """)
+    List<QuoteSQL> findLatestOfEachPlayer();
+
+    /**
      * La última cotización del jugador con vigencia anterior al instante, que queda excluido.
      */
     @Query("""

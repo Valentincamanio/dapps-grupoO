@@ -226,6 +226,34 @@ class QuoteRepositoryIT {
         assertThat(quoteRepository.findCurrentOf(List.of())).isEmpty();
     }
 
+    @Test
+    void laActualDeCadaJugadorEsLaDeMayorVigenciaConLasRecotizadasEInactivosYSinLosQueNoTienen() {
+        QuoteWeek next = WEEK.next();
+        Player zirkzee = otherPlayer("8137", "Joshua Zirkzee", Position.FORWARD);
+        Player retired = playerRepository.save(otherPlayer("8139", "Dominic Calvert-Lewin", Position.FORWARD)
+                .deactivate());
+        Player withoutQuotes = otherPlayer("8200", "Beto", Position.FORWARD);
+        quoteRepository.saveAll(List.of(
+                initial(ndiaye.id()), calculated(ndiaye.id(), WEEK, "103.00", "100.00"),
+                requoted(ndiaye.id(), WEEK, WEEK.end().plus(Duration.ofDays(2)), "104.00", "100.00"),
+                requoted(ndiaye.id(), WEEK, WEEK.end().plus(Duration.ofDays(3)), "102.50", "100.00"),
+                initial(zirkzee.id()), calculated(zirkzee.id(), WEEK, "103.00", "100.00"),
+                calculated(zirkzee.id(), next, "101.00", "103.00"),
+                initial(retired.id())));
+
+        Map<Long, Quote> latest = quoteRepository.findLatestByPlayer();
+
+        assertThat(latest).containsOnlyKeys(ndiaye.id(), zirkzee.id(), retired.id());
+        assertThat(latest.get(ndiaye.id()))
+                .extracting(Quote::type, Quote::value, Quote::strategy)
+                .containsExactly(QuoteType.REQUOTED, new BigDecimal("102.50"), strategyA);
+        assertThat(latest.get(zirkzee.id()))
+                .extracting(Quote::type, Quote::week, Quote::value)
+                .containsExactly(QuoteType.CALCULATED, next, new BigDecimal("101.00"));
+        assertThat(latest.get(retired.id()).type()).isEqualTo(QuoteType.INITIAL);
+        assertThat(latest).doesNotContainKey(withoutQuotes.id());
+    }
+
     /**
      * El ejemplo del spec (US2.6): inicial de 100,00 desde el 17/08, 103,00 desde el 24/08 y 101,00
      * desde el 31/08.
