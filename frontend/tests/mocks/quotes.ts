@@ -1,6 +1,16 @@
 // Cotizaciones de prueba para los jugadores de players.ts, con las formas de
 // specs/007-cotizacion-estrategias/contracts/quotes-api.yaml.
-import type { Quote, RankingRow, StrategyRef } from '../../src/types/quotes';
+import type { Profile } from '../../src/types/api';
+import type {
+  PendingWeek,
+  Quote,
+  RankingRow,
+  RecalculationReport,
+  SimulationRow,
+  StrategyDto,
+  StrategyRef,
+  WeightMap,
+} from '../../src/types/quotes';
 import { PLAYERS } from './players';
 
 export const STRATEGY_A: StrategyRef = { id: 1, name: 'Rendimiento de partido', version: 1 };
@@ -155,3 +165,152 @@ export const RANKING_ROWS: RankingRow[] = PLAYERS.flatMap((player) => {
   (a, b) =>
     b.quote.value - a.quote.value || a.name.localeCompare(b.name) || a.playerId - b.playerId,
 );
+
+// Administración (contracts/strategies-api.yaml y contracts/quotes-admin-api.yaml)
+
+// El usuario sembrado de handlers.ts con rol ADMIN. Los tests de administración lo obtienen
+// sobreescribiendo GET */api/auth/me con server.use(adminProfileHandler) (quoteHandlers.ts).
+export const ADMIN_PROFILE: Profile = {
+  id: 1,
+  username: 'lionel10',
+  email: 'lionel@mail.com',
+  role: 'ADMIN',
+  balance: 1000,
+};
+
+export const RECALCULATION_IN_PROGRESS = 'Ya hay un recálculo en curso.';
+export const SYNC_IN_PROGRESS = 'No se puede recalcular: hay una sincronización en curso.';
+
+const SEED_CREATED_AT = '2026-08-10T12:00:00Z';
+
+// Los pesos semilla de A (y de B como juego por defecto, US4.1)
+const MATCH_PERFORMANCE_WEIGHTS: WeightMap = {
+  GOALS: 0.25,
+  ASSISTS: 0.15,
+  SHOTS: 0.1,
+  KEY_PASSES: 0.1,
+  SUCCESSFUL_DRIBBLES: 0.1,
+  TACKLES: 0.1,
+  RATING: 0.2,
+};
+
+const FORWARD_WEIGHTS: WeightMap = {
+  GOALS: 0.28,
+  ASSISTS: 0.14,
+  SHOTS_ON_TARGET: 0.12,
+  KEY_PASSES: 0.06,
+  SUCCESSFUL_DRIBBLES: 0.08,
+  RATING: 0.2,
+  TEAM_RESULT: 0.05,
+  MINUTES_PLAYED: 0.03,
+  FOULS_COMMITTED: 0.01,
+  YELLOW_CARDS: 0.02,
+  RED_CARDS: 0.01,
+};
+
+// A activa en su versión 1 y B inactiva con un juego propio para delanteros. Devuelve copias
+// nuevas en cada llamada, así un test puede modificarlas sin afectar a los demás.
+export function seedStrategies(): StrategyDto[] {
+  return [
+    {
+      id: STRATEGY_A.id,
+      name: STRATEGY_A.name,
+      active: true,
+      versions: [
+        {
+          version: 1,
+          active: true,
+          scaleFactor: 10,
+          minimumValue: 10,
+          defaultWeights: { ...MATCH_PERFORMANCE_WEIGHTS },
+          positionWeights: {},
+          createdAt: SEED_CREATED_AT,
+        },
+      ],
+    },
+    {
+      id: STRATEGY_B.id,
+      name: STRATEGY_B.name,
+      active: false,
+      versions: [
+        {
+          version: 1,
+          active: false,
+          scaleFactor: 10,
+          minimumValue: 10,
+          defaultWeights: { ...MATCH_PERFORMANCE_WEIGHTS },
+          positionWeights: { FORWARD: { ...FORWARD_WEIGHTS } },
+          createdAt: SEED_CREATED_AT,
+        },
+      ],
+    },
+  ];
+}
+
+// Jugadores con alguna cotización: los que cuenta cada semana de un informe
+export const QUOTED_PLAYERS = PLAYERS.length - PLAYERS_WITHOUT_QUOTE.length;
+
+// Semanas cerradas que hoy quedarían pendientes, con los dos motivos
+export const PENDING_WEEKS: PendingWeek[] = [
+  { weekStart: '2026-10-12', reason: 'MISSING_STATS' },
+  { weekStart: '2026-10-19', reason: 'PREVIOUS_WEEK_PENDING' },
+];
+
+// Informe del recálculo manual: dos semanas cotizadas y dos pendientes
+export const RECALCULATION_REPORT: RecalculationReport = {
+  origin: 'MANUAL',
+  startedAt: '2026-10-26T09:00:00Z',
+  finishedAt: '2026-10-26T09:01:20Z',
+  strategy: ACTIVE_STRATEGY,
+  quotedWeeks: [
+    { weekStart: WEEKS[6], initial: 0, calculated: QUOTED_PLAYERS, requoted: 0 },
+    { weekStart: WEEKS[7], initial: 0, calculated: QUOTED_PLAYERS, requoted: 0 },
+  ],
+  pendingWeeks: PENDING_WEEKS,
+  nothingToQuote: false,
+  interruptedAt: null,
+};
+
+// Todas las semanas cerradas ya estaban cotizadas
+export const EMPTY_RECALCULATION_REPORT: RecalculationReport = {
+  ...RECALCULATION_REPORT,
+  finishedAt: RECALCULATION_REPORT.startedAt,
+  quotedWeeks: [],
+  pendingWeeks: [],
+  nothingToQuote: true,
+};
+
+// Informe de un cambio de estrategia con AHORA: la última semana cerrada recotizada
+export function requotationReport(strategy: StrategyRef): RecalculationReport {
+  return {
+    ...RECALCULATION_REPORT,
+    origin: 'STRATEGY_CHANGE',
+    finishedAt: '2026-10-26T09:00:04Z',
+    strategy,
+    quotedWeeks: [{ weekStart: WEEKS[7], initial: 0, calculated: 0, requoted: QUOTED_PLAYERS }],
+    pendingWeeks: [],
+  };
+}
+
+// Simulación determinística: la misma semilla da siempre las mismas filas, ordenadas por
+// cotización simulada descendente, luego nombre e id (el criterio del ranking)
+export function simulationRows(seed: number): SimulationRow[] {
+  return PLAYERS.map((player) => {
+    const currentValue = currentQuoteOf(player.id)?.value ?? null;
+    const step = ((player.id * 17 + seed * 7) % 31) - 15;
+    const simulatedValue = Math.max(round(INITIAL_VALUE + step * 0.85, 2), MINIMUM_VALUE);
+    return {
+      playerId: player.id,
+      name: player.name,
+      team: player.team,
+      league: player.league,
+      position: player.position,
+      currentValue,
+      simulatedValue,
+      difference: round(simulatedValue - (currentValue ?? INITIAL_VALUE), 2),
+    };
+  }).sort(
+    (a, b) =>
+      b.simulatedValue - a.simulatedValue || a.name.localeCompare(b.name) || a.playerId - b.playerId,
+  );
+}
