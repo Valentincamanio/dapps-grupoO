@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import type { ApiError, League, Player, PlayerPage, Position, Profile, Role } from '../../src/types/api';
 import { LEAGUES, POSITIONS } from '../../src/types/api';
 import { PLAYERS } from './players';
+import { quoteHandlers } from './quoteHandlers';
 
 interface MockUser {
   id: number;
@@ -261,4 +262,4 @@ const authHandlers = [
   }),
 ];
 
-export const handlers = [...playerHandlers, ...authHandlers];
+export const handlers = [...quoteHandlers, ...playerHandlers, ...authHandlers];
