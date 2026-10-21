@@ -71,6 +71,16 @@ public class QuoteRepository {
     }
 
     /**
+     * Lo que se recotiza de una semana (research D12): por id de jugador, su cotización de mayor
+     * vigencia en esa semana. Quien no figura no tiene ninguna en esa semana.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Quote> findLatestOfWeek(QuoteWeek week) {
+        return toQuotes(quoteDAO.findLatestOfEachPlayerIn(week.monday())).stream()
+                .collect(Collectors.toUnmodifiableMap(Quote::playerId, Function.identity()));
+    }
+
+    /**
      * La última semana cotizada: la mayor con una cotización {@code CALCULATED}.
      */
     @Transactional(readOnly = true)

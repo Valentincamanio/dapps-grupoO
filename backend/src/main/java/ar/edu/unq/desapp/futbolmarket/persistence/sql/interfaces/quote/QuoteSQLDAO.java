@@ -36,6 +36,18 @@ public interface QuoteSQLDAO extends JpaRepository<QuoteSQL, Long> {
     List<QuoteSQL> findLastOfEachPlayerBefore(@Param("weekStart") LocalDate weekStart);
 
     /**
+     * Por jugador, la cotización de mayor vigencia de esa semana, del tipo que sea: la calculada o
+     * la última recotizada (research D12). Trae la versión que la calculó, que el mapper lee.
+     */
+    @Query("""
+            select q from QuoteSQL q join fetch q.strategy
+            where q.weekStart = :weekStart
+              and q.validFrom = (select max(other.validFrom) from QuoteSQL other
+                                 where other.player = q.player and other.weekStart = :weekStart)
+            """)
+    List<QuoteSQL> findLatestOfEachPlayerIn(@Param("weekStart") LocalDate weekStart);
+
+    /**
      * La mayor semana con una cotización de ese tipo, o {@code null} si no hay ninguna. Usa el índice
      * {@code ix_quotes_week_start_type}.
      */

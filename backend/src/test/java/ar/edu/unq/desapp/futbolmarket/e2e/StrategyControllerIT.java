@@ -30,6 +30,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.match.Match;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.Quote;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteType;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteWeek;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StartingStrategies;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
@@ -43,7 +44,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * La administración de estrategias de punta a punta, como administrador (US4): las de arranque,
  * crear, editar, activar, listar y consultar, los rechazos y que crear o editar no toca las
- * cotizaciones guardadas.
+ * cotizaciones guardadas. También la opción {@code requote} al activar y al editar (US5).
  *
  * <p>Usa una H2 propia. Antes de cada test borra las cotizaciones y las estrategias y vuelve a
  * correr la semilla, así cada uno arranca con A activa en su versión 1 y B en su versión 1. Los ids
@@ -442,6 +443,109 @@ class StrategyControllerIT {
         assertThat(edited.getResponse().getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
         assertThat(activated.getResponse().getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
         assertThat(strategyDAO.count()).isEqualTo(STARTING_STRATEGIES);
+    }
+
+    @Test
+    void activarSinCuerpoOConProximaSemanaNoRecotizaNiCambiaNingunaCotizacion() throws Exception {
+        quotedPlayers();
+        List<Quote> before = database.quotes();
+
+        MvcTestResult withoutBody = post(STRATEGIES_PATH + "/" + idOf(BALANCED) + "/activate", null);
+        MvcTestResult nextWeek = post(STRATEGIES_PATH + "/" + idOf(MATCH_PERFORMANCE) + "/activate", """
+                {"requote": "PROXIMA_SEMANA"}
+                """);
+
+        assertThat(withoutBody.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(body(withoutBody).get("requotation").isNull()).isTrue();
+        assertThat(nextWeek.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(body(nextWeek).get("requotation").isNull()).isTrue();
+        assertThat(activeName()).isEqualTo(MATCH_PERFORMANCE);
+        assertThat(database.quotes()).containsExactlyInAnyOrderElementsOf(before);
+    }
+
+    @Test
+    void activarConAhoraRecotizaLaUltimaSemanaYDevuelveElInforme() throws Exception {
+        Player ndiaye = quotedPlayers();
+        long balancedId = idOf(BALANCED);
+        QuoteWeek lastClosed = QuoteWeek.lastClosedAt(Instant.now());
+
+        MvcTestResult result = post(STRATEGIES_PATH + "/" + balancedId + "/activate", """
+                {"requote": "AHORA"}
+                """);
+        JsonNode change = body(result);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(change.get("strategy").get("active").asBoolean()).isTrue();
+        JsonNode requotation = change.get("requotation");
+        assertThat(requotation.get("origin").asString()).isEqualTo("STRATEGY_CHANGE");
+        assertThat(requotation.get("strategy").get("id").asLong()).isEqualTo(balancedId);
+        assertThat(requotation.get("nothingToQuote").asBoolean()).isFalse();
+        assertThat(requotation.get("quotedWeeks").values()).singleElement().satisfies(week -> {
+            assertThat(week.get("weekStart").asString()).isEqualTo(lastClosed.monday().toString());
+            assertThat(week.get("requoted").asInt()).isEqualTo(2);
+        });
+        assertThat(activeName()).isEqualTo(BALANCED);
+        assertThat(database.quotesOf(ndiaye)).extracting(Quote::type)
+                .containsExactlyInAnyOrder(QuoteType.INITIAL, QuoteType.CALCULATED, QuoteType.REQUOTED);
+    }
+
+    @Test
+    void unaOpcionDeRecotizacionInvalidaRespondeBadRequestSinCambiarNada() throws Exception {
+        quotedPlayers();
+        List<Quote> before = database.quotes();
+
+        MvcTestResult activate = post(STRATEGIES_PATH + "/" + idOf(BALANCED) + "/activate", """
+                {"requote": "AHORA2"}
+                """);
+        MvcTestResult edit = post(STRATEGIES_PATH + "/" + idOf(MATCH_PERFORMANCE) + "/versions", """
+                {"defaultWeights": %s, "requote": "AHORA2"}
+                """.formatted(OTHER_WEIGHTS));
+
+        assertThat(activate.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(body(activate).get("message").asString())
+                .isEqualTo("La opción 'AHORA2' no es válida: use AHORA o PROXIMA_SEMANA.");
+        assertThat(edit.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(activeName()).isEqualTo(MATCH_PERFORMANCE);
+        assertThat(strategyDAO.count()).isEqualTo(STARTING_STRATEGIES);
+        assertThat(database.quotes()).containsExactlyInAnyOrderElementsOf(before);
+    }
+
+    @Test
+    void crearOEditarUnaQueNoEsLaActivaConAhoraIgnoraLaOpcion() throws Exception {
+        quotedPlayers();
+        List<Quote> before = database.quotes();
+
+        MvcTestResult created = post(STRATEGIES_PATH, """
+                {"name": "Ofensiva", "defaultWeights": %s, "requote": "AHORA"}
+                """.formatted(VALID_WEIGHTS));
+        MvcTestResult edited = post(STRATEGIES_PATH + "/" + idOf(BALANCED) + "/versions", """
+                {"defaultWeights": %s, "requote": "AHORA"}
+                """.formatted(OTHER_WEIGHTS));
+
+        assertThat(created.getResponse().getStatus()).isEqualTo(HttpStatus.CREATED.value());
+        assertThat(body(created).get("active").asBoolean()).isFalse();
+        assertThat(edited.getResponse().getStatus()).isEqualTo(HttpStatus.CREATED.value());
+        assertThat(body(edited).get("requotation").isNull()).isTrue();
+        assertThat(body(edited).get("strategy").get("active").asBoolean()).isFalse();
+        assertThat(activeName()).isEqualTo(MATCH_PERFORMANCE);
+        assertThat(database.quotes()).containsExactlyInAnyOrderElementsOf(before);
+    }
+
+    @Test
+    void activarConAhoraLaYaActivaQueCotizoLaUltimaSemanaNoCambiaNada() throws Exception {
+        quotedPlayers();
+        List<Quote> before = database.quotes();
+        Long activeRowId = activeRows().getFirst().getId();
+
+        MvcTestResult result = post(STRATEGIES_PATH + "/" + idOf(MATCH_PERFORMANCE) + "/activate", """
+                {"requote": "AHORA"}
+                """);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(body(result).get("requotation").isNull()).isTrue();
+        assertThat(body(result).get("strategy").get("active").asBoolean()).isTrue();
+        assertThat(activeRows()).extracting(StrategySQL::getId).containsExactly(activeRowId);
+        assertThat(database.quotes()).containsExactlyInAnyOrderElementsOf(before);
     }
 
     @Test

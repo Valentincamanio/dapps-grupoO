@@ -9,7 +9,10 @@ import ar.edu.unq.desapp.futbolmarket.modelo.strategy.ValuationMetric;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.WeightSet;
 import org.junit.jupiter.api.Test;
 
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.exception.QuoteInvariantException;
+
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,11 +42,18 @@ import static ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteFixtures.TARKOWSK
 import static ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteFixtures.WEEK;
 import static ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteFixtures.ZIRKZEE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class WeeklyQuotationTest {
     private static final List<Player> FORWARDS = List.of(NDIAYE, BETO, ZIRKZEE, SAKA, KANE);
     private static final QuoteWeek NEXT_WEEK = WEEK.next();
     private static final Match BAYERN_DORTMUND = QuoteFixtures.finishedMatch("560700", WEEK, BAYERN, DORTMUND, 3, 0);
+    private static final Instant REQUOTED_AT = NEXT_WEEK.end().plus(Duration.ofDays(2)).plus(Duration.ofHours(10));
+    private static final StrategyVersion REQUOTE_B = requoteStrategy(12L, "B",
+            new WeightSet(Map.of(ValuationMetric.GOALS, new BigDecimal("0.50"),
+                    ValuationMetric.TACKLES, new BigDecimal("0.50"))));
+    private static final StrategyVersion REQUOTE_C = requoteStrategy(13L, "C",
+            new WeightSet(Map.of(ValuationMetric.TACKLES, BigDecimal.ONE)));
 
     @Test
     void laPrimeraSemanaGeneraLaInicialDesdeElLunesYLaCalculadaDesdeElCierre() {
@@ -249,6 +259,154 @@ class WeeklyQuotationTest {
 
         assertThat(scores.keySet()).containsExactly(NDIAYE.id(), BETO.id(), ZIRKZEE.id(), SAKA.id(), KANE.id());
         assertThat(scores.get(NDIAYE.id())).isEqualTo(new BigDecimal("0.300000"));
+    }
+
+    @Test
+    void recotizarConBParteDelPrecioPrevioALaSemanaYConservaLaCalculada() {
+        var ndiayeHistory = specHistoryWithA();
+
+        var requoted = WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_B, FORWARDS, requoteWeekStats(),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(0)), Map.of(NDIAYE.id(), ndiayeHistory.get(1)), REQUOTED_AT);
+
+        assertThat(requoted).singleElement().satisfies(quote -> {
+            assertThat(quote.type()).isEqualTo(QuoteType.REQUOTED);
+            assertThat(quote.playerId()).isEqualTo(NDIAYE.id());
+            assertThat(quote.week()).isEqualTo(NEXT_WEEK);
+            assertThat(quote.validFrom()).isEqualTo(REQUOTED_AT);
+            assertThat(quote.score()).isEqualTo(new BigDecimal("0.100000"));
+            assertThat(quote.baseValue()).isEqualTo(new BigDecimal("103.00"));
+            assertThat(quote.value()).isEqualTo(new BigDecimal("104.00"));
+            assertThat(quote.strategy()).isEqualTo(REQUOTE_B.ref());
+        });
+        assertThat(ndiayeHistory.get(1).value()).isEqualTo(new BigDecimal("101.00"));
+    }
+
+    @Test
+    void laRecotizadaLlevaElMismoValorBaseQueLaCalculadaQueReemplaza() {
+        var ndiayeHistory = specHistoryWithA();
+        var replaced = ndiayeHistory.get(1);
+
+        var requoted = WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_B, FORWARDS, requoteWeekStats(),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(0)), Map.of(NDIAYE.id(), replaced), REQUOTED_AT);
+
+        assertThat(requoted.getFirst().baseValue()).isEqualTo(replaced.baseValue());
+    }
+
+    @Test
+    void repetirLaRecotizacionConLaMismaVersionNoGeneraNada() {
+        var ndiayeHistory = specHistoryWithA();
+        var first = WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_B, FORWARDS, requoteWeekStats(),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(0)), Map.of(NDIAYE.id(), ndiayeHistory.get(1)), REQUOTED_AT);
+
+        var again = WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_B, FORWARDS, requoteWeekStats(),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(0)), Map.of(NDIAYE.id(), first.getFirst()),
+                REQUOTED_AT.plus(Duration.ofHours(1)));
+
+        assertThat(again).isEmpty();
+    }
+
+    @Test
+    void recotizarConOtraEstrategiaVuelveAPartirDelPrecioPrevioYNoAcumula() {
+        var ndiayeHistory = specHistoryWithA();
+        var withB = WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_B, FORWARDS, requoteWeekStats(),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(0)), Map.of(NDIAYE.id(), ndiayeHistory.get(1)), REQUOTED_AT)
+                .getFirst();
+
+        var withC = WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_C, FORWARDS, requoteWeekStats(),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(0)), Map.of(NDIAYE.id(), withB),
+                REQUOTED_AT.plus(Duration.ofHours(1)));
+
+        assertThat(withB.value()).isEqualTo(new BigDecimal("104.00"));
+        assertThat(withC).singleElement().satisfies(quote -> {
+            assertThat(quote.baseValue()).isEqualTo(new BigDecimal("103.00"));
+            assertThat(quote.score()).isEqualTo(new BigDecimal("-0.200000"));
+            assertThat(quote.value()).isEqualTo(new BigDecimal("101.00"));
+            assertThat(quote.strategy()).isEqualTo(REQUOTE_C.ref());
+        });
+    }
+
+    @Test
+    void soloSeRecotizaAQuienTieneUnaCotizacionEnEsaSemanaPeroTodosLosActivosSonPares() {
+        var ndiayeHistory = specHistoryWithA();
+
+        var requoted = WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_B, FORWARDS, requoteWeekStats(),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(0)), Map.of(NDIAYE.id(), ndiayeHistory.get(1)), REQUOTED_AT);
+        var ndiayeAlone = WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_B, List.of(NDIAYE), requoteWeekStats(),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(0)), Map.of(NDIAYE.id(), ndiayeHistory.get(1)), REQUOTED_AT);
+
+        assertThat(requoted).extracting(Quote::playerId).containsExactly(NDIAYE.id());
+        assertThat(ndiayeAlone.getFirst().score()).isEqualTo(new BigDecimal("0.000000"));
+    }
+
+    @Test
+    void sinCotizacionAnteriorALaSemanaLaRecotizadaParteDeCien() {
+        var calculated = QuoteFixtures.calculated(BETO.id(), NEXT_WEEK, "98.00", "100.00", "-0.200000", STRATEGY_A);
+
+        var requoted = WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_B, FORWARDS, requoteWeekStats(), Map.of(),
+                Map.of(BETO.id(), calculated), REQUOTED_AT);
+
+        assertThat(requoted).singleElement().satisfies(quote -> {
+            assertThat(quote.playerId()).isEqualTo(BETO.id());
+            assertThat(quote.baseValue()).isEqualTo(new BigDecimal("100.00"));
+        });
+    }
+
+    @Test
+    void unJugadorInactivoNoSeRecotiza() {
+        var inactiveBeto = QuoteFixtures.inactive(BETO);
+        var ndiayeHistory = specHistoryWithA();
+        var betoCalculated = QuoteFixtures.calculated(BETO.id(), NEXT_WEEK, "98.00", "100.00", "-0.200000",
+                STRATEGY_A);
+
+        var requoted = WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_B,
+                List.of(NDIAYE, inactiveBeto, ZIRKZEE, SAKA, KANE), requoteWeekStats(),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(0)),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(1), BETO.id(), betoCalculated), REQUOTED_AT);
+
+        assertThat(requoted).extracting(Quote::playerId).containsExactly(NDIAYE.id());
+    }
+
+    @Test
+    void noSeRecotizaUnaSemanaQueNoCerro() {
+        var ndiayeHistory = specHistoryWithA();
+
+        assertThatThrownBy(() -> WeeklyQuotation.requoteWeek(NEXT_WEEK, REQUOTE_B, FORWARDS, requoteWeekStats(),
+                Map.of(NDIAYE.id(), ndiayeHistory.get(0)), Map.of(NDIAYE.id(), ndiayeHistory.get(1)),
+                NEXT_WEEK.end().minusSeconds(1)))
+                .isInstanceOf(QuoteInvariantException.class);
+    }
+
+    /**
+     * El historial del ejemplo del spec (US5.3) con la estrategia A: calculada de 103,00 en
+     * {@code WEEK} y de 101,00 en {@code NEXT_WEEK}, con score −0,20.
+     */
+    private static List<Quote> specHistoryWithA() {
+        return List.of(
+                QuoteFixtures.calculated(NDIAYE.id(), WEEK, "103.00", "100.00", "0.300000", STRATEGY_A),
+                QuoteFixtures.calculated(NDIAYE.id(), NEXT_WEEK, "101.00", "103.00", "-0.200000", STRATEGY_A));
+    }
+
+    /**
+     * La semana que se recotiza: con la estrategia B de la recotización (mitad goles, mitad quites),
+     * Ndiaye queda con goles +0,4 (3 goles, solo Kane hizo más) y quites −0,2 (empata con Beto en 1 y
+     * solo Zirkzee tiene menos), un score de +0,10. Con C (solo quites) queda en −0,20.
+     */
+    private static List<PlayerMatchStats> requoteWeekStats() {
+        var everton = QuoteFixtures.finishedMatch("560900", NEXT_WEEK, EVERTON, MAN_UTD, 4, 1);
+        var arsenal = QuoteFixtures.finishedMatch("560901", NEXT_WEEK, QuoteFixtures.ARSENAL,
+                QuoteFixtures.LIVERPOOL, 2, 0);
+        var bayern = QuoteFixtures.finishedMatch("560902", NEXT_WEEK, BAYERN, DORTMUND, 4, 0);
+        return List.of(
+                stats().forPlayer(NDIAYE).inMatch(everton).minutes(90).goals(3).tackles(1).build(),
+                stats().forPlayer(BETO).inMatch(everton).minutes(90).goals(0).tackles(1).build(),
+                stats().forPlayer(ZIRKZEE).inMatch(everton).minutes(90).goals(1).tackles(0).build(),
+                stats().forPlayer(SAKA).inMatch(arsenal).minutes(90).goals(2).tackles(2).build(),
+                stats().forPlayer(KANE).inMatch(bayern).minutes(90).goals(4).tackles(3).build());
+    }
+
+    private static StrategyVersion requoteStrategy(long id, String name, WeightSet defaultWeights) {
+        return new StrategyVersion(id, id, name, 1, BigDecimal.TEN, new BigDecimal("10.00"), defaultWeights,
+                Map.of(), Instant.parse("2026-08-01T00:00:00Z"));
     }
 
     /**

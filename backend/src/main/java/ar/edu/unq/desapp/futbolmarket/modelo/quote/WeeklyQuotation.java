@@ -1,6 +1,7 @@
 package ar.edu.unq.desapp.futbolmarket.modelo.quote;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -13,6 +14,7 @@ import java.util.TreeMap;
 import ar.edu.unq.desapp.futbolmarket.modelo.performance.PlayerMatchStats;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.exception.QuoteInvariantException;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyVersion;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.ValuationMetric;
 
@@ -50,6 +52,40 @@ public final class WeeklyQuotation {
             var baseValue = previous == null ? Quote.INITIAL_VALUE : previous.value();
             quotes.add(new Quote(null, playerId, week, week.end(), strategy.valueFor(baseValue, score), baseValue,
                     score, QuoteType.CALCULATED, strategy.ref()));
+        });
+        return List.copyOf(quotes);
+    }
+
+    /**
+     * Las recotizadas de una semana cerrada con la estrategia nueva (research D12), por jugador
+     * activo y en orden de id. Las cotizaciones anteriores se conservan: las recotizadas se suman y
+     * rigen desde {@code now}.
+     *
+     * <p>Solo recibe una el jugador activo que tiene una cotización en esa semana calculada con otra
+     * versión: repetir con la misma versión no genera nada. La base es la de la calculada que
+     * reemplaza, la última cotización de las semanas anteriores, nunca una de la propia semana, así
+     * que recotizar no acumula (FR-037). Los pares son todos los activos de la posición, también
+     * los que no tienen cotización.</p>
+     *
+     * @param lastBeforeWeek por id de jugador, su última cotización de las semanas anteriores.
+     * @param latestOfWeek   por id de jugador, su cotización de mayor vigencia de esa semana.
+     */
+    public static List<Quote> requoteWeek(QuoteWeek week, StrategyVersion strategy, List<Player> activePlayers,
+                                          List<PlayerMatchStats> weekStats, Map<Long, Quote> lastBeforeWeek,
+                                          Map<Long, Quote> latestOfWeek, Instant now) {
+        if (!week.isClosedAt(now)) {
+            throw new QuoteInvariantException("Solo se recotiza una semana cerrada y " + week + " no lo está.");
+        }
+        var quotes = new ArrayList<Quote>();
+        weekScores(week, strategy, activePlayers, weekStats).forEach((playerId, score) -> {
+            var latest = latestOfWeek.get(playerId);
+            if (latest == null || isQuotedWith(latest, strategy)) {
+                return;
+            }
+            var previous = lastBeforeWeek.get(playerId);
+            var baseValue = previous == null ? Quote.INITIAL_VALUE : previous.value();
+            quotes.add(new Quote(null, playerId, week, now, strategy.valueFor(baseValue, score), baseValue, score,
+                    QuoteType.REQUOTED, strategy.ref()));
         });
         return List.copyOf(quotes);
     }
@@ -96,6 +132,10 @@ public final class WeeklyQuotation {
         var values = new HashMap<Long, BigDecimal>();
         performances.forEach((id, performance) -> performance.value(metric).ifPresent(value -> values.put(id, value)));
         return values;
+    }
+
+    private static boolean isQuotedWith(Quote quote, StrategyVersion strategy) {
+        return strategy.id() != null && strategy.id().equals(quote.strategy().versionId());
     }
 
     private static Quote initial(long playerId, QuoteWeek week, StrategyVersion strategy) {
