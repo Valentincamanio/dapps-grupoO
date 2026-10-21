@@ -1,7 +1,9 @@
 // Post-it de un jugador: un único link a su ficha, sin ninguna otra acción.
 import type { ElementType, ReactNode } from 'react';
 import type { Player, Position } from '../types/api';
+import type { QuoteBadge } from '../types/quotes';
 import { leagueLabel, positionLabel } from '../utils/positions';
+import { QuoteTag } from './QuoteTag';
 import styles from './PostIt.module.css';
 
 interface LinkProps {
@@ -18,6 +20,8 @@ interface PostItProps {
   linkState?: unknown;
   // Por defecto un <a>; la página pasa el Link del router (research R-9)
   LinkComponent?: ElementType;
+  // Cotización actual; sin ella el post-it queda igual que antes de las cotizaciones
+  quote?: QuoteBadge;
 }
 
 const COLOR_CLASS: Record<Position, string> = {
@@ -35,7 +39,13 @@ function DefaultLink({ to, className, draggable, children }: LinkProps) {
   );
 }
 
-export function PostIt({ player, href, linkState, LinkComponent = DefaultLink }: PostItProps) {
+export function PostIt({
+  player,
+  href,
+  linkState,
+  LinkComponent = DefaultLink,
+  quote,
+}: PostItProps) {
   return (
     <LinkComponent
       to={href}
@@ -49,6 +59,7 @@ export function PostIt({ player, href, linkState, LinkComponent = DefaultLink }:
       <span className={styles.meta}>
         {player.team} · {leagueLabel(player.league)}
       </span>
+      {quote ? <QuoteTag badge={quote} /> : null}
     </LinkComponent>
   );
 }

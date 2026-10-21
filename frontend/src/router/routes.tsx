@@ -5,6 +5,7 @@ import { BoardPage } from '../pages/BoardPage';
 import { LockerRoomPage } from '../pages/LockerRoomPage';
 import { LoginPage } from '../pages/LoginPage';
 import { PlayerPage } from '../pages/PlayerPage';
+import { RankingPage } from '../pages/RankingPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { RequireSession } from './RequireSession';
 
@@ -17,6 +18,7 @@ export const appRoutes: RouteObject[] = [
       { index: true, element: <Navigate to="/pizarra" replace /> },
       { path: 'pizarra', element: <BoardPage /> },
       { path: 'jugadores/:id', element: <PlayerPage /> },
+      { path: 'ranking', element: <RankingPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       {

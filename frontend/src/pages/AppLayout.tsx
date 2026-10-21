@@ -26,6 +26,7 @@ export function AppLayout() {
   return (
     <Board>
       <TopBar
+        navSlot={<Link to="/ranking">Ranking</Link>}
         searchSlot={
           <SearchBox
             players={catalog.players}
