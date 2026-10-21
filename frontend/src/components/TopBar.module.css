@@ -26,6 +26,18 @@
   transform: rotate(1deg);
 }
 
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-family: var(--font-script);
+  font-size: 26px;
+}
+
+.nav a {
+  color: var(--chalk);
+}
+
 .search {
   flex: 1 1 220px;
   min-width: 0;

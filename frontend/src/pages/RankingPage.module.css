@@ -1,0 +1,61 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.filters {
+  display: flex;
+  justify-content: center;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-marker);
+  font-size: 2rem;
+  font-weight: 400;
+  text-shadow: var(--shadow-chalk-text);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.team {
+  display: flex;
+}
+
+.strategy {
+  margin: 0;
+  font-family: var(--font-script);
+  font-size: 22px;
+  color: var(--yellow);
+}
+
+/* Cancha a la izquierda desde pantallas medianas; en celular va arriba, como en la pizarra */
+@media (min-width: 900px) {
+  .layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .filters {
+    flex: 0 0 320px;
+    position: sticky;
+    top: 16px;
+  }
+
+  .content {
+    flex: 1 1 auto;
+  }
+}

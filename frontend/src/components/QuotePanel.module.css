@@ -1,0 +1,35 @@
+.panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px 20px;
+  margin: 0;
+  font-family: var(--font-hand);
+  color: var(--ink);
+}
+
+@media (min-width: 520px) {
+  .panel {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Los datos secundarios ocupan todo el ancho, debajo del valor y el precio */
+  .panel > div:not(.main) {
+    grid-column: 1 / -1;
+  }
+}
+
+.panel dt {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.panel dd {
+  margin: 0;
+  font-size: 1.1rem;
+  overflow-wrap: anywhere;
+}
+
+.panel .value {
+  font-family: var(--font-marker);
+  font-size: 1.4rem;
+}

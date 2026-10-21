@@ -23,6 +23,13 @@
   --ink-soft: #4a4a4a;
   --marker-red: #c0392b;
 
+  /* Subida y bajada de una cotización: tiza verde y roja sobre el pizarrón, tinta sobre el post-it.
+     El color solo refuerza el signo, el texto y el triángulo (FR-059). */
+  --chalk-up: #9be58a;
+  --chalk-down: #ff9b8f;
+  --ink-up: #1d6b2c;
+  --ink-down: #a8281c;
+
   /* Cinta adhesiva */
   --tape: rgba(244, 241, 230, 0.85);
   --tape-ink: #333;

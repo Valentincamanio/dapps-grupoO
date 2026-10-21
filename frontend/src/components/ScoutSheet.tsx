@@ -7,11 +7,13 @@ import styles from './ScoutSheet.module.css';
 interface ScoutSheetProps {
   player: Player;
   backLink: ReactNode;
+  // Espacio para la cotización y su evolución; sin él, la hoja queda como antes
+  quoteSlot?: ReactNode;
 }
 
-export function ScoutSheet({ player, backLink }: ScoutSheetProps) {
+export function ScoutSheet({ player, backLink, quoteSlot }: ScoutSheetProps) {
   return (
-    <article className={styles.sheet}>
+    <article className={quoteSlot ? `${styles.sheet} ${styles.wide}` : styles.sheet}>
       <span className={styles.pin} aria-hidden="true" />
       <h1 className={styles.name}>{player.name}</h1>
       <dl className={styles.data}>
@@ -28,6 +30,7 @@ export function ScoutSheet({ player, backLink }: ScoutSheetProps) {
           <dd>{leagueLabel(player.league)}</dd>
         </div>
       </dl>
+      {quoteSlot ? <div className={styles.quote}>{quoteSlot}</div> : null}
       <div className={styles.back}>{backLink}</div>
     </article>
   );

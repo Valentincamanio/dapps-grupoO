@@ -45,3 +45,8 @@ futbolmarket:
       path: snapshot/whoscored-stats.jsonl
   sync:
     catch-up-after: 7d
+  quotes:
+    recalculation:
+      cron: "0 0 6 * * MON"
+      zone: America/Argentina/Buenos_Aires
+      on-startup: true

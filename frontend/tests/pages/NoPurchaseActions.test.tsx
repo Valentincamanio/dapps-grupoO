@@ -1,10 +1,10 @@
-// Research R-4, CE-009: ninguna pantalla ofrece compra, venta, plantel, precio ni puntaje.
+// Research R-4, CE-009: ninguna pantalla ofrece compra, venta ni plantel.
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { PLAYERS } from '../mocks/players';
 import { renderWithRouter } from '../mocks/renderWithRouter';
 
-const FORBIDDEN = /comprar|vender|sumar|plantel|precio|valor|presupuesto|puntaje|portfolio|orden/i;
+const FORBIDDEN = /comprar|vender|sumar|plantel|presupuesto|puntaje|portfolio|orden/i;
 const PRICE_TEXT = /[$€]\s*\d|\d\s*[$€]|\bUSD\b|\bEUR\b/;
 
 function expectNoPurchaseActions() {

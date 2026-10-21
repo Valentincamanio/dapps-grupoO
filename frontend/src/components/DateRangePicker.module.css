@@ -1,0 +1,77 @@
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-family: var(--font-hand);
+  color: var(--ink);
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.field label {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.field input {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 2px solid var(--ink-soft);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--ink);
+}
+
+.field input[aria-invalid='true'] {
+  border-color: var(--ink-down);
+}
+
+.field input:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.error {
+  margin: 0;
+  color: var(--ink-down);
+}
+
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quickButton {
+  background: var(--tape);
+  color: var(--tape-ink);
+  border: 0;
+  padding: 4px 12px;
+  font-family: var(--font-hand);
+  font-size: 1rem;
+  box-shadow: var(--shadow-pin);
+}
+
+.quickButton[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--yellow);
+  font-weight: 700;
+}
+
+.quickButton:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}

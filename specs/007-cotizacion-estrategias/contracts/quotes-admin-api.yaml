@@ -1,0 +1,408 @@
+openapi: 3.0.3
+info:
+  title: "API de administración de cotizaciones: recálculo y simulación"
+  version: 1.0.0
+  description: |
+    Contrato de la feature `007-cotizacion-estrategias` de Futbol Market: el disparo manual del
+    recálculo y la simulación. **Exclusivos del rol `ADMIN`** (FR-053 y FR-054). Reutilizan
+    los esquemas de `quotes-api.yaml` (`ApiError`, `Position`, `League`, `StrategyRef`) y de
+    `strategies-api.yaml` (`StrategyParameters`).
+
+    **Credenciales.** Sin credencial: 401. Con la credencial de un usuario común: 403. Los dos se
+    resuelven en `SecurityConfig` (`POST /quotes/**` → `hasRole(ADMIN)`), antes del controller: no
+    se cotiza ni se simula nada.
+
+    **Recálculo.** Cotiza, semana cerrada por semana cerrada y en orden, a todos los jugadores
+    activos con la estrategia activa:
+
+    - Cada semana es una transacción: se cotiza completa o no deja nada (FR-012).
+    - Una semana con partidos terminados sin estadísticas espera 7 días desde su cierre; después
+      se cotiza con lo que haya. Una semana pendiente bloquea las siguientes.
+    - La semana en curso nunca se cotiza. Repetir el recálculo no crea cotizaciones nuevas.
+    - No consulta ninguna fuente externa: trabaja con lo guardado.
+    - **Un recálculo a la vez**, y **no corre junto con una sincronización** de Football-Data o de
+      WhoScored: en ambos casos el disparo manual responde 409 con un motivo distinto. La corrida
+      programada (lunes 06:00 hora de Argentina) y la de arranque se omiten y dejan el motivo en el
+      registro.
+    - El request **espera a que termine** y devuelve el informe con 200, también si no había semanas
+      para cotizar. La primera reconstrucción de una temporada puede demorar minutos.
+    - El informe **no se guarda**: va a la respuesta y al registro de la aplicación.
+
+    **Simulación.** Reproduce, en memoria y **sin guardar nada**, todas las semanas cerradas desde
+    100,00 con una estrategia guardada (su versión más reciente) o con parámetros enviados, y
+    devuelve por jugador su cotización actual y la simulada. No modifica cotizaciones, estrategias
+    ni la activa, y es determinista. No toma el candado de recálculo ni el de sincronización. Cada
+    página vuelve a calcular todo.
+servers:
+  - url: http://localhost:8080
+    description: Perfil local (./gradlew bootRun)
+tags:
+  - name: Recálculo
+    description: Disparo manual del recálculo semanal. Solo administradores.
+  - name: Simulación
+    description: Simulación de una estrategia sin guardar nada. Solo administradores.
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+paths:
+  /quotes/recalculate:
+    post:
+      tags: [Recálculo]
+      operationId: recalculateQuotes
+      summary: Dispara el recálculo de las cotizaciones
+      description: |
+        Sin cuerpo ni parámetros. Cotiza las semanas cerradas pendientes con la estrategia activa y
+        devuelve el informe: las semanas cotizadas (con la cantidad de cotizaciones iniciales,
+        calculadas y recotizadas de cada una) y las semanas pendientes con su motivo.
+      responses:
+        '200':
+          description: "Recálculo terminado. El informe puede estar vacío (`nothingToQuote: true`)."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecalculationReport'
+              examples:
+                primeraEjecucion:
+                  value:
+                    origin: MANUAL
+                    startedAt: '2026-10-15T15:00:00Z'
+                    finishedAt: '2026-10-15T15:01:20Z'
+                    strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                    quotedWeeks:
+                      - { weekStart: '2026-08-17', initial: 2380, calculated: 2380, requoted: 0 }
+                      - { weekStart: '2026-08-24', initial: 0, calculated: 2380, requoted: 0 }
+                    pendingWeeks:
+                      - { weekStart: '2026-10-05', reason: MISSING_STATS }
+                      - { weekStart: '2026-10-12', reason: PREVIOUS_WEEK_PENDING }
+                    nothingToQuote: false
+                sinSemanas:
+                  summary: Todas las semanas cerradas ya cotizadas
+                  value:
+                    origin: MANUAL
+                    startedAt: '2026-10-15T15:00:00Z'
+                    finishedAt: '2026-10-15T15:00:00Z'
+                    strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                    quotedWeeks: []
+                    pendingWeeks: []
+                    nothingToQuote: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Ya hay un recálculo en curso, o hay una sincronización en curso. No se cotiza nada.
+          content:
+            application/json:
+              schema:
+                $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+              examples:
+                recalculoEnCurso:
+                  value:
+                    timestamp: '2026-10-15T15:00:00Z'
+                    status: 409
+                    error: Conflict
+                    message: Ya hay un recálculo en curso.
+                    path: /quotes/recalculate
+                sincronizacionEnCurso:
+                  value:
+                    timestamp: '2026-10-15T15:00:00Z'
+                    status: 409
+                    error: Conflict
+                    message: 'No se puede recalcular: hay una sincronización en curso.'
+                    path: /quotes/recalculate
+  /quotes/simulate:
+    post:
+      tags: [Simulación]
+      operationId: simulateQuotes
+      summary: Simula una estrategia sin guardar nada
+      description: |
+        El cuerpo trae **una estrategia guardada (`strategyId`) o parámetros (`parameters`); uno de los
+        dos, no ambos ni ninguno** (400). Los parámetros se validan con las mismas reglas que al crear
+        una estrategia, y no se guardan.
+
+        Los filtros `league`, `team` y `position` y la paginación (`page`, `size`) son los del catálogo
+        y van en la dirección, como en `GET /players`.
+
+        Una estrategia guardada usa su versión más reciente. Con la estrategia activa sobre un historial
+        calculado íntegramente con su versión vigente, la cotización simulada de cada jugador coincide
+        con la actual.
+      parameters:
+        - name: league
+          in: query
+          required: false
+          schema:
+            $ref: 'quotes-api.yaml#/components/schemas/League'
+        - name: team
+          in: query
+          required: false
+          description: Nombre oficial exacto del equipo.
+          schema:
+            type: string
+            pattern: '\S'
+        - name: position
+          in: query
+          required: false
+          schema:
+            $ref: 'quotes-api.yaml#/components/schemas/Position'
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimulationRequest'
+            examples:
+              estrategiaGuardada:
+                value:
+                  strategyId: 2
+              parametros:
+                value:
+                  parameters:
+                    scaleFactor: 5
+                    minimumValue: 10.00
+                    defaultWeights:
+                      GOALS: 0.25
+                      ASSISTS: 0.15
+                      SHOTS: 0.10
+                      KEY_PASSES: 0.10
+                      SUCCESSFUL_DRIBBLES: 0.10
+                      TACKLES: 0.10
+                      RATING: 0.20
+      responses:
+        '200':
+          description: Página con, por jugador, la cotización actual, la simulada y la diferencia.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationPage'
+              example:
+                strategy: { id: 2, name: Equilibrada por posición, version: 1 }
+                weeksSimulated: 9
+                pendingWeeks: []
+                content:
+                  - playerId: 1
+                    name: Kylian Mbappé
+                    team: Real Madrid CF
+                    league: LA_LIGA
+                    position: FORWARD
+                    currentValue: 112.40
+                    simulatedValue: 109.80
+                    difference: -2.60
+                page: 0
+                size: 10
+                totalElements: 2380
+                totalPages: 238
+                hasPrevious: false
+                hasNext: true
+        '400':
+          description: |
+            Vienen los dos (`strategyId` y `parameters`) o ninguno; parámetros inválidos (pesos que no
+            suman 1,00, métrica desconocida, factor, mínimo); filtro con valor no admitido; o paginación fuera
+            de rango.
+          content:
+            application/json:
+              schema:
+                $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-15T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: Indique una estrategia guardada o parámetros, pero no las dos cosas ni ninguna.
+                path: /quotes/simulate
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: La estrategia guardada no existe.
+          content:
+            application/json:
+              schema:
+                $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-15T15:00:00Z'
+                status: 404
+                error: Not Found
+                message: No existe una estrategia con id 99.
+                path: /quotes/simulate
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de sesión obtenido en POST /auth/login.
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clave de API entregada en el registro o en la regeneración.
+  responses:
+    Unauthorized:
+      description: Falta la credencial, o es inválida o está vencida. No se cotiza ni se simula nada.
+      content:
+        application/json:
+          schema:
+            $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-15T15:00:00Z'
+            status: 401
+            error: Unauthorized
+            message: 'Se requiere una credencial: un token de sesión (Authorization: Bearer) o una clave de API (X-API-Key).'
+            path: /quotes/recalculate
+    Forbidden:
+      description: La credencial es válida pero no es de un administrador. No se cotiza ni se simula nada.
+      content:
+        application/json:
+          schema:
+            $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-15T15:00:00Z'
+            status: 403
+            error: Forbidden
+            message: No tiene permisos para acceder a este recurso.
+            path: /quotes/recalculate
+  schemas:
+    PendingReason:
+      type: string
+      enum: [MISSING_STATS, PREVIOUS_WEEK_PENDING]
+      description: |
+        `MISSING_STATS`: faltan estadísticas de partidos terminados de esa semana y todavía no pasaron
+        7 días desde su cierre. `PREVIOUS_WEEK_PENDING`: hay una semana anterior pendiente.
+    RecalculationOrigin:
+      type: string
+      enum: [WEEKLY, STARTUP, MANUAL, STRATEGY_CHANGE]
+      description: |
+        `WEEKLY`: la corrida de los lunes. `STARTUP`: la del arranque. `MANUAL`: este endpoint.
+        `STRATEGY_CHANGE`: la recotización de un cambio de estrategia con `AHORA`.
+    WeekResult:
+      type: object
+      required: [weekStart, initial, calculated, requoted]
+      properties:
+        weekStart:
+          type: string
+          format: date
+          description: Lunes de la semana, hora de Argentina.
+        initial:
+          type: integer
+          description: Jugadores que recibieron su cotización inicial (100,00) en esa semana.
+        calculated:
+          type: integer
+          description: Jugadores con una cotización calculada de esa semana.
+        requoted:
+          type: integer
+          description: Jugadores con una cotización recotizada de esa semana.
+    PendingWeek:
+      type: object
+      required: [weekStart, reason]
+      properties:
+        weekStart:
+          type: string
+          format: date
+        reason:
+          $ref: '#/components/schemas/PendingReason'
+    RecalculationReport:
+      type: object
+      description: Resumen de una corrida. No se guarda.
+      required: [origin, startedAt, finishedAt, strategy, quotedWeeks, pendingWeeks, nothingToQuote]
+      properties:
+        origin:
+          $ref: '#/components/schemas/RecalculationOrigin'
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        strategy:
+          $ref: 'quotes-api.yaml#/components/schemas/StrategyRef'
+        quotedWeeks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeekResult'
+        pendingWeeks:
+          type: array
+          items:
+            $ref: '#/components/schemas/PendingWeek'
+        nothingToQuote:
+          type: boolean
+          description: No había semanas para cotizar. No es un error.
+        interruptedAt:
+          type: string
+          format: date
+          nullable: true
+          description: |
+            La semana que falló al guardarse, si la corrida se cortó. De esa semana no queda ninguna
+            cotización y la siguiente corrida la reintenta.
+    SimulationRequest:
+      type: object
+      description: Una estrategia guardada o parámetros; uno de los dos, no ambos ni ninguno.
+      properties:
+        strategyId:
+          type: integer
+          format: int64
+          minimum: 1
+        parameters:
+          $ref: 'strategies-api.yaml#/components/schemas/StrategyParameters'
+    SimulationRow:
+      type: object
+      required: [playerId, name, team, league, position, simulatedValue, difference]
+      properties:
+        playerId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        team:
+          type: string
+        league:
+          $ref: 'quotes-api.yaml#/components/schemas/League'
+        position:
+          $ref: 'quotes-api.yaml#/components/schemas/Position'
+        currentValue:
+          type: number
+          nullable: true
+          description: La cotización actual guardada, con dos decimales. Es `null` si el jugador no tiene.
+        simulatedValue:
+          type: number
+          description: La cotización simulada, con dos decimales.
+        difference:
+          type: number
+          description: '`simulatedValue − currentValue`, con signo. Si no hay cotización actual, `simulatedValue − 100,00`.'
+    SimulationPage:
+      allOf:
+        - $ref: 'quotes-api.yaml#/components/schemas/PageInfo'
+        - type: object
+          required: [weeksSimulated, pendingWeeks, content]
+          properties:
+            strategy:
+              allOf:
+                - $ref: 'quotes-api.yaml#/components/schemas/StrategyRef'
+              nullable: true
+              description: La estrategia guardada que se simuló. `null` si fueron parámetros enviados.
+            weeksSimulated:
+              type: integer
+              description: Cuántas semanas cerradas se reprodujeron.
+            pendingWeeks:
+              type: array
+              description: Las semanas que hoy quedarían pendientes y no se simularon.
+              items:
+                $ref: '#/components/schemas/PendingWeek'
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/SimulationRow'

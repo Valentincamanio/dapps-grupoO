@@ -25,3 +25,7 @@ futbolmarket:
     base-url: http://whoscored.invalid
     snapshot:
       path: build/test-snapshot/absent.jsonl
+  quotes:
+    recalculation:
+      cron: "-"
+      on-startup: false

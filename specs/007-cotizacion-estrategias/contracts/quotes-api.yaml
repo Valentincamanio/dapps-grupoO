@@ -1,0 +1,646 @@
+openapi: 3.0.3
+info:
+  title: API de consulta de cotizaciones y ranking de jugadores
+  version: 1.0.0
+  description: |
+    Contrato de la feature `007-cotizacion-estrategias` de Futbol Market: las consultas públicas
+    de cotizaciones. Los endpoints de administrador están en `quotes-admin-api.yaml` y
+    `strategies-api.yaml`; los tres archivos comparten los esquemas definidos acá.
+
+    **Qué es una cotización.** Es el valor del 100 % del jugador, en créditos, con dos decimales
+    (`value`). Sus 100 tokens son ese 100 %: cada token es el 1 % y vale la cotización dividida
+    100, con cuatro decimales (`tokenPrice`). Al inicio cada token vale 1 crédito y el jugador
+    vale 100,00. Esta API **no redondea a créditos enteros**: eso lo hace la funcionalidad de
+    mercado sobre el total que paga o recibe un usuario.
+
+    **Qué no informa.** Ninguna respuesta lleva estadísticas crudas, métricas normalizadas ni el
+    score de una cotización (FR-006 del spec). El score se guarda pero no se expone.
+
+    **Acceso.** Todas las rutas son **públicas**: no piden credencial. Salen de la excepción
+    transitoria de `SecurityConfig` que deja públicas las lecturas bajo `GET /players/**` (marca
+    `TEMPORAL`: "la protección de estos endpoints se activa en un PR posterior"). Cuando esa
+    regla se active, estas rutas quedarían protegidas con el resto del catálogo, y el spec exige
+    que sean públicas (FR-040): hay que coordinarlo entonces.
+
+    **Rutas.** `GET /players/ranking` y `GET /players/quotes/current` son rutas literales y
+    Spring MVC las prefiere sobre `GET /players/{id}`; no hay conflicto con el detalle del
+    catálogo, y un test lo fija.
+
+    **Tipos de cotización.** `INITIAL` (el 100,00 de partida, rige desde el lunes 00:00 de la
+    primera semana cotizada del jugador), `CALCULATED` (la del cierre semanal, rige desde el
+    cierre de su semana) y `REQUOTED` (la de una recotización en el acto, rige desde el momento
+    en que se hizo). Una semana puede tener varias cotizaciones de un jugador: la calculada y las
+    recotizadas.
+
+    **Variación.** Es la diferencia, en créditos y en porcentaje, contra el valor desde el que
+    se calculó la cotización. La `INITIAL` no informa variación (el campo no aparece). Una
+    recotizada se mide contra el mismo valor de partida que la calculada que reemplaza.
+
+    **Semana y hora.** Una semana va del lunes 00:00 al lunes 00:00 siguiente, hora de Argentina
+    (UTC−3, sin horario de verano). `weekStart` es ese lunes. `validFrom` es un instante en UTC.
+servers:
+  - url: http://localhost:8080
+    description: Perfil local (./gradlew bootRun)
+tags:
+  - name: Cotizaciones
+    description: Cotización actual, a una fecha y evolución de un jugador.
+  - name: Ranking
+    description: Jugadores ordenados por su cotización vigente.
+paths:
+  /players/{id}/quotes:
+    get:
+      tags: [Cotizaciones]
+      operationId: getPlayerQuoteHistory
+      summary: Evolución de la cotización de un jugador
+      description: |
+        Historial paginado, ordenado por `validFrom` ascendente. Incluye **todas** las cotizaciones
+        del rango: también las calculadas que una recotización dejó de vigentes.
+
+        `from` y `to` son fechas `AAAA-MM-DD` en hora de Argentina, **ambos extremos incluidos**
+        (de `from` 00:00 al final del día `to`). Sin ellos se devuelve todo el historial. Las dos
+        fechas se reciben como texto para poder informar el valor no admitido.
+
+        El tamaño máximo de página es 100: alcanza para los puntos semanales de una temporada
+        entera, así el gráfico no necesita varias consultas.
+      parameters:
+        - $ref: '#/components/parameters/PlayerId'
+        - name: from
+          in: query
+          required: false
+          description: Inicio del rango, `AAAA-MM-DD`, inclusive.
+          schema:
+            type: string
+            example: '2026-08-17'
+        - name: to
+          in: query
+          required: false
+          description: Fin del rango, `AAAA-MM-DD`, inclusive. No puede ser anterior a `from`.
+          schema:
+            type: string
+            example: '2026-10-12'
+        - $ref: '#/components/parameters/Page'
+        - name: size
+          in: query
+          required: false
+          description: Tamaño de página, de 1 a 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Página del historial. Puede estar vacía si el jugador no tiene cotizaciones en el rango.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteHistoryPage'
+              examples:
+                conRecotizacion:
+                  summary: Una semana con la calculada y la recotizada
+                  value:
+                    playerId: 12
+                    content:
+                      - value: 100.00
+                        tokenPrice: 1.0000
+                        weekStart: '2026-08-17'
+                        validFrom: '2026-08-17T03:00:00Z'
+                        type: INITIAL
+                        strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                      - value: 103.00
+                        tokenPrice: 1.0300
+                        variation: { amount: 3.00, percent: 3.00 }
+                        weekStart: '2026-08-17'
+                        validFrom: '2026-08-24T03:00:00Z'
+                        type: CALCULATED
+                        strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                      - value: 104.00
+                        tokenPrice: 1.0400
+                        variation: { amount: 4.00, percent: 4.00 }
+                        weekStart: '2026-08-17'
+                        validFrom: '2026-08-26T15:30:00Z'
+                        type: REQUOTED
+                        strategy: { id: 2, name: Equilibrada por posición, version: 1 }
+                    page: 0
+                    size: 20
+                    totalElements: 3
+                    totalPages: 1
+                    hasPrevious: false
+                    hasNext: false
+        '400':
+          description: |
+            `from` o `to` con formato inválido, `from` posterior a `to`, o `page`/`size` fuera de rango.
+            El mensaje indica el valor no admitido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                rangoInvertido:
+                  value:
+                    timestamp: '2026-10-15T15:00:00Z'
+                    status: 400
+                    error: Bad Request
+                    message: El inicio del rango (2026-09-01) es posterior al final (2026-08-01).
+                    path: /players/12/quotes
+                fechaInvalida:
+                  value:
+                    timestamp: '2026-10-15T15:00:00Z'
+                    status: 400
+                    error: Bad Request
+                    message: "La fecha '2026-13-45' no es válida: use el formato AAAA-MM-DD."
+                    path: /players/12/quotes
+        '404':
+          $ref: '#/components/responses/PlayerNotFound'
+  /players/{id}/quotes/current:
+    get:
+      tags: [Cotizaciones]
+      operationId: getPlayerCurrentQuote
+      summary: Cotización actual de un jugador
+      description: |
+        La última cotización (por `validFrom`) del jugador, activo o inactivo: un jugador inactivo
+        conserva su última cotización y se consulta por identificador.
+
+        Se cachea en memoria; el caché se invalida al terminar un recálculo, una recotización y al
+        cambiar la estrategia activa.
+
+        Un jugador del catálogo **sin ninguna cotización** responde 404 con un mensaje propio,
+        distinto del de un jugador inexistente.
+      parameters:
+        - $ref: '#/components/parameters/PlayerId'
+      responses:
+        '200':
+          description: La cotización vigente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerQuote'
+              example:
+                playerId: 12
+                value: 103.00
+                tokenPrice: 1.0300
+                variation: { amount: 3.00, percent: 3.00 }
+                weekStart: '2026-08-17'
+                validFrom: '2026-08-24T03:00:00Z'
+                type: CALCULATED
+                strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+        '400':
+          $ref: '#/components/responses/BadRequestId'
+        '404':
+          description: El jugador no existe, o existe y todavía no tiene cotización. Se distinguen por el mensaje.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                jugadorInexistente:
+                  value:
+                    timestamp: '2026-10-15T15:00:00Z'
+                    status: 404
+                    error: Not Found
+                    message: No existe un jugador con id 9999.
+                    path: /players/9999/quotes/current
+                jugadorSinCotizacion:
+                  value:
+                    timestamp: '2026-10-15T15:00:00Z'
+                    status: 404
+                    error: Not Found
+                    message: El jugador 12 no tiene cotización.
+                    path: /players/12/quotes/current
+  /players/{id}/quotes/at:
+    get:
+      tags: [Cotizaciones]
+      operationId: getPlayerQuoteAt
+      summary: Cotización de un jugador en una fecha
+      description: |
+        La última cotización que **ya regía al final de ese día**, hora de Argentina. Si ese día hubo
+        una recotización en el acto, rige la recotizada. Una fecha anterior a la primera cotización
+        del jugador responde 404. Una fecha futura o con formato inválido responde 400.
+
+        Ejemplo: con una inicial de 100,00 desde el lunes 17/08/2026, una calculada de 103,00 desde el
+        lunes 24/08 y otra de 101,00 desde el lunes 31/08, la cotización al 20/08 es 100,00, al 24/08
+        es 103,00 y al 16/08 no hay cotización.
+      parameters:
+        - $ref: '#/components/parameters/PlayerId'
+        - name: date
+          in: query
+          required: true
+          description: Fecha `AAAA-MM-DD`, hora de Argentina. No puede ser futura.
+          schema:
+            type: string
+            example: '2026-08-20'
+      responses:
+        '200':
+          description: La cotización vigente al final de ese día.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerQuote'
+        '400':
+          description: Fecha con formato inválido, futura, o falta el parámetro. El mensaje indica el valor no admitido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                fechaFutura:
+                  value:
+                    timestamp: '2026-10-15T15:00:00Z'
+                    status: 400
+                    error: Bad Request
+                    message: La fecha 2027-01-01 es futura.
+                    path: /players/12/quotes/at
+        '404':
+          description: El jugador no existe, o no tiene cotización a esa fecha.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                sinCotizacionALaFecha:
+                  value:
+                    timestamp: '2026-10-15T15:00:00Z'
+                    status: 404
+                    error: Not Found
+                    message: El jugador 12 no tiene cotización al 2026-08-16.
+                    path: /players/12/quotes/at
+  /players/quotes/current:
+    get:
+      tags: [Cotizaciones]
+      operationId: getCurrentQuotes
+      summary: Cotización actual de varios jugadores (para la pizarra)
+      description: |
+        Una consulta por lote: la pizarra pide la cotización actual de los jugadores de una hoja
+        **sin hacer una consulta por jugador** (FR-062). Devuelve solo los jugadores que tienen
+        cotización; los que no tienen **no figuran** en la respuesta y los ids que no existen
+        tampoco (no es un error).
+
+        Hasta 50 ids, el mismo máximo que la página del catálogo. No se cachea.
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: Identificadores de jugadores separados por coma, de 1 a 50, cada uno mayor o igual a 1.
+          style: form
+          explode: false
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 50
+            items:
+              type: integer
+              format: int64
+              minimum: 1
+          example: [12, 13, 14]
+      responses:
+        '200':
+          description: La cotización actual de los jugadores que tienen una.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentQuotesResponse'
+              example:
+                quotes:
+                  - playerId: 12
+                    value: 103.00
+                    tokenPrice: 1.0300
+                    variation: { amount: 3.00, percent: 3.00 }
+                    weekStart: '2026-08-17'
+                    validFrom: '2026-08-24T03:00:00Z'
+                    type: CALCULATED
+                    strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+        '400':
+          description: Falta `ids`, hay más de 50 o alguno no es un entero mayor o igual a 1.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-15T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: Los parámetros enviados no son válidos.
+                path: /players/quotes/current
+  /players/ranking:
+    get:
+      tags: [Ranking]
+      operationId: getRanking
+      summary: Ranking de jugadores por cotización vigente
+      description: |
+        Los jugadores **activos con cotización**, ordenados por cotización vigente descendente; ante
+        empate, por nombre y luego por identificador. Un jugador inactivo o sin cotización no aparece.
+
+        Los filtros `league`, `team` y `position` son opcionales y se combinan. Sus reglas son las
+        del catálogo (`GET /players`): `team` es el nombre oficial exacto del equipo, y un valor
+        no admitido de `league` o `position` se rechaza con 400.
+
+        La respuesta informa la **estrategia activa**. Cada fila informa la cotización vigente del
+        jugador, su variación semanal (la de su última cotización) y la estrategia y la versión con
+        que se calculó. Se cachea en memoria por combinación de filtros; el caché se invalida al
+        terminar un recálculo, una recotización y al cambiar la estrategia activa.
+      parameters:
+        - $ref: '#/components/parameters/League'
+        - $ref: '#/components/parameters/Team'
+        - $ref: '#/components/parameters/Position'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/RankingSize'
+      responses:
+        '200':
+          description: Página del ranking. Puede estar vacía.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RankingPage'
+              example:
+                activeStrategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                content:
+                  - playerId: 1
+                    name: Kylian Mbappé
+                    position: FORWARD
+                    team: Real Madrid CF
+                    league: LA_LIGA
+                    teamCrest: https://crests.football-data.org/86.png
+                    quote:
+                      value: 112.40
+                      tokenPrice: 1.1240
+                      variation: { amount: 2.10, percent: 1.90 }
+                      weekStart: '2026-10-05'
+                      validFrom: '2026-10-12T03:00:00Z'
+                      type: CALCULATED
+                      strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                page: 0
+                size: 10
+                totalElements: 2380
+                totalPages: 238
+                hasPrevious: false
+                hasNext: true
+        '400':
+          description: Un filtro con valor no admitido (por ejemplo, una posición inexistente) o `page`/`size` fuera de rango.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-15T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: Los parámetros enviados no son válidos.
+                path: /players/ranking
+components:
+  parameters:
+    PlayerId:
+      name: id
+      in: path
+      required: true
+      description: Identificador del jugador, mayor o igual a 1.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    League:
+      name: league
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/League'
+    Team:
+      name: team
+      in: query
+      required: false
+      description: Nombre oficial exacto del equipo. No puede estar vacío.
+      schema:
+        type: string
+        pattern: '\S'
+    Position:
+      name: position
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/Position'
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Número de página. La primera es la 0.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    RankingSize:
+      name: size
+      in: query
+      required: false
+      description: Tamaño de página, de 1 a 50.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
+  responses:
+    BadRequestId:
+      description: Identificador con formato inválido.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-15T15:00:00Z'
+            status: 400
+            error: Bad Request
+            message: Los parámetros enviados no son válidos.
+            path: /players/abc/quotes/current
+    PlayerNotFound:
+      description: No existe un jugador con ese identificador.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-15T15:00:00Z'
+            status: 404
+            error: Not Found
+            message: No existe un jugador con id 9999.
+            path: /players/9999/quotes
+  schemas:
+    League:
+      type: string
+      enum: [PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1]
+    Position:
+      type: string
+      enum: [GOALKEEPER, DEFENDER, MIDFIELDER, FORWARD]
+    QuoteType:
+      type: string
+      enum: [INITIAL, CALCULATED, REQUOTED]
+      description: |
+        `INITIAL`: el 100,00 de partida. `CALCULATED`: la del cierre semanal. `REQUOTED`: la de una
+        recotización en el acto de la última semana cerrada.
+    StrategyRef:
+      type: object
+      description: La estrategia y la versión con que se calculó una cotización.
+      required: [id, name, version]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Identificador de la estrategia (el de su versión 1).
+        name:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+    Variation:
+      type: object
+      description: Diferencia contra el valor desde el que se calculó la cotización.
+      required: [amount, percent]
+      properties:
+        amount:
+          type: number
+          description: Diferencia en créditos, con dos decimales y signo.
+          example: 3.00
+        percent:
+          type: number
+          description: Diferencia porcentual contra el valor de partida, con dos decimales y signo.
+          example: 3.00
+    Quote:
+      type: object
+      description: La cotización de un jugador en una semana. Nunca lleva estadísticas ni score.
+      required: [value, tokenPrice, weekStart, validFrom, type, strategy]
+      properties:
+        value:
+          type: number
+          description: Valor del 100 % del jugador, en créditos, con dos decimales.
+          example: 103.00
+        tokenPrice:
+          type: number
+          description: Precio por token (`value / 100`), con cuatro decimales, sin otro redondeo.
+          example: 1.0300
+        variation:
+          allOf:
+            - $ref: '#/components/schemas/Variation'
+          description: No aparece en la cotización `INITIAL`.
+        weekStart:
+          type: string
+          format: date
+          description: Lunes de la semana a la que pertenece, hora de Argentina.
+          example: '2026-08-17'
+        validFrom:
+          type: string
+          format: date-time
+          description: Desde cuándo rige, en UTC.
+          example: '2026-08-24T03:00:00Z'
+        type:
+          $ref: '#/components/schemas/QuoteType'
+        strategy:
+          $ref: '#/components/schemas/StrategyRef'
+    PlayerQuote:
+      allOf:
+        - $ref: '#/components/schemas/Quote'
+        - type: object
+          required: [playerId]
+          properties:
+            playerId:
+              type: integer
+              format: int64
+    PageInfo:
+      type: object
+      description: Los datos de paginación del catálogo.
+      required: [page, size, totalElements, totalPages, hasPrevious, hasNext]
+      properties:
+        page:
+          type: integer
+          description: Índice base cero.
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        hasPrevious:
+          type: boolean
+        hasNext:
+          type: boolean
+    QuoteHistoryPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          required: [playerId, content]
+          properties:
+            playerId:
+              type: integer
+              format: int64
+            content:
+              type: array
+              description: Ordenado por `validFrom` ascendente.
+              items:
+                $ref: '#/components/schemas/Quote'
+    CurrentQuotesResponse:
+      type: object
+      required: [quotes]
+      properties:
+        quotes:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerQuote'
+    RankingRow:
+      type: object
+      required: [playerId, name, position, team, league, quote]
+      properties:
+        playerId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        position:
+          $ref: '#/components/schemas/Position'
+        team:
+          type: string
+        league:
+          $ref: '#/components/schemas/League'
+        teamCrest:
+          type: string
+          nullable: true
+        quote:
+          $ref: '#/components/schemas/Quote'
+    RankingPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          required: [activeStrategy, content]
+          properties:
+            activeStrategy:
+              $ref: '#/components/schemas/StrategyRef'
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/RankingRow'
+    ApiError:
+      type: object
+      description: Formato de error común del backend.
+      required: [timestamp, status, error, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          format: int32
+        error:
+          type: string
+          description: Frase estándar del status HTTP.
+        message:
+          type: string
+          description: Mensaje claro en español, sin detalles internos.
+        path:
+          type: string
+        violations:
+          type: array
+          description: Solo en errores de validación del cuerpo.
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
