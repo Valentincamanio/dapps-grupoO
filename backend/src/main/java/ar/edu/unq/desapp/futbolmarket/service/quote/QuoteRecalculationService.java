@@ -1,6 +1,7 @@
 package ar.edu.unq.desapp.futbolmarket.service.quote;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 
 import org.springframework.dao.DataAccessException;
@@ -49,19 +50,31 @@ public class QuoteRecalculationService {
         return report;
     }
 
+    /**
+     * Si queda alguna semana cerrada sin cotizar, según lo guardado. Solo lee: no toma candados ni
+     * escribe. Con esto el arranque decide si dispara el recálculo (US6.2, US6.3).
+     */
+    public boolean hasClosedUnquotedWeeks() {
+        return plan(clock.instant()).hasClosedUnquotedWeeks();
+    }
+
     private RecalculationReport run(RecalculationOrigin origin) {
         StrategyVersion strategy = strategyRepository.findCatalog().activeVersion();
         var startedAt = clock.instant();
         reportLogger.started(origin, strategy.ref());
-        var finishedMatches = matchRepository.findAllFinished();
-        var plan = QuotingPlan.of(quoteRepository.findLastCalculatedWeek(),
-                QuotingPlan.firstWeekWithStats(finishedMatches), finishedMatches, startedAt);
+        var plan = plan(startedAt);
         var report = RecalculationReport.builder(origin, startedAt, strategy.ref())
                 .pendingWeeks(plan.pendingWeeks());
         quoteInOrder(plan.weeksToQuote(), strategy, report);
         RecalculationReport finished = report.build(clock.instant());
         reportLogger.log(finished);
         return finished;
+    }
+
+    private QuotingPlan plan(Instant now) {
+        var finishedMatches = matchRepository.findAllFinished();
+        return QuotingPlan.of(quoteRepository.findLastCalculatedWeek(),
+                QuotingPlan.firstWeekWithStats(finishedMatches), finishedMatches, now);
     }
 
     private void quoteInOrder(List<QuoteWeek> weeks, StrategyVersion strategy, RecalculationReport.Builder report) {

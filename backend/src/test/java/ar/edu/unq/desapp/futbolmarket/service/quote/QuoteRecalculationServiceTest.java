@@ -234,6 +234,45 @@ class QuoteRecalculationServiceTest {
         verifyNoInteractions(strategyRepository, quoteRepository, matchRepository, weekWriter, cacheInvalidator);
     }
 
+    @Test
+    void conSemanasCerradasSinCotizarLasInformaSinTomarCandadosNiEscribir() {
+        givenHistory(Optional.of(FIRST), List.of(EVERTON_MAN_UTD));
+
+        boolean pending = recalculationLock.runExclusively(service::hasClosedUnquotedWeeks);
+
+        assertThat(pending).isTrue();
+        verifyNoInteractions(strategyRepository, weekWriter, cacheInvalidator);
+    }
+
+    @Test
+    void conUnaSemanaPendienteDeEstadisticasTambienHaySemanasSinCotizar() {
+        Match withoutStats = QuoteFixtures.finishedMatchWithoutStats("560700", THIRD, ARSENAL, LIVERPOOL);
+        givenHistory(Optional.of(SECOND), List.of(EVERTON_MAN_UTD, withoutStats));
+
+        boolean pending = service.hasClosedUnquotedWeeks();
+
+        assertThat(pending).isTrue();
+    }
+
+    @Test
+    void conLaUltimaSemanaCerradaYaCotizadaNoHaySemanasSinCotizar() {
+        givenHistory(Optional.of(THIRD), List.of(EVERTON_MAN_UTD));
+
+        boolean pending = service.hasClosedUnquotedWeeks();
+
+        assertThat(pending).isFalse();
+        verifyNoInteractions(strategyRepository, weekWriter, cacheInvalidator);
+    }
+
+    @Test
+    void sinEstadisticasEnNingunaParteNoHaySemanasSinCotizar() {
+        givenHistory(Optional.empty(), List.of());
+
+        boolean pending = service.hasClosedUnquotedWeeks();
+
+        assertThat(pending).isFalse();
+    }
+
     private void givenActive(StrategyCatalog catalog) {
         when(strategyRepository.findCatalog()).thenReturn(catalog);
     }
