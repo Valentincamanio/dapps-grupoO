@@ -128,7 +128,7 @@ fecha 2099-01-01 es futura").
 curl -s "http://localhost:8080/players/999999/quotes/current"
 ```
 
-Esperado: 404 "No existe un jugador con id 999999". Para un jugador del catálogo sin cotización
+Esperado: 404 "No se encontró el jugador con id 999999." Para un jugador del catálogo sin cotización
 (por ejemplo uno recién agregado por una sincronización posterior al recálculo): 404 "El jugador N no
 tiene cotización".
 
@@ -183,8 +183,9 @@ valor que `P1` tenía **antes de esa semana** (`baseValue`), no del de la calcul
 
 **3.4. Repetir no acumula**
 
-Repetir el comando del paso 3.3. Esperado: 200 con `requotation.quotedWeeks: []` y
-`nothingToQuote: true`; el historial de `P1` **no** suma ninguna cotización.
+Repetir el comando del paso 3.3. Esperado: 200 con `requotation: null`, porque la estrategia ya es la
+activa y la última semana cerrada ya está cotizada con ella; el historial de `P1` **no** suma ninguna
+cotización.
 
 **3.5. Cambiar a otra estrategia con `AHORA` parte del mismo valor previo**
 

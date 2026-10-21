@@ -6,6 +6,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyVersion;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.strategy.StrategyMapper;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.strategy.StrategySQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.strategy.StrategySQLDAO;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,14 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
  * en una fila guardada es la marca {@code active} (research D13).
  */
 @Repository
+@RequiredArgsConstructor
 public class StrategyRepository {
     private final StrategySQLDAO strategyDAO;
     private final StrategyMapper strategyMapper;
-
-    public StrategyRepository(StrategySQLDAO strategyDAO, StrategyMapper strategyMapper) {
-        this.strategyDAO = strategyDAO;
-        this.strategyMapper = strategyMapper;
-    }
 
     /**
      * Todas las estrategias con sus versiones y pesos, y la versión activa.

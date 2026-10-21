@@ -10,6 +10,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.quote.exception.RecalculationBlocke
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.exception.RecalculationInProgressException;
 import ar.edu.unq.desapp.futbolmarket.modelo.sync.exception.SyncInProgressException;
 import ar.edu.unq.desapp.futbolmarket.service.sync.SyncLock;
+import lombok.RequiredArgsConstructor;
 
 /**
  * El candado del recálculo (research D17): un recálculo a la vez, y nunca junto con una
@@ -21,13 +22,10 @@ import ar.edu.unq.desapp.futbolmarket.service.sync.SyncLock;
  * 409). Mientras corre un recálculo, una sincronización recibe el 409 de la 006 (P-2 de D18).</p>
  */
 @Component
+@RequiredArgsConstructor
 public class RecalculationLock {
     private final Semaphore permit = new Semaphore(1);
     private final SyncLock syncLock;
-
-    public RecalculationLock(SyncLock syncLock) {
-        this.syncLock = syncLock;
-    }
 
     public <T> T runExclusively(Supplier<T> action) {
         if (!permit.tryAcquire()) {

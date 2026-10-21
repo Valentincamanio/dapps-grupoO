@@ -12,6 +12,7 @@ import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.quote.QuoteSQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.player.PlayerSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.quote.QuoteSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.strategy.StrategySQLDAO;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
@@ -30,21 +31,13 @@ import java.util.stream.Collectors;
  * una cotización guardada no cambia ni se pierde (FR-005).
  */
 @Repository
+@RequiredArgsConstructor
 public class QuoteRepository {
     private final QuoteSQLDAO quoteDAO;
     private final PlayerSQLDAO playerDAO;
     private final StrategySQLDAO strategyDAO;
     private final QuoteMapper quoteMapper;
     private final PlayerMapper playerMapper;
-
-    public QuoteRepository(QuoteSQLDAO quoteDAO, PlayerSQLDAO playerDAO, StrategySQLDAO strategyDAO,
-                           QuoteMapper quoteMapper, PlayerMapper playerMapper) {
-        this.quoteDAO = quoteDAO;
-        this.playerDAO = playerDAO;
-        this.strategyDAO = strategyDAO;
-        this.quoteMapper = quoteMapper;
-        this.playerMapper = playerMapper;
-    }
 
     /**
      * Inserta las cotizaciones. El jugador y la versión se referencian sin cargarlos.

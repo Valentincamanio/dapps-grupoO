@@ -85,6 +85,61 @@ Las propiedades están detalladas en
 [contracts/configuration.md](specs/006-scraping-whoscored/contracts/configuration.md), y la
 validación de punta a punta, en [quickstart.md](specs/006-scraping-whoscored/quickstart.md).
 
+### Cotizaciones y estrategias de valuación
+
+Cada jugador activo tiene una cotización semanal en créditos, calculada con las estadísticas de
+WhoScored y la estrategia de valuación activa. Arranca en 100,00 y cada semana cerrada parte del
+valor que dejó la anterior. Al arrancar quedan sembradas dos estrategias, "Rendimiento de partido"
+(activa) y "Equilibrada por posición".
+
+Endpoints públicos (sin credencial):
+
+| Método y ruta | Qué devuelve |
+|---|---|
+| `GET /players/{id}/quotes/current` | La cotización vigente, el precio por token y la variación semanal |
+| `GET /players/{id}/quotes?from=&to=&page=&size=` | El historial, con rango de fechas opcional (`AAAA-MM-DD`) |
+| `GET /players/{id}/quotes/at?date=` | La cotización vigente en una fecha |
+| `GET /players/quotes/current?ids=1,2,3` | Las vigentes de hasta 50 jugadores (la usa la pizarra) |
+| `GET /players/ranking?league=&team=&position=&page=&size=` | El ranking por cotización, con la estrategia activa |
+
+Endpoints de administrador (JWT o API key de un usuario con rol `ADMIN`):
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /strategies` y `GET /strategies/{id}` | Lista las estrategias, o una, con todas sus versiones |
+| `POST /strategies` | Registra una estrategia (nombre, factor de escala, mínimo y pesos por posición) |
+| `POST /strategies/{id}/versions` | Edita una estrategia: crea su versión siguiente, sin tocar las anteriores |
+| `POST /strategies/{id}/activate` | La activa; con `{"requote": "AHORA"}` recotiza la última semana cerrada, y con `PROXIMA_SEMANA` (o sin cuerpo) rige desde la semana siguiente |
+| `POST /quotes/recalculate` | Cotiza todas las semanas cerradas que falten y devuelve el informe |
+| `POST /quotes/simulate?league=&team=&position=&page=&size=` | Simula una estrategia guardada o unos parámetros sin guardar nada |
+
+- **El recálculo automático**: corre los lunes a las 06:00 de Argentina, después de la cadena de
+  sincronización, y al arrancar si hay semanas cerradas sin cotizar. Una semana con partidos sin
+  estadísticas espera hasta 7 días desde su cierre.
+- Hay a lo sumo un recálculo a la vez y nunca junto con una sincronización: un disparo manual en
+  ese caso responde 409, y el automático se omite con un aviso en el registro.
+- Las propiedades, con sus valores por defecto:
+
+  | Propiedad | Valor | Qué controla |
+  |---|---|---|
+  | `futbolmarket.quotes.recalculation.cron` | `0 0 6 * * MON` | Cuándo corre el recálculo semanal; `-` lo deshabilita |
+  | `futbolmarket.quotes.recalculation.zone` | `America/Argentina/Buenos_Aires` | La zona en la que se interpreta el cron |
+  | `futbolmarket.quotes.recalculation.on-startup` | `true` | Si recalcula al arrancar cuando hay semanas pendientes |
+
+  Como las demás, se pisan con variables de entorno, por ejemplo
+  `FUTBOLMARKET_QUOTES_RECALCULATION_ONSTARTUP=false`.
+
+**La medición de volumen**: un test aparte carga 2.600 jugadores y 40 semanas de estadísticas
+sintéticas en una H2 en archivo, reconstruye la temporada y verifica los tiempos del spec. Tarda
+unos minutos y no corre en el build normal. Desde `backend/`:
+
+    QUOTES_BENCHMARK=true ./gradlew test --tests '*QuoteVolumeBenchmarkIT' -i
+
+En PowerShell: `$env:QUOTES_BENCHMARK = 'true'; ./gradlew test --tests '*QuoteVolumeBenchmarkIT' -i`.
+
+Los contratos están en [contracts/](specs/007-cotizacion-estrategias/contracts/), y la validación de
+punta a punta, en [quickstart.md](specs/007-cotizacion-estrategias/quickstart.md).
+
 ### Base local con el dataset ficticio
 
 Si tu base local es de antes de Football-Data.org, tiene el dataset ficticio y tablas sin las
@@ -122,7 +177,8 @@ ni consulta WhoScored.
 
 El backend es un monolito organizado primero por capa y, dentro de cada capa, por contexto
 (`auth`, `user`, `player`, `team`, `league`, `position`, `season`, `match`, `performance`,
-`sync`). `performance` tiene las estadísticas de cada jugador en cada partido. Las fuentes
+`sync`, `strategy`, `quote`). `performance` tiene las estadísticas de cada jugador en cada
+partido; `strategy`, las estrategias de valuación, y `quote`, las cotizaciones semanales. Las fuentes
 externas van en la capa `adapter`, organizada por proveedor: `footballdata` (la API de
 Football-Data.org) y `whoscored` (las páginas de WhoScored). El árbol lo fija el Principio I de
 [la constitución](.specify/memory/constitution.md):

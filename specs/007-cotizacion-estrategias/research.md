@@ -705,6 +705,26 @@ tercero vea el commit antes de que se libere).
   `allocationSize` y activar `hibernate.jdbc.batch_size`. H2 y PostgreSQL lo soportan, así que sigue
   siendo portable. Cambia la estrategia de id de una sola entidad, algo que el equipo debe avalar
   (D28) antes de hacerlo, y no se hace a priori.
+- **Resultado de la medición (T169, 2026-10-21)**: `QuoteVolumeBenchmarkIT` con Java 21 en una
+  notebook de desarrollo (Windows 11), 130 equipos de 20 jugadores (2.600) y 40 semanas con 65
+  partidos cada una (104.000 filas de estadísticas, semilla fija). Todos los topes se cumplen, así
+  que **no hace falta el plan B**:
+
+  | Qué | Medido | Tope |
+  |---|---|---|
+  | Carga de los datos sintéticos (no es un criterio) | 14,9 s | n/a |
+  | Reconstrucción de 40 semanas desde cero (SC-009) | 1 min 32 s | 5 min |
+  | Una semana para todo el catálogo, con la base de la anterior (SC-009) | 4,6 s | 1 min |
+  | Filas en `quotes` (2.600 `INITIAL` + 104.000 `CALCULATED`) | 106.600 | n/a |
+  | Tamaño del archivo H2 (con estadísticas, partidos y jugadores) | 228 MB | n/a |
+  | Primera página de una simulación de 40 semanas (SC-010) | 4,2 s | 30 s |
+  | Primera página del ranking, sin caché (SC-008) | 1,94 s | 2 s |
+  | Cotización actual de un jugador, sin caché (SC-008) | 0,02 s | 2 s |
+
+  El ranking sin caché queda **muy cerca del tope**: es la consulta "última por jugador" sobre las
+  106.600 filas, y solo la primera llamada después de cada recálculo la paga (las siguientes salen
+  del caché `quotes-ranking`). Si en otra máquina pasa los 2 s, lo primero a mirar es esa consulta
+  (un índice o la última por jugador desnormalizada), no el plan B, que solo acelera las escrituras.
 
 **Alternativas descartadas**:
 
