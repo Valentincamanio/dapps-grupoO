@@ -151,3 +151,79 @@ export function weightsFromFormState(
   }
   return { defaultWeights: weightMapFromText(state.defaultWeights), positionWeights };
 }
+
+// Parámetros de valuación: el factor de escala y la cotización mínima junto con los pesos. Los
+// dos números siguen la regla del backend: mayores que 0 (el mínimo, al menos 0,01, que con dos
+// decimales es lo mismo) y a lo sumo dos decimales.
+
+export interface ParametersFormState {
+  scaleFactor: string;
+  minimumValue: string;
+  weights: WeightsFormState;
+}
+
+export interface ParametersCheck {
+  scaleFactorError?: string;
+  minimumValueError?: string;
+  // Los dos números válidos y todos los juegos definidos sumando 1,00
+  valid: boolean;
+}
+
+// Los de una estrategia nueva cuando no se los indica (contracts/strategies-api.yaml)
+const DEFAULT_SCALE_FACTOR_TEXT = '10';
+const DEFAULT_MINIMUM_VALUE_TEXT = '10,00';
+
+// Mensaje del error de un número positivo con dos decimales, o undefined si es válido
+export function positiveAmountError(text: string): string | undefined {
+  if (text.trim() === '') return 'es obligatorio';
+  const parsed = parseWeight(text);
+  if (!parsed.ok) return weightErrorMessage(parsed.error);
+  if (parsed.hundredths === 0) return 'tiene que ser mayor que 0';
+  return undefined;
+}
+
+// Texto ya validado -> número de la API
+function amountFromText(text: string): number {
+  const parsed = parseWeight(text);
+  return parsed.ok ? parsed.hundredths / HUNDREDTHS_PER_UNIT : Number.NaN;
+}
+
+// Vacío con los valores por defecto al crear, o los de una versión al editar
+export function parametersFormState(version?: StrategyInput): ParametersFormState {
+  if (!version) {
+    return {
+      scaleFactor: DEFAULT_SCALE_FACTOR_TEXT,
+      minimumValue: DEFAULT_MINIMUM_VALUE_TEXT,
+      weights: weightsFormState(),
+    };
+  }
+  return {
+    scaleFactor: amountText(version.scaleFactor, DEFAULT_SCALE_FACTOR_TEXT),
+    minimumValue: amountText(version.minimumValue, DEFAULT_MINIMUM_VALUE_TEXT),
+    weights: weightsFormState(version),
+  };
+}
+
+// Número de la API -> texto con coma y dos decimales; sin número, el valor por defecto
+function amountText(amount: number | undefined, fallback: string): string {
+  return amount === undefined ? fallback : formatHundredths(Math.round(amount * HUNDREDTHS_PER_UNIT));
+}
+
+export function checkParameters(state: ParametersFormState): ParametersCheck {
+  const scaleFactorError = positiveAmountError(state.scaleFactor);
+  const minimumValueError = positiveAmountError(state.minimumValue);
+  return {
+    scaleFactorError,
+    minimumValueError,
+    valid: !scaleFactorError && !minimumValueError && isFormValid(state.weights),
+  };
+}
+
+// Estado del formulario (ya validado) -> parámetros del pedido
+export function parametersFromFormState(state: ParametersFormState): StrategyInput {
+  return {
+    scaleFactor: amountFromText(state.scaleFactor),
+    minimumValue: amountFromText(state.minimumValue),
+    ...weightsFromFormState(state.weights),
+  };
+}

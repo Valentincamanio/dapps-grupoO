@@ -39,15 +39,45 @@ export function formatTokenPrice(tokenPrice: number): string {
   return `${tokenPriceFormatter.format(tokenPrice)} cr.`;
 }
 
+// Instante en hora de Argentina, p. ej. 26/10/2026, 06:00
+const instantFormatter = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Buenos_Aires',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+// Sube, baja o sin cambios según el signo de un monto
+export function amountDirection(amount: number): VariationDirection {
+  if (amount > 0) return 'up';
+  if (amount < 0) return 'down';
+  return 'flat';
+}
+
 // Sube, baja o sin cambios según el monto (el porcentaje tiene el mismo signo)
 export function variationDirection(variation: Variation): VariationDirection {
-  if (variation.amount > 0) return 'up';
-  if (variation.amount < 0) return 'down';
-  return 'flat';
+  return amountDirection(variation.amount);
 }
 
 export function variationText(variation: Variation): string {
   return DIRECTION_TEXT[variationDirection(variation)];
+}
+
+export function directionText(direction: VariationDirection): string {
+  return DIRECTION_TEXT[direction];
+}
+
+// Diferencia en créditos con signo salvo el cero, p. ej. +3,00 cr.
+export function formatSignedCredits(amount: number): string {
+  return `${signedFormatter.format(amount)} cr.`;
+}
+
+// Instante ISO 8601 -> DD/MM/AAAA, HH:MM en hora de Argentina
+export function formatInstant(instant: string): string {
+  return instantFormatter.format(new Date(instant));
 }
 
 // Monto y porcentaje con signo, p. ej. +3,00 (+3,00 %)

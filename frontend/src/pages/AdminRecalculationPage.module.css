@@ -1,0 +1,24 @@
+.admin {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.heading {
+  font-family: var(--font-script);
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.hint {
+  font-family: var(--font-script);
+  font-size: 22px;
+  color: var(--chalk-dim);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

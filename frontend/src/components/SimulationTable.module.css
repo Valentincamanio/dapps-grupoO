@@ -1,0 +1,121 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-hand);
+  font-size: 18px;
+  color: var(--chalk);
+}
+
+.caption {
+  text-align: left;
+  font-family: var(--font-script);
+  font-size: 22px;
+  color: var(--chalk-dim);
+  padding-bottom: 8px;
+}
+
+.table th,
+.table td {
+  padding: 8px 10px;
+  border-bottom: 1px dashed var(--chalk-faint);
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.table thead th {
+  font-family: var(--font-script);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--chalk-dim);
+  border-bottom: 2px solid var(--chalk-dim);
+}
+
+.player {
+  font-family: var(--font-script);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.value {
+  font-family: var(--font-marker);
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--chalk-dim);
+  font-family: var(--font-hand);
+  font-style: italic;
+}
+
+.difference {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.triangle {
+  font-size: 0.8em;
+}
+
+.text {
+  font-style: italic;
+}
+
+.up {
+  color: var(--chalk-up);
+}
+
+.down {
+  color: var(--chalk-down);
+}
+
+.flat {
+  color: var(--chalk-dim);
+}
+
+/* Por debajo de 760 px cada fila es una tarjeta con etiquetas: sin desplazamiento horizontal */
+@media (max-width: 759px) {
+  .table,
+  .caption,
+  .table tbody,
+  .table tr,
+  .table th,
+  .table td {
+    display: block;
+  }
+
+  /* Los encabezados quedan para los lectores de pantalla */
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .table tr {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border: 2px dashed var(--chalk-faint);
+    border-radius: 6px;
+  }
+
+  .table th,
+  .table td {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 2px 0;
+    border-bottom: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .table td::before {
+    content: attr(data-label) ':';
+    color: var(--chalk-dim);
+    font-family: var(--font-script);
+  }
+}

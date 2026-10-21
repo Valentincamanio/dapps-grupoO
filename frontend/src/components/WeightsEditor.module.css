@@ -1,0 +1,50 @@
+.set {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  border: 2px dashed var(--chalk-faint);
+  border-radius: 6px;
+  padding: 10px 14px 14px;
+}
+
+.legend {
+  padding: 0 6px;
+  font-family: var(--font-script);
+  font-size: 26px;
+  color: var(--yellow);
+}
+
+.action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Tantas columnas como entren; a 360 px queda una sola */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
+  gap: 10px 16px;
+}
+
+.sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  font-family: var(--font-script);
+  font-size: 24px;
+}
+
+.complete {
+  color: var(--green);
+}
+
+.incomplete {
+  color: var(--pink);
+}
+
+.notice {
+  color: var(--pink);
+  font-size: 20px;
+}

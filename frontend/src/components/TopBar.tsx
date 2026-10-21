@@ -1,11 +1,12 @@
-// Encabezado del pizarrón: logo, enlaces de secciones, buscador opcional, saldo opcional y
-// enlace de cuenta.
+// Encabezado del pizarrón: logo, enlaces de secciones (quien lo usa decide cuáles ve cada rol),
+// buscador opcional, saldo opcional y enlace de cuenta.
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import styles from './TopBar.module.css';
 
 interface TopBarProps {
-  // Enlaces a las secciones (ranking...); sin listas, la pizarra tiene una sola
+  // Enlaces a las secciones (ranking y, solo para ADMIN, administración); sin listas, la pizarra
+  // tiene una sola
   navSlot?: ReactNode;
   searchSlot?: ReactNode;
   balance?: string;
