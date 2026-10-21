@@ -60,7 +60,8 @@ public class SyncController {
             description = "La credencial es válida pero no es de un administrador. No se consulta la fuente.",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "409",
-            description = "Ya hay una sincronización en curso (manual, semanal o de arranque).",
+            description = "Ya hay una sincronización en curso, de cualquiera de las dos fuentes: un disparo "
+                    + "manual, la cadena semanal o la puesta al día al arrancar.",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "503",
             description = "La sincronización está deshabilitada porque falta la credencial de la fuente.",

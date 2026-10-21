@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface TeamSQLDAO extends JpaRepository<TeamSQL, Long> {
     List<TeamSQL> findAllByExternalIdIn(Collection<String> externalIds);
+
+    List<TeamSQL> findAllByWhoscoredIdIsNotNull();
 }

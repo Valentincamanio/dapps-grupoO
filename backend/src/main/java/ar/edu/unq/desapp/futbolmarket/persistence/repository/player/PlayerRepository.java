@@ -81,6 +81,15 @@ public class PlayerRepository {
         return toPlayers(playerDAO.findAllByActiveTrue());
     }
 
+    /**
+     * Todos los jugadores del catálogo, activos o inactivos, con su equipo, en una sola consulta.
+     * Un jugador inactivo también se puede cruzar con WhoScored (research D14 de la 006).
+     */
+    @Transactional(readOnly = true)
+    public List<Player> findAllWithTeam() {
+        return toPlayers(playerDAO.findAll());
+    }
+
     @Transactional(readOnly = true)
     public boolean hasPlayers() {
         return playerDAO.count() > 0;

@@ -7,6 +7,7 @@ import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.season.SeasonSQ
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -22,6 +23,14 @@ public class SeasonRepository {
     @Transactional(readOnly = true)
     public Optional<Season> findByExternalId(String externalId) {
         return seasonDAO.findByExternalId(externalId).map(seasonMapper::toDomain);
+    }
+
+    /**
+     * Todas las temporadas, de todas las ligas, para saber cuál está en curso en cada una.
+     */
+    @Transactional(readOnly = true)
+    public List<Season> findAll() {
+        return seasonDAO.findAll().stream().map(seasonMapper::toDomain).toList();
     }
 
     @Transactional

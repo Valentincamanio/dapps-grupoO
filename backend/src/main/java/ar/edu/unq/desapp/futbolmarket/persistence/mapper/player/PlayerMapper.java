@@ -22,7 +22,8 @@ public class PlayerMapper {
                 teamMapper.toDomain(player.getTeam()),
                 player.getDateOfBirth(),
                 player.getNationality(),
-                player.isActive()
+                player.isActive(),
+                player.getWhoscoredId()
         );
     }
 
@@ -35,7 +36,8 @@ public class PlayerMapper {
                 teamMapper.toSQL(player.team()),
                 player.dateOfBirth(),
                 player.nationality(),
-                player.active()
+                player.active(),
+                player.whoscoredId()
         );
     }
 }

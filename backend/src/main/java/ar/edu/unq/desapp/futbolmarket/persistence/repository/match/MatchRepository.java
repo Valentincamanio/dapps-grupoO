@@ -32,6 +32,30 @@ public class MatchRepository {
         return toMatches(matchDAO.findAllByExternalIdIn(externalIds));
     }
 
+    /**
+     * Los partidos de una temporada, con su temporada y sus dos equipos.
+     */
+    @Transactional(readOnly = true)
+    public List<Match> findAllBySeason(String seasonExternalId) {
+        return toMatches(matchDAO.findAllBySeasonExternalId(seasonExternalId));
+    }
+
+    /**
+     * Los partidos ya cruzados con WhoScored, de cualquier temporada, que van al snapshot.
+     */
+    @Transactional(readOnly = true)
+    public List<Match> findAllCrossed() {
+        return toMatches(matchDAO.findAllByWhoscoredIdIsNotNull());
+    }
+
+    /**
+     * Los partidos que ya tienen estadísticas, que van al snapshot.
+     */
+    @Transactional(readOnly = true)
+    public List<Match> findAllWithStats() {
+        return toMatches(matchDAO.findAllByStatsLoadedTrue());
+    }
+
     @Transactional
     public List<Match> saveAll(List<Match> matches) {
         List<MatchSQL> savedMatches = matchDAO.saveAll(matches.stream().map(matchMapper::toSQL).toList());
