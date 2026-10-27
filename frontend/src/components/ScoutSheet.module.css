@@ -10,6 +10,11 @@
   transform: rotate(-0.8deg);
 }
 
+.wide {
+  max-width: 760px;
+  transform: rotate(-0.3deg);
+}
+
 .pin {
   position: absolute;
   top: 8px;
@@ -45,6 +50,16 @@
 .data dd {
   margin: 0;
   font-size: 1.3rem;
+}
+
+.quote {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 2px dashed var(--ink-soft);
+  min-width: 0;
 }
 
 .back {

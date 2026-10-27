@@ -1,0 +1,114 @@
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.strategy {
+  border: 2px dashed var(--chalk-faint);
+  border-radius: 6px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+}
+
+.name {
+  font-family: var(--font-script);
+  font-size: 30px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.badge {
+  font-family: var(--font-marker);
+  font-size: 18px;
+  color: var(--ink);
+  background: var(--green);
+  padding: 0 10px;
+  transform: rotate(-3deg);
+  box-shadow: var(--shadow-pin);
+}
+
+.actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.versions {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.version {
+  border-top: 1px dashed var(--chalk-faint);
+  padding-top: 8px;
+}
+
+.versionLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+
+.versionNumber {
+  font-family: var(--font-marker);
+  color: var(--yellow);
+}
+
+.activeMark {
+  font-family: var(--font-script);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.muted {
+  color: var(--chalk-dim);
+}
+
+.weights {
+  margin-top: 4px;
+}
+
+.weights summary {
+  cursor: pointer;
+  font-family: var(--font-script);
+  font-size: 20px;
+  color: var(--chalk-dim);
+}
+
+.weights dl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.weights dl div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+
+.weights dt {
+  font-family: var(--font-script);
+  font-size: 20px;
+  color: var(--yellow);
+}
+
+.weights dd {
+  overflow-wrap: anywhere;
+}

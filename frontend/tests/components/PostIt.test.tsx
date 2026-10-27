@@ -30,13 +30,13 @@ describe('PostIt', () => {
     expect(links[0]).toHaveAttribute('href', '/jugadores/7');
   });
 
-  it('no contiene botones ni textos de compra, venta, plantel, precio o valor', () => {
+  it('no contiene botones ni textos de compra, venta ni plantel', () => {
     const { container } = render(<PostIt player={PLAYER} href="/jugadores/7" />);
 
     const text = container.textContent?.toLowerCase() ?? '';
 
     expect(screen.queryAllByRole('button')).toHaveLength(0);
-    expect(text).not.toMatch(/compr|vend|plantel|precio|valor/);
+    expect(text).not.toMatch(/compr|vend|plantel/);
   });
 
   it('no es arrastrable', () => {

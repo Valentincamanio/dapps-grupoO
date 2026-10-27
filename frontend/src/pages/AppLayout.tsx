@@ -26,6 +26,13 @@ export function AppLayout() {
   return (
     <Board>
       <TopBar
+        navSlot={
+          <>
+            <Link to="/ranking">Ranking</Link>
+            {/* La entrada a la administración existe solo para ADMIN (FR-064) */}
+            {profile?.role === 'ADMIN' ? <Link to="/admin">Administración</Link> : null}
+          </>
+        }
         searchSlot={
           <SearchBox
             players={catalog.players}

@@ -1,0 +1,26 @@
+.tag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--ink-soft);
+  font-family: var(--font-hand);
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.muted {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.label {
+  color: var(--ink-soft);
+}
+
+.value {
+  font-family: var(--font-marker);
+  font-size: 18px;
+}

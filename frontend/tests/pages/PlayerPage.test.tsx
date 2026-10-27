@@ -51,7 +51,7 @@ describe('PlayerPage', () => {
     renderWithRouter({ initialEntries: [`/jugadores/${PLAYERS[0].id}`] });
     await screen.findByRole('heading', { name: PLAYERS[0].name });
 
-    expect(screen.queryByRole('button', { name: /comprar|vender|sumar|plantel|precio/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /comprar|vender|sumar|plantel/i })).toBeNull();
   });
 
   it('un error de red muestra "reintentar" y al reintentar carga la ficha', async () => {

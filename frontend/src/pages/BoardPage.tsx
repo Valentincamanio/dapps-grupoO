@@ -9,6 +9,7 @@ import { TapeTab } from '../components/TapeTab';
 import { TeamSelect } from '../components/TeamSelect';
 import { useBoardFilters } from '../hooks/useBoardFilters';
 import { useCatalog } from '../hooks/useCatalog';
+import { useCurrentQuotes } from '../hooks/useCurrentQuotes';
 import { usePlayers } from '../hooks/usePlayers';
 import { LEAGUES } from '../types/api';
 import { describeEmptyCombination } from '../utils/filters';
@@ -21,6 +22,10 @@ export function BoardPage() {
   const { filters, setPage, setPosition, setLeague, setTeam, clear } = useBoardFilters();
   const catalog = useCatalog();
   const { status, sheet, retry } = usePlayers(filters);
+  // Una sola consulta de cotizaciones por hoja visible (FR-062)
+  const quotes = useCurrentQuotes(
+    status === 'success' && sheet ? sheet.players.map((player) => player.id) : [],
+  );
 
   function renderContent() {
     if (status === 'loading' || status === 'idle') return <ChalkNote variant="loading" />;
@@ -54,6 +59,15 @@ export function BoardPage() {
 
     return (
       <>
+        {/* Si fallan las cotizaciones, la pizarra sigue y cada post-it lo indica */}
+        {quotes.status === 'error' ? (
+          <ChalkNote
+            variant="error"
+            action={{ label: 'reintentar cotizaciones', onClick: quotes.retry }}
+          >
+            no se pudieron cargar las cotizaciones
+          </ChalkNote>
+        ) : null}
         <ul className={styles.grid}>
           {sheet.players.map((player) => (
             <li key={player.id}>
@@ -62,6 +76,7 @@ export function BoardPage() {
                 href={`/jugadores/${player.id}`}
                 LinkComponent={Link}
                 linkState={{ boardSearch: location.search }}
+                quote={quotes.badgeFor(player.id)}
               />
             </li>
           ))}

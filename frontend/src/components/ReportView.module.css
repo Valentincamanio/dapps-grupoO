@@ -1,0 +1,131 @@
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  border: 2px dashed var(--chalk-faint);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.title {
+  font-family: var(--font-script);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--chalk-dim);
+  overflow-wrap: anywhere;
+}
+
+.interrupted {
+  font-family: var(--font-script);
+  font-size: 22px;
+  color: var(--pink);
+}
+
+.empty {
+  font-family: var(--font-script);
+  font-size: 24px;
+  color: var(--yellow);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-hand);
+  font-size: 18px;
+}
+
+.caption {
+  text-align: left;
+  font-family: var(--font-script);
+  font-size: 22px;
+  color: var(--chalk-dim);
+  padding-bottom: 8px;
+}
+
+.table th,
+.table td {
+  padding: 6px 10px;
+  border-bottom: 1px dashed var(--chalk-faint);
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.table thead th {
+  font-family: var(--font-script);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--chalk-dim);
+  border-bottom: 2px solid var(--chalk-dim);
+}
+
+.week {
+  font-weight: 700;
+}
+
+.subtitle {
+  font-family: var(--font-script);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--chalk-dim);
+}
+
+.pendingList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.pendingList li {
+  overflow-wrap: anywhere;
+}
+
+/* Por debajo de 560 px cada semana es una tarjeta con etiquetas */
+@media (max-width: 559px) {
+  .table,
+  .caption,
+  .table tbody,
+  .table tr,
+  .table th,
+  .table td {
+    display: block;
+  }
+
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .table tr {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border: 2px dashed var(--chalk-faint);
+    border-radius: 6px;
+  }
+
+  .table th,
+  .table td {
+    display: flex;
+    gap: 8px;
+    padding: 2px 0;
+    border-bottom: 0;
+  }
+
+  .table td::before {
+    content: attr(data-label) ':';
+    color: var(--chalk-dim);
+    font-family: var(--font-script);
+  }
+}
