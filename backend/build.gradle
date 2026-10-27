@@ -65,6 +65,17 @@ sonar {
         property 'sonar.projectKey', 'Valentincamanio_dapps-grupoO'
         property 'sonar.organization', 'valentincamanio'
         property 'sonar.host.url', 'https://sonarcloud.io'
+        // Falsos positivos revisados, ignorados acá para que la decisión quede versionada.
+        // e1 y e2: java:S2068 toma por contraseñas los mensajes de error cuyo nombre dice PASSWORD.
+        // e3: java:S4502 marca el CSRF deshabilitado, pero la API no usa sesión ni cookies (la
+        // credencial viaja en un header) y la consola de H2 solo existe en el perfil local.
+        property 'sonar.issue.ignore.multicriteria', 'e1,e2,e3'
+        property 'sonar.issue.ignore.multicriteria.e1.ruleKey', 'java:S2068'
+        property 'sonar.issue.ignore.multicriteria.e1.resourceKey', '**/modelo/auth/CredentialPolicy.java'
+        property 'sonar.issue.ignore.multicriteria.e2.ruleKey', 'java:S2068'
+        property 'sonar.issue.ignore.multicriteria.e2.resourceKey', '**/modelo/user/AppUser.java'
+        property 'sonar.issue.ignore.multicriteria.e3.ruleKey', 'java:S4502'
+        property 'sonar.issue.ignore.multicriteria.e3.resourceKey', '**/security/SecurityConfig.java'
     }
 }
 
