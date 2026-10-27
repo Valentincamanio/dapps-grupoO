@@ -1,0 +1,527 @@
+openapi: 3.0.3
+info:
+  title: API de administración de estrategias de valuación
+  version: 1.0.0
+  description: |
+    Contrato de la feature `007-cotizacion-estrategias` de Futbol Market: registrar, editar, listar
+    y activar estrategias de valuación. **Todas las rutas son exclusivas del rol `ADMIN`**
+    (FR-032), también las de lectura. Reutilizan los esquemas de `quotes-api.yaml`
+    (`ApiError`, `Position`, `StrategyRef`) y de `quotes-admin-api.yaml` (`RecalculationReport`).
+
+    **Credenciales.** Sin credencial: 401. Con la credencial de un usuario común: 403. Los dos se
+    resuelven en `SecurityConfig`, antes del controller. Se aceptan el token de sesión y la clave
+    de API de la feature 001 (dos requirements alternativos).
+
+    **Estrategia, versión y activa.**
+
+    - Una estrategia tiene un **nombre único** (sin distinguir mayúsculas ni espacios de los
+      extremos), un factor de escala, una cotización mínima y pesos por métrica: un juego **por
+      defecto** (obligatorio) y, opcionalmente, uno por posición.
+    - **El identificador de una estrategia es el de su versión 1.** Cada edición crea una versión
+      nueva (1, 2, 3...) y las anteriores quedan intactas. El nombre no se edita.
+    - **Exactamente una versión está activa.** Activar otra estrategia deja activa su versión más
+      reciente; editar la estrategia activa deja activa su versión nueva. No se activan versiones
+      viejas, no se desactiva sin activar otra y no se borra.
+    - Las cotizaciones ya guardadas conservan la versión con que se calcularon.
+
+    **Pesos.** Se identifican por el nombre de la métrica (`GOALS`, `TACKLES`, ...; las 19 están
+    en `Metric`). Cada peso es mayor o igual a 0, con a lo sumo dos decimales; **cada juego suma
+    exactamente 1,00**. Una métrica que no figura pesa 0. Una métrica desconocida se rechaza con
+    400 indicando su nombre.
+
+    **La opción de recotización.** `requote` es `AHORA` o `PROXIMA_SEMANA`. Si no viene, vale
+    **`PROXIMA_SEMANA`**.
+
+    - **Aplica solo** a `POST /strategies/{id}/activate` y a `POST /strategies/{id}/versions` **cuando
+      esa estrategia es la activa** (los dos casos que dejan activa una versión nueva).
+    - Con `PROXIMA_SEMANA` solo cambia la activa: ninguna cotización cambia y el próximo cierre
+      semanal usa la nueva.
+    - Con `AHORA`, el cambio de la activa y la recotización se hacen en **una sola transacción**:
+      se cotizan las semanas cerradas pendientes con la estrategia nueva y se vuelve a cotizar la
+      última semana cerrada, partiendo del valor que cada jugador tenía antes de esa semana. Si
+      hay un recálculo o una sincronización en curso, responde **409 y la activa no cambia**. La
+      respuesta incluye el informe de la recotización.
+    - **Decisión (spec FR-034 y US5.9): crear una estrategia o editar una que no es la activa NO
+      admite la opción, y se IGNORA** (no se rechaza con 400). `POST /strategies` no define el
+      campo: si el cliente lo manda, se descarta. En `POST /strategies/{id}/versions` sobre una
+      estrategia no activa se acepta y se ignora, y `requotation` vuelve `null`. Un valor que no es
+      `AHORA` ni `PROXIMA_SEMANA` sí se rechaza con 400 en los endpoints que leen el campo.
+servers:
+  - url: http://localhost:8080
+    description: Perfil local (./gradlew bootRun)
+tags:
+  - name: Estrategias
+    description: Estrategias de valuación y sus versiones. Solo administradores.
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+paths:
+  /strategies:
+    post:
+      tags: [Estrategias]
+      operationId: createStrategy
+      summary: Registra una estrategia nueva
+      description: |
+        Crea la **versión 1, inactiva**. Ninguna cotización cambia y la estrategia activa no cambia.
+        Si se omiten `scaleFactor` y `minimumValue`, valen 10 y 10,00.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStrategyRequest'
+            example:
+              name: Ofensiva
+              scaleFactor: 10
+              minimumValue: 10.00
+              defaultWeights:
+                GOALS: 0.30
+                ASSISTS: 0.20
+                SHOTS_ON_TARGET: 0.10
+                KEY_PASSES: 0.10
+                SUCCESSFUL_DRIBBLES: 0.10
+                RATING: 0.20
+              positionWeights:
+                GOALKEEPER:
+                  RATING: 0.60
+                  CLEAN_SHEETS: 0.40
+      responses:
+        '201':
+          description: La estrategia creada, en su versión 1 y sin activar.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyResponse'
+        '400':
+          $ref: '#/components/responses/InvalidStrategy'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Ya existe una estrategia con ese nombre (sin distinguir mayúsculas ni espacios de los extremos).
+          content:
+            application/json:
+              schema:
+                $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-15T15:00:00Z'
+                status: 409
+                error: Conflict
+                message: Ya existe una estrategia con el nombre 'Ofensiva'.
+                path: /strategies
+    get:
+      tags: [Estrategias]
+      operationId: listStrategies
+      summary: Lista las estrategias con todas sus versiones
+      description: Cada estrategia con todas sus versiones y cuál es la activa, con su versión.
+      responses:
+        '200':
+          description: Las estrategias, en orden de creación.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StrategyResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /strategies/{id}:
+    get:
+      tags: [Estrategias]
+      operationId: getStrategy
+      summary: Consulta una estrategia con todas sus versiones
+      parameters:
+        - $ref: '#/components/parameters/StrategyId'
+      responses:
+        '200':
+          description: La estrategia.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/StrategyNotFound'
+  /strategies/{id}/versions:
+    post:
+      tags: [Estrategias]
+      operationId: createStrategyVersion
+      summary: Edita una estrategia (crea su versión siguiente)
+      description: |
+        Crea la versión siguiente, con los parámetros que se envían; la anterior queda intacta.
+        `scaleFactor` y `minimumValue` omitidos **conservan los de la versión anterior**; los pesos se
+        reemplazan por completo (`positionWeights` omitido deja a la versión sin pesos por
+        posición).
+
+        - Si la estrategia **no es la activa**: la versión nueva queda inactiva, la activa no cambia,
+          ninguna cotización cambia, y `requote` se ignora (`requotation` es `null`).
+        - Si la estrategia **es la activa**: la versión nueva pasa a ser la activa y rige la opción
+          `requote` (ver la descripción del contrato).
+      parameters:
+        - $ref: '#/components/parameters/StrategyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewVersionRequest'
+            example:
+              scaleFactor: 8
+              defaultWeights:
+                GOALS: 0.25
+                ASSISTS: 0.15
+                SHOTS: 0.10
+                KEY_PASSES: 0.10
+                SUCCESSFUL_DRIBBLES: 0.10
+                TACKLES: 0.10
+                RATING: 0.20
+              requote: PROXIMA_SEMANA
+      responses:
+        '201':
+          description: La estrategia con su versión nueva y, con `AHORA` sobre la activa, el informe de la recotización.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyChangeResponse'
+        '400':
+          $ref: '#/components/responses/InvalidStrategy'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/StrategyNotFound'
+        '409':
+          $ref: '#/components/responses/RecalculationConflict'
+  /strategies/{id}/activate:
+    post:
+      tags: [Estrategias]
+      operationId: activateStrategy
+      summary: Activa una estrategia
+      description: |
+        Deja activa la **versión más reciente** de la estrategia. El cuerpo es opcional: sin cuerpo,
+        o sin `requote`, se aplica `PROXIMA_SEMANA`.
+
+        - `PROXIMA_SEMANA`: solo cambia la activa. Se aplica aunque haya un recálculo en curso, que
+          termina con la estrategia que tenía al empezar.
+        - `AHORA`: cambia la activa y recotiza en el acto, en una sola transacción. Si ya está activa
+          y la última semana ya fue cotizada con esa versión, no se repite ninguna cotización. Con un
+          recálculo o una sincronización en curso responde 409 y **no cambia nada**. Sin
+          cotizaciones todavía, cambia la activa y no hay nada que recotizar.
+      parameters:
+        - $ref: '#/components/parameters/StrategyId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivateStrategyRequest'
+            example:
+              requote: AHORA
+      responses:
+        '200':
+          description: La estrategia activa y, con `AHORA`, el informe de la recotización.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyChangeResponse'
+              example:
+                strategy:
+                  id: 2
+                  name: Equilibrada por posición
+                  active: true
+                  versions:
+                    - version: 1
+                      active: true
+                      scaleFactor: 10
+                      minimumValue: 10.00
+                      defaultWeights: { RATING: 0.18, GOALS: 0.10 }
+                      positionWeights: {}
+                      createdAt: '2026-10-14T12:00:00Z'
+                requotation:
+                  origin: STRATEGY_CHANGE
+                  startedAt: '2026-10-15T15:00:00Z'
+                  finishedAt: '2026-10-15T15:00:04Z'
+                  strategy: { id: 2, name: Equilibrada por posición, version: 1 }
+                  quotedWeeks:
+                    - { weekStart: '2026-10-05', initial: 0, calculated: 0, requoted: 2380 }
+                  pendingWeeks: []
+                  nothingToQuote: false
+        '400':
+          $ref: '#/components/responses/InvalidStrategy'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/StrategyNotFound'
+        '409':
+          $ref: '#/components/responses/RecalculationConflict'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de sesión obtenido en POST /auth/login.
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clave de API entregada en el registro o en la regeneración.
+  parameters:
+    StrategyId:
+      name: id
+      in: path
+      required: true
+      description: Identificador de la estrategia (el de su versión 1), mayor o igual a 1.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+  responses:
+    BadRequestId:
+      description: Identificador con formato inválido.
+      content:
+        application/json:
+          schema:
+            $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+    InvalidStrategy:
+      description: |
+        Datos inválidos: pesos que no suman 1,00, un peso negativo o con más de dos decimales, una
+        métrica desconocida, un factor de escala menor o igual a 0, una cotización mínima menor a
+        0,01, un nombre vacío, una opción de recotización que no es `AHORA` ni `PROXIMA_SEMANA`, o un
+        cuerpo ilegible. No se crea ni se cambia nada. El mensaje indica la regla incumplida.
+      content:
+        application/json:
+          schema:
+            $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+          examples:
+            pesosQueNoSuman:
+              value:
+                timestamp: '2026-10-15T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: Los pesos por defecto deben sumar 1,00 y suman 0,95.
+                path: /strategies
+            metricaDesconocida:
+              value:
+                timestamp: '2026-10-15T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: La métrica 'GOLES' no existe.
+                path: /strategies
+            opcionInvalida:
+              value:
+                timestamp: '2026-10-15T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: "La opción 'AHORA2' no es válida: use AHORA o PROXIMA_SEMANA."
+                path: /strategies/2/activate
+    Unauthorized:
+      description: Falta la credencial, o es inválida o está vencida.
+      content:
+        application/json:
+          schema:
+            $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+    Forbidden:
+      description: La credencial es válida pero no es de un administrador.
+      content:
+        application/json:
+          schema:
+            $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+    StrategyNotFound:
+      description: No existe una estrategia con ese identificador.
+      content:
+        application/json:
+          schema:
+            $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-15T15:00:00Z'
+            status: 404
+            error: Not Found
+            message: No existe una estrategia con id 99.
+            path: /strategies/99
+    RecalculationConflict:
+      description: |
+        Con `requote: AHORA`: hay un recálculo o una sincronización en curso. **El cambio no se
+        aplica**: ni la estrategia activa ni las cotizaciones cambian. También 409 si otra
+        modificación concurrente chocó con esta.
+      content:
+        application/json:
+          schema:
+            $ref: 'quotes-api.yaml#/components/schemas/ApiError'
+          examples:
+            recalculoEnCurso:
+              value:
+                timestamp: '2026-10-15T15:00:00Z'
+                status: 409
+                error: Conflict
+                message: Ya hay un recálculo en curso.
+                path: /strategies/2/activate
+            sincronizacionEnCurso:
+              value:
+                timestamp: '2026-10-15T15:00:00Z'
+                status: 409
+                error: Conflict
+                message: 'No se puede recalcular: hay una sincronización en curso.'
+                path: /strategies/2/activate
+  schemas:
+    Metric:
+      type: string
+      description: Las 19 métricas semanales. Las tres últimas son de "menos es mejor" y se invierten.
+      enum:
+        - GOALS
+        - ASSISTS
+        - SHOTS
+        - SHOTS_ON_TARGET
+        - KEY_PASSES
+        - SUCCESSFUL_DRIBBLES
+        - TACKLES
+        - INTERCEPTIONS
+        - CLEARANCES
+        - AERIALS_WON
+        - PASSES
+        - MINUTES_PLAYED
+        - RATING
+        - PASS_ACCURACY
+        - TEAM_RESULT
+        - CLEAN_SHEETS
+        - FOULS_COMMITTED
+        - YELLOW_CARDS
+        - RED_CARDS
+    WeightMap:
+      type: object
+      description: |
+        Pesos por métrica. Las claves son nombres de `Metric` (se reciben como texto: una desconocida se
+        rechaza con 400 indicando su nombre). Cada valor es ≥ 0 con a lo sumo dos decimales y el juego suma
+        exactamente 1,00.
+      additionalProperties:
+        type: number
+        minimum: 0
+        maximum: 1
+      example:
+        GOALS: 0.25
+        ASSISTS: 0.15
+        SHOTS: 0.10
+        KEY_PASSES: 0.10
+        SUCCESSFUL_DRIBBLES: 0.10
+        TACKLES: 0.10
+        RATING: 0.20
+    PositionWeights:
+      type: object
+      description: Juegos de pesos propios por posición. Las claves son `GOALKEEPER`, `DEFENDER`, `MIDFIELDER` y `FORWARD`. Una posición sin juego propio usa el por defecto.
+      additionalProperties:
+        $ref: '#/components/schemas/WeightMap'
+    StrategyParameters:
+      type: object
+      description: Los parámetros de valuación. Los usa también la simulación (`POST /quotes/simulate`).
+      required: [defaultWeights]
+      properties:
+        scaleFactor:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          description: |
+            Mayor que 0, con a lo sumo dos decimales. Es la baja o suba máxima por semana, en créditos
+            sobre el 100 % del jugador (±0,10 por token con el valor por defecto). Por defecto, 10.
+          example: 10
+        minimumValue:
+          type: number
+          minimum: 0.01
+          description: Cotización mínima, al menos 0,01, con a lo sumo dos decimales. Por defecto, 10,00.
+          example: 10.00
+        defaultWeights:
+          $ref: '#/components/schemas/WeightMap'
+        positionWeights:
+          $ref: '#/components/schemas/PositionWeights'
+    CreateStrategyRequest:
+      allOf:
+        - $ref: '#/components/schemas/StrategyParameters'
+        - type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 100
+              description: Único sin distinguir mayúsculas ni espacios de los extremos. No se edita después.
+    NewVersionRequest:
+      allOf:
+        - $ref: '#/components/schemas/StrategyParameters'
+        - type: object
+          properties:
+            requote:
+              $ref: '#/components/schemas/RequoteTiming'
+    ActivateStrategyRequest:
+      type: object
+      properties:
+        requote:
+          $ref: '#/components/schemas/RequoteTiming'
+    RequoteTiming:
+      type: string
+      enum: [AHORA, PROXIMA_SEMANA]
+      default: PROXIMA_SEMANA
+      description: |
+        `AHORA`: cambia la activa y recotiza en el acto. `PROXIMA_SEMANA`: solo cambia la activa y la usa
+        el próximo cierre semanal.
+    StrategyVersion:
+      type: object
+      required: [version, active, scaleFactor, minimumValue, defaultWeights, positionWeights, createdAt]
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        active:
+          type: boolean
+          description: Exactamente una versión de todo el sistema la tiene en `true`.
+        scaleFactor:
+          type: number
+        minimumValue:
+          type: number
+        defaultWeights:
+          $ref: '#/components/schemas/WeightMap'
+        positionWeights:
+          $ref: '#/components/schemas/PositionWeights'
+        createdAt:
+          type: string
+          format: date-time
+    StrategyResponse:
+      type: object
+      required: [id, name, active, versions]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: El de su versión 1.
+        name:
+          type: string
+        active:
+          type: boolean
+          description: Si es la estrategia activa (su versión más reciente es la activa).
+        versions:
+          type: array
+          description: Todas las versiones, de la 1 en adelante.
+          items:
+            $ref: '#/components/schemas/StrategyVersion'
+    StrategyChangeResponse:
+      type: object
+      required: [strategy]
+      properties:
+        strategy:
+          $ref: '#/components/schemas/StrategyResponse'
+        requotation:
+          allOf:
+            - $ref: 'quotes-admin-api.yaml#/components/schemas/RecalculationReport'
+          nullable: true
+          description: |
+            El informe de la recotización. Solo con `AHORA` cuando el cambio lo admite; en cualquier otro
+            caso es `null`. Con `AHORA` y nada para cotizar, es un informe vacío (no `null`).

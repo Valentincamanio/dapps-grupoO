@@ -1,0 +1,119 @@
+.chart {
+  margin: 0;
+  font-family: var(--font-hand);
+  color: var(--ink);
+}
+
+.frame {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+}
+
+/* Valores del eje, a la altura de cada línea de la grilla */
+.axis {
+  position: relative;
+  min-width: 3.2em;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.tick {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+.plot {
+  position: relative;
+  /* Alto fijo según el ancho de la pantalla: con aspect-ratio y un alto mínimo, el ancho
+     mínimo resultante desbordaba la hoja a 360 px */
+  height: clamp(160px, 40vw, 280px);
+  min-width: 0;
+  border-left: 2px solid var(--ink-soft);
+  border-bottom: 2px solid var(--ink-soft);
+}
+
+.lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.grid {
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.45;
+}
+
+.line {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* Cada punto es un botón de 28 px centrado en su coordenada */
+.point {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  transform: translate(-50%, -50%);
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--yellow);
+  transition: transform 0.15s;
+}
+
+.point:hover .dot,
+.selected .dot {
+  background: var(--ink);
+  transform: scale(1.3);
+}
+
+.point:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 0;
+}
+
+.weeks {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.detail {
+  margin-top: 10px;
+  min-height: 2.6em;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 1.1rem;
+  font-style: italic;
+  color: var(--ink-soft);
+}

@@ -1,0 +1,6 @@
+{"format":"futbolmarket-whoscored-snapshot","version":1,"playerColumns":["player","whoscored","starter","minutesPlayed","goals","assists","shots","shotsOnTarget","keyPasses","passes","accuratePasses","successfulDribbles","tackles","interceptions","clearances","aerialsWon","foulsCommitted","yellowCards","redCards","rating","manOfTheMatch"]}
+{"type":"team","league":"PREMIER","team":"67","whoscored":"23"}
+{"type":"team","league":"PREMIER","team":"341","whoscored":"19"}
+{"type":"match","league":"PREMIER","match":"537800","whoscored":"1983600"}
+{"type":"match","league":"PREMIER","match":"537809","whoscored":"1983609"}
+{"type":"stats","league":"PREMIER","match":"537800","players":[["3754","141469",1,80,2,0,4,3,0,14,10,1,0,0,1,4,1,1,0,8.95,1],["99812","389064",0,22,0,0,0,0,1,6,4,0,1,1,0,1,1,0,0,6.27,0]]}

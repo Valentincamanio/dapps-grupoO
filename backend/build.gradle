@@ -67,3 +67,11 @@ sonar {
         property 'sonar.host.url', 'https://sonarcloud.io'
     }
 }
+
+tasks.register('exportStatsSnapshot', JavaExec) {
+    group = 'application'
+    description = 'Exporta el snapshot de estadísticas de WhoScored desde la base local, sin servidor web ni sincronizaciones.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ar.edu.unq.desapp.futbolmarket.StatsSnapshotExport'
+    workingDir = projectDir
+}

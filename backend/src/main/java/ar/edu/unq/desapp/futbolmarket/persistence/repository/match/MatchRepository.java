@@ -1,6 +1,7 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.repository.match;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.match.Match;
+import ar.edu.unq.desapp.futbolmarket.modelo.match.MatchStatus;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.match.MatchMapper;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.match.MatchSQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.match.MatchSQLDAO;
@@ -30,6 +31,38 @@ public class MatchRepository {
             return List.of();
         }
         return toMatches(matchDAO.findAllByExternalIdIn(externalIds));
+    }
+
+    /**
+     * Los partidos de una temporada, con su temporada y sus dos equipos.
+     */
+    @Transactional(readOnly = true)
+    public List<Match> findAllBySeason(String seasonExternalId) {
+        return toMatches(matchDAO.findAllBySeasonExternalId(seasonExternalId));
+    }
+
+    /**
+     * Los partidos ya cruzados con WhoScored, de cualquier temporada, que van al snapshot.
+     */
+    @Transactional(readOnly = true)
+    public List<Match> findAllCrossed() {
+        return toMatches(matchDAO.findAllByWhoscoredIdIsNotNull());
+    }
+
+    /**
+     * Los partidos que ya tienen estadísticas, que van al snapshot.
+     */
+    @Transactional(readOnly = true)
+    public List<Match> findAllWithStats() {
+        return toMatches(matchDAO.findAllByStatsLoadedTrue());
+    }
+
+    /**
+     * Los partidos terminados, de cualquier temporada, con su temporada y sus dos equipos.
+     */
+    @Transactional(readOnly = true)
+    public List<Match> findAllFinished() {
+        return toMatches(matchDAO.findAllByStatus(MatchStatus.FINISHED.name()));
     }
 
     @Transactional

@@ -1,0 +1,509 @@
+openapi: 3.0.3
+info:
+  title: API de las sincronizaciones con Football-Data.org y WhoScored
+  version: 3.0.0
+  description: |
+    Contrato de la feature `006-scraping-whoscored` de Futbol Market. Describe el endpoint nuevo
+    `POST /matches/stats/sync` y lo que cambia en `POST /players/sync` respecto del contrato de
+    la feature 005 (`specs/005-integracion-football-data/contracts/players-api.yaml`).
+
+    La sincronización de WhoScored obtiene las estadísticas de cada jugador en cada partido
+    terminado de las cinco ligas, las cruza con el catálogo y las guarda. **Las estadísticas no
+    se exponen**: ningún endpoint las devuelve (FR-009). El informe dice qué se procesó y qué no.
+
+    Hay a lo sumo una sincronización a la vez, de cualquiera de las dos fuentes. La cadena del
+    lunes a las 04:00 y la de la puesta al día al arrancar (Football-Data y después WhoScored)
+    cuentan como una sola. Los disparos manuales no se encadenan: cada uno corre solo su fuente.
+
+    Los dos disparos exigen el rol `ADMIN` y aceptan cualquiera de las dos credenciales de la
+    feature 001: el token de sesión o la clave de API.
+
+    Cambios en `POST /players/sync`:
+
+    - Responde 409 también si hay en curso una sincronización de WhoScored o una cadena.
+    - El origen de los informes que van al registro pasa a ser `WEEKLY`, `CATCH_UP` o `MANUAL`:
+      `CATCH_UP` (puesta al día al arrancar) reemplaza a `STARTUP`. El disparo manual sigue
+      respondiendo `MANUAL`.
+    - Una sincronización completa con las cinco ligas en éxito queda registrada como la última
+      completa exitosa de Football-Data. No cambia nada de la respuesta.
+servers:
+  - url: http://localhost:8080
+    description: Perfil local (./gradlew bootRun)
+tags:
+  - name: Sincronización
+    description: Disparo manual de las sincronizaciones con Football-Data.org y WhoScored. Solo administradores.
+paths:
+  /matches/stats/sync:
+    post:
+      tags: [Sincronización]
+      operationId: synchronizeStats
+      summary: Sincroniza con WhoScored las estadísticas de los partidos terminados
+      description: |
+        Sin `league`, procesa las cinco ligas. Con `league`, solo esa liga. No necesita la
+        credencial de Football-Data: trabaja sobre los partidos ya guardados.
+
+        Primero completa desde el snapshot versionado los partidos pendientes que este trae, sin
+        consultar WhoScored. Después scrapea los partidos terminados que siguen sin estadísticas,
+        una página a la vez y con al menos 4 segundos entre una y la siguiente.
+
+        El request espera a que la sincronización termine y devuelve su informe con 200. También
+        cuando WhoScored bloqueó: en ese caso `cut` dice en qué página se cortó, lo ya guardado
+        se conserva y lo que falta queda pendiente para la próxima. Sin snapshot y con la
+        temporada avanzada puede tardar unos 47 minutos.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SyncLeague'
+      responses:
+        '200':
+          description: Sincronización terminada, completa o cortada por bloqueo. Devuelve el informe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsSyncReportResponse'
+              examples:
+                completaConSnapshot:
+                  summary: Completa, con el snapshot al día hasta la fecha anterior (recortada a una liga)
+                  value:
+                    type: FULL
+                    origin: MANUAL
+                    startedAt: '2026-10-13T15:00:00Z'
+                    finishedAt: '2026-10-13T15:02:40Z'
+                    snapshot: LOADED
+                    cut: null
+                    leagues:
+                      - league: PREMIER
+                        status: PROCESSED
+                        matchesFromSnapshot: 50
+                        matchesScraped: 10
+                        skippedMatches:
+                          - externalId: '537860'
+                            homeTeam: Arsenal FC
+                            awayTeam: Leeds United FC
+                            utcDate: '2026-10-10T11:30:00Z'
+                            reason: NOT_FINISHED_IN_SOURCE
+                        uncrossedTeams: []
+                        uncrossedPlayers:
+                          - whoscoredId: '640705'
+                            name: Mason Miley
+                            team: Newcastle United FC
+                            match: '537800'
+                            reason: NOT_FOUND
+                        skippedSnapshotEntries:
+                          - reason: PLAYER_NOT_IN_CATALOG
+                            count: 2
+                cortadaPorBloqueo:
+                  summary: Completa, cortada por un bloqueo en la página de un partido de LaLiga (recortada)
+                  value:
+                    type: FULL
+                    origin: MANUAL
+                    startedAt: '2026-10-13T16:00:00Z'
+                    finishedAt: '2026-10-13T16:21:05Z'
+                    snapshot: MISSING
+                    cut:
+                      page: MATCH
+                      whoscoredId: '1990412'
+                      path: /matches/1990412/live
+                      league: LA_LIGA
+                      match: '544120'
+                    leagues:
+                      - league: PREMIER
+                        status: PROCESSED
+                        matchesFromSnapshot: 0
+                        matchesScraped: 60
+                        skippedMatches: []
+                        uncrossedTeams: []
+                        uncrossedPlayers: []
+                        skippedSnapshotEntries: []
+                      - league: LA_LIGA
+                        status: CUT
+                        matchesFromSnapshot: 0
+                        matchesScraped: 23
+                        skippedMatches: []
+                        uncrossedTeams: []
+                        uncrossedPlayers: []
+                        skippedSnapshotEntries: []
+                      - league: BUNDESLIGA
+                        status: NOT_REACHED
+                        matchesFromSnapshot: 0
+                        matchesScraped: 0
+                        skippedMatches: []
+                        uncrossedTeams: []
+                        uncrossedPlayers: []
+                        skippedSnapshotEntries: []
+                unaSolaLigaConEquipoSinCruzar:
+                  summary: Una sola liga, con un equipo que no se pudo cruzar
+                  value:
+                    type: SINGLE_LEAGUE
+                    origin: MANUAL
+                    startedAt: '2026-10-13T17:00:00Z'
+                    finishedAt: '2026-10-13T17:03:12Z'
+                    snapshot: LOADED
+                    cut: null
+                    leagues:
+                      - league: SERIE_A
+                        status: PROCESSED
+                        matchesFromSnapshot: 0
+                        matchesScraped: 4
+                        skippedMatches:
+                          - externalId: '541002'
+                            homeTeam: Parma Calcio 1913
+                            awayTeam: SSC Napoli
+                            utcDate: '2026-10-04T16:00:00Z'
+                            reason: UNCROSSED_TEAM
+                        uncrossedTeams:
+                          - externalId: '112'
+                            name: Parma Calcio 1913
+                            reason: AMBIGUOUS
+                        uncrossedPlayers: []
+                        skippedSnapshotEntries: []
+        '400':
+          $ref: '#/components/responses/UnsupportedLeague'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/SyncInProgress'
+  /players/sync:
+    post:
+      tags: [Sincronización]
+      operationId: synchronize
+      summary: Sincroniza el catálogo con Football-Data.org
+      description: |
+        Sin cambios de comportamiento respecto de la feature 005, salvo lo que sigue:
+
+        - Responde 409 si hay cualquier sincronización en curso, también una de WhoScored o la
+          cadena del lunes o del arranque.
+        - No dispara la sincronización de WhoScored al terminar (FR-038).
+        - Una completa con las cinco ligas en éxito queda registrada como la última completa
+          exitosa de Football-Data, que decide la puesta al día al arrancar.
+
+        El esquema de la respuesta es el `SyncReportResponse` de la feature 005. Su `origin`
+        usa el enum `SyncOrigin` de este contrato.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SyncLeague'
+      responses:
+        '200':
+          description: Sincronización terminada. Devuelve el informe, igual que en la feature 005.
+          content:
+            application/json:
+              schema:
+                $ref: '../../005-integracion-football-data/contracts/players-api.yaml#/components/schemas/SyncReportResponse'
+        '400':
+          $ref: '#/components/responses/UnsupportedLeaguePlayers'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/SyncInProgress'
+        '503':
+          $ref: '#/components/responses/SyncDisabled'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de sesión obtenido en POST /auth/login.
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clave de API entregada en el registro o en la regeneración.
+  parameters:
+    SyncLeague:
+      name: league
+      in: query
+      required: false
+      description: |
+        Liga a sincronizar. Sin este parámetro se sincronizan las cinco. Un valor que no es una de
+        las cinco, vacío o en minúsculas se rechaza con 400 indicando el valor recibido, sin
+        consultar la fuente.
+      schema:
+        $ref: '#/components/schemas/League'
+  schemas:
+    League:
+      type: string
+      enum: [PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1]
+    SyncType:
+      type: string
+      enum: [FULL, SINGLE_LEAGUE]
+    SyncOrigin:
+      type: string
+      enum: [WEEKLY, CATCH_UP, MANUAL]
+      description: |
+        `WEEKLY` es la cadena del lunes a las 04:00 de Argentina, `CATCH_UP` la puesta al día al
+        arrancar y `MANUAL` un disparo de un administrador. Un disparo manual siempre informa
+        `MANUAL`; los otros dos orígenes solo aparecen en el registro. `CATCH_UP` reemplaza a
+        `STARTUP` de la feature 005.
+    SnapshotStatus:
+      type: string
+      enum: [LOADED, MISSING, UNREADABLE]
+      description: |
+        `LOADED`: se leyó el snapshot. `MISSING`: el archivo no existe. `UNREADABLE`: no se pudo
+        leer completo y se ignoró entero. En los dos últimos casos queda una advertencia en el
+        registro y se scrapea todo lo pendiente.
+    LeagueStatsStatus:
+      type: string
+      enum: [PROCESSED, CUT, NOT_REACHED]
+      description: |
+        `PROCESSED`: la liga se procesó entera. `CUT`: la corrida se cortó por bloqueo mientras se
+        procesaba esta liga. `NOT_REACHED`: la corrida se cortó antes; la liga solo tiene lo que
+        se cargó del snapshot.
+    StatsSkipReason:
+      type: string
+      enum: [UNCROSSED_TEAM, NOT_IN_SOURCE, NOT_FINISHED_IN_SOURCE, INVALID_IN_SOURCE, WRITE_FAILED]
+      description: |
+        `UNCROSSED_TEAM`: el local o el visitante no se pudo cruzar. `NOT_IN_SOURCE`: el partido no
+        aparece entre los partidos de liga de sus equipos en WhoScored. `NOT_FINISHED_IN_SOURCE`:
+        WhoScored todavía no lo da por terminado. `INVALID_IN_SOURCE`: WhoScored informó un valor
+        imposible (un rating fuera de 0 a 10 o una métrica negativa). `WRITE_FAILED`: no se pudo
+        guardar. En todos los casos el partido queda pendiente y no cuenta como una falla de
+        WhoScored.
+    CrossFailure:
+      type: string
+      enum: [NOT_FOUND, AMBIGUOUS, NOT_CONFIRMED]
+      description: |
+        `NOT_FOUND`: no hay ningún candidato. `AMBIGUOUS`: hay más de uno. `NOT_CONFIRMED`: solo
+        para equipos; el nombre coincide pero el calendario de la temporada no.
+    SnapshotSkipReason:
+      type: string
+      enum: [TEAM_NOT_IN_CATALOG, MATCH_NOT_IN_CATALOG, PLAYER_NOT_IN_CATALOG, MATCH_NOT_FINISHED, CONFLICTING_CROSS]
+    PageKind:
+      type: string
+      enum: [LEAGUE, TEAM_FIXTURES, MATCH]
+    RunCutReport:
+      type: object
+      required: [page, whoscoredId, path, league, match]
+      description: Dónde se cortó la corrida por bloqueo. Después del corte no se hizo ningún otro pedido.
+      properties:
+        page:
+          $ref: '#/components/schemas/PageKind'
+        whoscoredId:
+          type: string
+          description: Id de WhoScored de la liga, del equipo o del partido de la página.
+        path:
+          type: string
+          example: /matches/1990412/live
+        league:
+          $ref: '#/components/schemas/League'
+        match:
+          type: string
+          nullable: true
+          description: Id de Football-Data del partido, si la página era la de un partido.
+    SkippedStatsMatch:
+      type: object
+      required: [externalId, homeTeam, awayTeam, utcDate, reason]
+      properties:
+        externalId:
+          type: string
+          description: Id de Football-Data del partido.
+        homeTeam:
+          type: string
+          description: Nombre oficial del local.
+        awayTeam:
+          type: string
+          description: Nombre oficial del visitante.
+        utcDate:
+          type: string
+          format: date-time
+        reason:
+          $ref: '#/components/schemas/StatsSkipReason'
+    UncrossedTeam:
+      type: object
+      required: [externalId, name, reason]
+      description: Equipo del catálogo que no se pudo cruzar. Sus partidos se omiten con UNCROSSED_TEAM.
+      properties:
+        externalId:
+          type: string
+          description: Id de Football-Data del equipo.
+        name:
+          type: string
+        reason:
+          $ref: '#/components/schemas/CrossFailure'
+    UncrossedPlayer:
+      type: object
+      required: [whoscoredId, name, team, match, reason]
+      description: Jugador de WhoScored que no se pudo cruzar con el catálogo. Sus estadísticas en ese partido no se guardan.
+      properties:
+        whoscoredId:
+          type: string
+        name:
+          type: string
+          description: Nombre tal como lo informa WhoScored.
+        team:
+          type: string
+          description: Nombre oficial del equipo del catálogo en ese partido.
+        match:
+          type: string
+          description: Id de Football-Data del partido.
+        reason:
+          $ref: '#/components/schemas/CrossFailure'
+    SnapshotSkipCount:
+      type: object
+      required: [reason, count]
+      properties:
+        reason:
+          $ref: '#/components/schemas/SnapshotSkipReason'
+        count:
+          type: integer
+          minimum: 1
+    LeagueStatsReport:
+      type: object
+      required: [league, status, matchesFromSnapshot, matchesScraped, skippedMatches, uncrossedTeams, uncrossedPlayers, skippedSnapshotEntries]
+      properties:
+        league:
+          $ref: '#/components/schemas/League'
+        status:
+          $ref: '#/components/schemas/LeagueStatsStatus'
+        matchesFromSnapshot:
+          type: integer
+          minimum: 0
+          description: Partidos pendientes que se completaron desde el snapshot, sin consultar WhoScored.
+        matchesScraped:
+          type: integer
+          minimum: 0
+          description: Partidos procesados con su página de WhoScored.
+        skippedMatches:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkippedStatsMatch'
+        uncrossedTeams:
+          type: array
+          items:
+            $ref: '#/components/schemas/UncrossedTeam'
+        uncrossedPlayers:
+          type: array
+          items:
+            $ref: '#/components/schemas/UncrossedPlayer'
+        skippedSnapshotEntries:
+          type: array
+          description: Entradas del snapshot de esta liga que se saltearon, contadas por motivo. Vacío si no hubo ninguna.
+          items:
+            $ref: '#/components/schemas/SnapshotSkipCount'
+    StatsSyncReportResponse:
+      type: object
+      required: [type, origin, startedAt, finishedAt, snapshot, cut, leagues]
+      properties:
+        type:
+          $ref: '#/components/schemas/SyncType'
+        origin:
+          $ref: '#/components/schemas/SyncOrigin'
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        snapshot:
+          $ref: '#/components/schemas/SnapshotStatus'
+        cut:
+          allOf:
+            - $ref: '#/components/schemas/RunCutReport'
+          nullable: true
+          description: '`null` si la corrida no se cortó.'
+        leagues:
+          type: array
+          description: Una entrada por liga pedida, en el orden PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1.
+          items:
+            $ref: '#/components/schemas/LeagueStatsReport'
+    ApiError:
+      type: object
+      description: Formato de error común del backend.
+      required: [timestamp, status, error, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          format: int32
+        error:
+          type: string
+          description: Frase estándar del status HTTP (por ejemplo, Conflict).
+        message:
+          type: string
+          description: Mensaje claro en español, sin detalles internos.
+        path:
+          type: string
+  responses:
+    UnsupportedLeague:
+      description: La liga pedida no es una de las cinco. No se consulta WhoScored.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-13T15:00:00Z'
+            status: 400
+            error: Bad Request
+            message: "La liga 'MLS' no es una de las admitidas: PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1."
+            path: /matches/stats/sync
+    UnsupportedLeaguePlayers:
+      description: La liga pedida no es una de las cinco. No se consulta Football-Data. Sin cambios respecto de la feature 005.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-13T15:00:00Z'
+            status: 400
+            error: Bad Request
+            message: "La liga 'MLS' no es una de las admitidas: PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1."
+            path: /players/sync
+    Unauthorized:
+      description: Falta la credencial, o es inválida o está vencida. No se consulta ninguna fuente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-13T15:00:00Z'
+            status: 401
+            error: Unauthorized
+            message: 'Se requiere una credencial: un token de sesión (Authorization: Bearer) o una clave de API (X-API-Key).'
+            path: /matches/stats/sync
+    Forbidden:
+      description: La credencial es válida pero no es de un administrador. No se consulta ninguna fuente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-13T15:00:00Z'
+            status: 403
+            error: Forbidden
+            message: No tiene permisos para acceder a este recurso.
+            path: /matches/stats/sync
+    SyncInProgress:
+      description: |
+        Ya hay una sincronización en curso, de cualquiera de las dos fuentes: un disparo manual,
+        la cadena semanal o la puesta al día al arrancar.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-13T15:00:00Z'
+            status: 409
+            error: Conflict
+            message: Ya hay una sincronización en curso.
+            path: /matches/stats/sync
+    SyncDisabled:
+      description: La sincronización con Football-Data está deshabilitada porque falta su credencial. Sin cambios respecto de la feature 005; no aplica a WhoScored.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-13T15:00:00Z'
+            status: 503
+            error: Service Unavailable
+            message: 'La sincronización con Football-Data.org está deshabilitada: falta configurar la credencial de la fuente (FOOTBALL_DATA_TOKEN).'
+            path: /players/sync

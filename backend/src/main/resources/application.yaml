@@ -32,3 +32,21 @@ futbolmarket:
       cron: "0 0 4 * * MON"
       zone: America/Argentina/Buenos_Aires
       on-startup: true
+  whoscored:
+    base-url: https://www.whoscored.com
+    user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36"
+    accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    accept-language: "en-US,en;q=0.9"
+    connect-timeout: 10s
+    read-timeout: 30s
+    request-interval: 4s
+    retry-wait: 30s
+    snapshot:
+      path: snapshot/whoscored-stats.jsonl
+  sync:
+    catch-up-after: 7d
+  quotes:
+    recalculation:
+      cron: "0 0 6 * * MON"
+      zone: America/Argentina/Buenos_Aires
+      on-startup: true

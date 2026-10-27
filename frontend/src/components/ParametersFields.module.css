@@ -1,0 +1,23 @@
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 12px 20px;
+}
+
+.hint {
+  font-family: var(--font-script);
+  font-size: 20px;
+  color: var(--chalk-dim);
+}
+
+.add {
+  align-self: flex-start;
+  font-size: 20px;
+}
