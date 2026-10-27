@@ -22,7 +22,7 @@ public record QuoteWeek(LocalDate monday) implements Comparable<QuoteWeek> {
         if (monday == null) {
             throw new QuoteInvariantException("El lunes de la semana es obligatorio.");
         }
-        if (monday.getDayOfWeek() != DayOfWeek.MONDAY) {
+        if (!DayOfWeek.MONDAY.equals(monday.getDayOfWeek())) {
             throw new QuoteInvariantException("La semana tiene que empezar un lunes y " + monday + " no lo es.");
         }
     }

@@ -27,7 +27,6 @@ public record RecalculationReport(RecalculationOrigin origin, Instant startedAt,
         requireNotNull(strategy, "La estrategia del recálculo es obligatoria.");
         quotedWeeks = List.copyOf(quotedWeeks);
         pendingWeeks = List.copyOf(pendingWeeks);
-        interruptedAt = interruptedAt == null ? Optional.empty() : interruptedAt;
     }
 
     public static Builder builder(RecalculationOrigin origin, Instant startedAt, StrategyVersionRef strategy) {
