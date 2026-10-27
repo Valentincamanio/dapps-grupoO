@@ -11,10 +11,6 @@ import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyDetail;
  * una opción que se ignoró).
  */
 public record StrategyChangeResult(StrategyDetail strategy, Optional<RecalculationReport> requotation) {
-    public StrategyChangeResult {
-        requotation = requotation == null ? Optional.empty() : requotation;
-    }
-
     static StrategyChangeResult withoutRequotation(StrategyDetail strategy) {
         return new StrategyChangeResult(strategy, Optional.empty());
     }
