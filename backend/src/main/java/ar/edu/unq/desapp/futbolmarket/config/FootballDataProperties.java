@@ -1,13 +1,9 @@
 package ar.edu.unq.desapp.futbolmarket.config;
 
 import java.net.URI;
-import java.time.DateTimeException;
 import java.time.Duration;
-import java.time.ZoneId;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.Valid;
@@ -84,26 +80,7 @@ public record FootballDataProperties(
             boolean onStartup) {
 
         public Sync {
-            if (cron != null && !isValidCron(cron)) {
-                throw new IllegalArgumentException(
-                        "La expresión cron de la sincronización semanal no es válida: '%s'.".formatted(cron));
-            }
-            if (zone != null) {
-                requireValidZone(zone);
-            }
-        }
-
-        private static boolean isValidCron(String cron) {
-            return Scheduled.CRON_DISABLED.equals(cron) || CronExpression.isValidExpression(cron);
-        }
-
-        private static void requireValidZone(String zone) {
-            try {
-                ZoneId.of(zone);
-            } catch (DateTimeException e) {
-                throw new IllegalArgumentException(
-                        "La zona horaria de la sincronización semanal no es válida: '%s'.".formatted(zone), e);
-            }
+            ScheduleValidation.requireValid(cron, zone, "de la sincronización semanal");
         }
     }
 }
