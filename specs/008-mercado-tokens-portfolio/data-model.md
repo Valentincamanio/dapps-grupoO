@@ -657,6 +657,23 @@ Tipos propios de la interfaz: `MarketFilters` (`side`, `league`, `team`, `ownerT
 (`player`, `side`, `from`, `to`, `page`), `TradeEstimate` (cantidad a 1,0000, cantidad al precio vigente, total
 estimado) y `TradeBlock` (`'not-tradable' | 'sale-blocked' | null`, con el motivo).
 
+Implementación (T034 a T042):
+
+- La hoja de `MarketFilters` y `TransactionFilters` es desde 1, como `BoardFilters` (sección 12.4). `TradeBlock` es
+  `{ kind: 'not-tradable', reason }`, `{ kind: 'sale-blocked', remainingTokens }` o `null`. Las consultas a la API
+  son `MarketOrderQuery`, `TransactionQuery` y `PageQuery`.
+- `utils/market.ts` calcula los totales en enteros (centavos y diezmilésimos) y formatea con `Intl` de es-AR, como
+  `utils/quotes.ts`: el signo menos es el guion común ("-0,30"), igual que en `formatSignedCredits`. `formatScore`
+  muestra al menos dos decimales y hasta seis ("0,30", "0,123456").
+- `RequireRole` ya tenía la prop `role` con `ADMIN` por defecto (de la 007). Lo que cambió es el aviso de falta de
+  permiso, que depende del rol que pide la ruta; el de la administración no cambia.
+- `useOrderCommands` expone `trade` (comprar y vender comparten el estado) y `cancellation`, cada uno con `status`,
+  `data`, `error` y `reset`, y `buy`, `sell` y `cancel`. Si el perfil no se puede volver a pedir después de una
+  operación, la operación igual se informa como hecha.
+- Mocks: `createMarketHandlers` recibe de `handlers.ts` las cuentas simuladas, así comprar y cancelar cambian los
+  saldos de `GET /auth/me`. Simplifican el cruce: una compra solo se cruza con la orden inicial y una venta queda
+  pendiente.
+
 ## 11. Configuración
 
 | Clave | `application.yaml` | `application-test.yml` | Para qué |

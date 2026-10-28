@@ -57,6 +57,14 @@ function addDays(day: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+// Con el factor de escala de la estrategia A, un score de 0,30 lleva 100,00 a 103,00 (ejemplo de la
+// historia 8 de la 008): el score es la variación relativa dividida por ese factor
+const SCORE_SCALE_FACTOR = 0.1;
+
+function scoreOf(base: number, value: number): number {
+  return round(Math.max(-1, Math.min(1, (value - base) / base / SCORE_SCALE_FACTOR)), 6);
+}
+
 function initialQuote(): Quote {
   return {
     value: INITIAL_VALUE,
@@ -65,6 +73,7 @@ function initialQuote(): Quote {
     validFrom: mondayStart(FIRST_WEEK),
     type: 'INITIAL',
     strategy: STRATEGY_A,
+    score: 0,
   };
 }
 
@@ -86,6 +95,7 @@ function quoteFrom(
     validFrom,
     type,
     strategy,
+    score: scoreOf(base, value),
   };
 }
 
@@ -176,6 +186,8 @@ export const ADMIN_PROFILE: Profile = {
   email: 'lionel@mail.com',
   role: 'ADMIN',
   balance: 1000,
+  availableBalance: 1000,
+  reservedBalance: 0,
 };
 
 export const RECALCULATION_IN_PROGRESS = 'Ya hay un recálculo en curso.';

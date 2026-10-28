@@ -1,6 +1,7 @@
 // Tipos de la API de cotizaciones copiados del contrato
-// specs/007-cotizacion-estrategias/contracts/quotes-api.yaml (parte de lectura).
-// No se agregan campos que el backend no devuelve: ninguna respuesta trae score ni estadísticas.
+// specs/007-cotizacion-estrategias/contracts/quotes-api.yaml (parte de lectura), versión 1.1.0.
+// No se agregan campos que el backend no devuelve: desde la 008 cada cotización trae su score, y
+// ninguna respuesta trae estadísticas.
 import type { League, PlayerPage, Position } from './api';
 
 export const QUOTE_TYPES = ['INITIAL', 'CALCULATED', 'REQUOTED'] as const;
@@ -35,6 +36,9 @@ export interface Quote {
   validFrom: string;
   type: QuoteType;
   strategy: StrategyRef;
+  // De -1 a +1, seis decimales. La API lo envía siempre; es opcional para los objetos que arman
+  // los tests de la 007 sin él (research D27 de la 008)
+  score?: number;
 }
 
 export interface PlayerQuote extends Quote {

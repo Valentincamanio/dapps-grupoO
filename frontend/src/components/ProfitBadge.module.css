@@ -1,0 +1,50 @@
+.badge {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-hand);
+  font-weight: 700;
+}
+
+.triangle {
+  font-size: 0.8em;
+}
+
+.text {
+  font-style: italic;
+}
+
+/* Solo para lectores de pantalla: el guion solo no dice nada */
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.chalk.up {
+  color: var(--chalk-up);
+}
+
+.chalk.down {
+  color: var(--chalk-down);
+}
+
+.chalk.flat {
+  color: var(--chalk-dim);
+}
+
+.ink.up {
+  color: var(--ink-up);
+}
+
+.ink.down {
+  color: var(--ink-down);
+}
+
+.ink.flat {
+  color: var(--ink-soft);
+}

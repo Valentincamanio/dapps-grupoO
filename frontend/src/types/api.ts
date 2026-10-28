@@ -78,7 +78,11 @@ export interface Profile {
   username: string;
   email: string;
   role: Role;
+  // Saldo total, como en la 001
   balance: number;
+  // Saldo libre (total − reservado) y reservado para compras pendientes (FR-057 de la 008)
+  availableBalance: number;
+  reservedBalance: number;
 }
 
 export interface ChangePasswordRequest {

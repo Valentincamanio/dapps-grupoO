@@ -267,7 +267,7 @@ paths:
                     timestamp: '2026-10-28T15:00:00Z'
                     status: 409
                     error: Conflict
-                    message: 'Todavía no se puede vender: al administrador le quedan 1 tokens de este jugador.'
+                    message: 'Todavía no se puede vender: al administrador le queda 1 token de este jugador.'
                     path: /orders/sell
                 tokens:
                   value:
