@@ -23,7 +23,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @Configuration
 @EnableConfigurationProperties({AuthProperties.class, JwtProperties.class, FootballDataProperties.class,
-        WhoScoredProperties.class, SyncProperties.class, QuoteRecalculationProperties.class})
+        WhoScoredProperties.class, SyncProperties.class, QuoteRecalculationProperties.class, MarketProperties.class})
 @EnableScheduling
 @EnableAsync
 public class ApplicationConfig {

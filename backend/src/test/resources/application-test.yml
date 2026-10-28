@@ -29,3 +29,6 @@ futbolmarket:
     recalculation:
       cron: "-"
       on-startup: false
+  market:
+    initial-orders:
+      automatic: false

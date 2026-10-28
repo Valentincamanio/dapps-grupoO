@@ -58,6 +58,11 @@ Clase final de utilidad, sin estado, con las escalas como constantes (D4):
 | `averagePrice(cost, quantity)` | `cost / quantity`, 4 decimales `HALF_UP` | `averagePrice(15.15, 15) = 1.0100` |
 | `percent(part, whole)` | `part / whole × 100`, 2 decimales; vacío si `whole = 0` | `percent(0.30, 10.00) = 3.00` |
 
+Implementación (T009 y T010): las escalas no repiten el literal (`CREDIT_SCALE` es la del saldo de la cuenta y
+`PRICE_SCALE` y `PERCENT_SCALE` las de `Quote`, sección 12.2) y se suma `ZERO_CREDITS` (0,00). Los montos de los
+mensajes y de la auditoría los escribe `MarketFormat` (`credits`, `price` y `tokens`, que dice "1 token" o "N
+tokens"): coma decimal y sin separador de miles, como los ejemplos del spec.
+
 ### 2.3 `MarketOrder`
 
 Una orden de compra o de venta. Entidad con identidad; cambia solo por sus métodos.
@@ -92,6 +97,20 @@ Fábricas y métodos:
 | `adjustReservation(available)` | `reservedCredits = min(total(pending, reservationPrice), available)` (D11); devuelve cuánto cambió, para mover lo mismo en la cuenta | — |
 | `cancelRemainder(reason)` | `cancelled += pending`, `reservedCredits = 0` | `OrderNotCancellableException` si no está abierta |
 | `requireOwnedBy(requesterId)` | — | `OrderNotOwnedException` si es ajena **o inicial** |
+
+Una lectura de órdenes (`OrderView(order, player)`) suma el jugador para mostrarla: la usan el portfolio del
+superusuario (US2), el listado del mercado (US5) y las órdenes propias (US6). Es un modelo de lectura, como
+`TradeView`, y no se guarda. El plan no la nombraba (T012).
+
+Implementación (T013):
+
+- `cancelRemainder(reason)` devuelve la reserva que libera (0 en una venta), para devolver lo mismo a la cuenta, y
+  rechaza la orden inicial con `MarketInvariantException` además de la regla de `requireOwnedBy`.
+- `cancelBeyond(keep)` (D9) es solo de compras: cancela por saldo insuficiente todo el pendiente salvo `keep`, con
+  `1 ≤ keep < pendiente`, y no toca la reserva (la ajusta `adjustReservation` después de pagar lo ejecutado). Si no
+  alcanza para ningún token, se usa `cancelRemainder(INSUFFICIENT_CREDITS)`.
+- Todavía no hay una fábrica para reconstruir una orden leída de la base (con su id): la suma el mapper de T020,
+  como `Holding` la suya en T021.
 
 ### 2.4 `CostBasis`
 
@@ -178,6 +197,14 @@ Un registro de auditoría. **Inmutable** (`record`). Las fábricas arman el `det
 
 Fábricas: `orderCreated(order, actor, change, at)`, `tradeExecuted(trade, actor, buyer, seller)`,
 `orderCancelled(order, actor, reason, change, at)`.
+
+Implementación (T017): las tres fábricas reciben también el `Player`, porque el detalle lleva su nombre, y el autor
+es un `AuditActor(type, id)` (con `AuditActor.user`, `superuser` y `system`), que aplica la regla del `actorId`.
+`orderCancelled(order, player, actor, change, at)` toma el motivo y la cantidad de la orden ya cancelada, en vez de
+recibirlos aparte. En `tradeExecuted`, la orden y el lado del registro son los de quien hizo el pedido (comprador o
+vendedor). Los detalles son, por ejemplo, "Orden inicial de venta de 100 tokens de Harry Kane a 1,0000", "Orden de
+compra de 10 tokens de Harry Kane con 10,30 créditos reservados", "Compra de 5 tokens de Harry Kane a 1,0300 por
+5,15 entre usuarios" y "Cancelación de 7 tokens de la orden de venta de Harry Kane a pedido del usuario".
 
 ### 2.9 `OrderMatcher`, `MatchPlan` y `Fill`
 

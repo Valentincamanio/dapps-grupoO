@@ -50,3 +50,6 @@ futbolmarket:
       cron: "0 0 6 * * MON"
       zone: America/Argentina/Buenos_Aires
       on-startup: true
+  market:
+    initial-orders:
+      automatic: true
