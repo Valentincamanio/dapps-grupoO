@@ -1,0 +1,1418 @@
+openapi: 3.0.3
+info:
+  title: API del mercado de tokens y del portfolio de usuarios
+  version: 1.0.0
+  description: |
+    Contrato de la feature `008-mercado-tokens-portfolio` de Futbol Market: órdenes de compra y de
+    venta de tokens, listado del mercado, portfolio, historial de operaciones, órdenes propias y
+    auditoría. Las cotizaciones (y su `score`) siguen en `specs/007-cotizacion-estrategias/contracts/
+    quotes-api.yaml`, versión 1.1.0. Los esquemas comunes (`League`, `Position`, `StrategyRef`,
+    `PageInfo`, `ApiError`) se repiten acá iguales a los de la 007 para que el archivo se lea solo.
+
+    **Tokens y precios.** Cada jugador tiene 100 tokens; cada uno es el 1 % del jugador. El precio por
+    token es la cotización vigente / 100, con cuatro decimales. Contra la **orden inicial** del
+    superusuario (el administrador) el precio es siempre 1,0000. El total de una operación es
+    cantidad × precio por token, redondeado **una sola vez** a dos decimales, hacia arriba desde la
+    mitad; el comprador paga y el vendedor recibe exactamente ese total. No hay comisiones.
+
+    **Saldo.** `balance` es el saldo total; `reservedBalance`, lo comprometido en compras pendientes;
+    `availableBalance` = `balance − reservedBalance`, lo que se puede gastar. Ningún saldo ni tenencia
+    queda negativo.
+
+    **Cruce.** Una compra se ejecuta primero contra la orden inicial del jugador, a 1,0000, y después
+    contra las ventas pendientes de otros usuarios, de la más vieja a la más nueva, al precio vigente;
+    lo que falta queda pendiente y reserva créditos al precio vigente. Una venta se rechaza mientras la
+    orden inicial del jugador tenga tokens pendientes; si no, se cruza con las compras pendientes de la
+    más vieja a la más nueva. Hay ejecución parcial en los dos sentidos. Las órdenes no vencen. Las de un
+    mismo usuario nunca se cruzan, y un usuario no puede tener a la vez compras y ventas pendientes del
+    mismo jugador.
+
+    **Credenciales.** Las rutas privadas aceptan el token de sesión (`Authorization: Bearer ...`) o la
+    clave de API (`X-API-Key`); alcanza con una. El usuario sale **siempre** de la credencial: un
+    `userId` en el cuerpo se ignora.
+
+    **Acceso.** `GET /orders` es público. `POST /orders/**` es solo de usuarios comunes (`USER`): el
+    administrador recibe 403. `/users/{id}/**` es del dueño o del administrador; otro usuario recibe 403.
+    `GET /audit` es solo del administrador.
+
+    **Fechas.** `AAAA-MM-DD` en hora de Argentina (UTC−3, sin horario de verano). Un día va de su 00:00
+    al 00:00 del día siguiente. Los instantes (`createdAt`, `executedAt`, `occurredAt`) van en UTC.
+
+    **Errores.** Todos con el formato `ApiError` y mensajes en español: 400 (forma del pedido, filtro o
+    fecha no admitidos), 401 (sin credencial o credencial inválida), 403 (falta de permiso), 404 (no
+    encontrado) y 409 (conflicto con el estado del mercado).
+servers:
+  - url: http://localhost:8080
+    description: Perfil local (./gradlew bootRun)
+tags:
+  - name: Órdenes
+    description: Comprar, vender y cancelar.
+  - name: Mercado
+    description: Listado público de las órdenes con remanente pendiente.
+  - name: Portfolio
+    description: Portfolio, historial de operaciones y órdenes de un usuario.
+  - name: Auditoría
+    description: Registro inmutable de los hechos del mercado (solo administrador).
+  - name: Cuenta
+    description: Cambio al perfil de la 001 (FR-057).
+paths:
+  /orders/buy:
+    post:
+      tags: [Órdenes]
+      operationId: buyTokens
+      summary: Compra tokens de un jugador
+      description: |
+        Se ejecuta en el acto contra la orden inicial del jugador (a 1,0000) y contra las ventas
+        pendientes de otros usuarios (al precio vigente), en ese orden; lo que falta queda como compra
+        pendiente y reserva créditos al precio vigente. El pedido se rechaza entero si el saldo libre no
+        alcanza para la parte que se ejecuta más la reserva del remanente: entonces no se crea ninguna
+        orden ni cambia ningún saldo.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+            example:
+              playerId: 12
+              quantity: 10
+      responses:
+        '201':
+          description: La orden creada, con las operaciones que se ejecutaron en el acto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderExecution'
+              examples:
+                contraLaInicial:
+                  summary: 10 tokens contra la orden inicial (US1.4)
+                  value:
+                    order:
+                      id: 2601
+                      player: { id: 12, name: Harry Kane, team: FC Bayern München, league: BUNDESLIGA }
+                      side: BUY
+                      ownerType: USER
+                      status: EXECUTED
+                      requestedQuantity: 10
+                      executedQuantity: 10
+                      cancelledQuantity: 0
+                      pendingQuantity: 0
+                      reservedCredits: 0.00
+                      createdAt: '2026-10-28T15:00:00Z'
+                    trades:
+                      - id: 1
+                        executedAt: '2026-10-28T15:00:00Z'
+                        quantity: 10
+                        tokenPrice: 1.0000
+                        total: 10.00
+                        counterparty: ADMIN
+                        quote:
+                          validFrom: '2026-10-26T03:00:00Z'
+                          value: 103.00
+                          tokenPrice: 1.0300
+                          score: 0.300000
+                          strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                    executedQuantity: 10
+                    executedTotal: 10.00
+                    balance: 990.00
+                    availableBalance: 990.00
+                    reservedBalance: 0.00
+                parcial:
+                  summary: 3 contra la inicial y 7 que quedan pendientes (US1.5)
+                  value:
+                    order:
+                      id: 2602
+                      player: { id: 12, name: Harry Kane, team: FC Bayern München, league: BUNDESLIGA }
+                      side: BUY
+                      ownerType: USER
+                      status: PARTIAL
+                      requestedQuantity: 10
+                      executedQuantity: 3
+                      cancelledQuantity: 0
+                      pendingQuantity: 7
+                      reservedCredits: 7.21
+                      createdAt: '2026-10-28T15:00:00Z'
+                    trades:
+                      - id: 2
+                        executedAt: '2026-10-28T15:00:00Z'
+                        quantity: 3
+                        tokenPrice: 1.0000
+                        total: 3.00
+                        counterparty: ADMIN
+                        quote:
+                          validFrom: '2026-10-26T03:00:00Z'
+                          value: 103.00
+                          tokenPrice: 1.0300
+                          score: 0.300000
+                          strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                    executedQuantity: 3
+                    executedTotal: 3.00
+                    balance: 997.00
+                    availableBalance: 989.79
+                    reservedBalance: 7.21
+        '400':
+          $ref: '#/components/responses/InvalidOrderRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminCannotTrade'
+        '404':
+          $ref: '#/components/responses/PlayerNotFound'
+        '409':
+          description: |
+            Saldo insuficiente; ventas propias pendientes de ese jugador; jugador no operable
+            (inactivo, sin cotización o sin su orden inicial); mercado ocupado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                saldo:
+                  value:
+                    timestamp: '2026-10-28T15:00:00Z'
+                    status: 409
+                    error: Conflict
+                    message: 'Saldo insuficiente: se necesitan 10,00 créditos y el saldo libre es 5,00.'
+                    path: /orders/buy
+                noOperable:
+                  value:
+                    timestamp: '2026-10-28T15:00:00Z'
+                    status: 409
+                    error: Conflict
+                    message: 'El jugador no se puede operar: está inactivo.'
+                    path: /orders/buy
+  /orders/sell:
+    post:
+      tags: [Órdenes]
+      operationId: sellTokens
+      summary: Vende tokens de un jugador
+      description: |
+        Se rechaza al crearla, sin crear nada, mientras la orden inicial del jugador tenga tokens
+        pendientes. Si no, compromete los tokens y se cruza con las compras pendientes de otros
+        usuarios, de la más vieja a la más nueva, al precio vigente; lo que no se vende queda como venta
+        pendiente. Una compra pendiente cuyo saldo (su reserva más el saldo libre de su dueño) no alcanza
+        se ejecuta por lo que alcanza y el resto se cancela.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+            example:
+              playerId: 12
+              quantity: 4
+      responses:
+        '201':
+          description: La orden creada, con las operaciones que se ejecutaron en el acto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderExecution'
+              example:
+                order:
+                  id: 2650
+                  player: { id: 12, name: Harry Kane, team: FC Bayern München, league: BUNDESLIGA }
+                  side: SELL
+                  ownerType: USER
+                  status: EXECUTED
+                  requestedQuantity: 4
+                  executedQuantity: 4
+                  cancelledQuantity: 0
+                  pendingQuantity: 0
+                  reservedCredits: 0.00
+                  createdAt: '2026-11-02T15:00:00Z'
+                trades:
+                  - id: 40
+                    executedAt: '2026-11-02T15:00:00Z'
+                    quantity: 4
+                    tokenPrice: 1.0500
+                    total: 4.20
+                    counterparty: USER
+                    quote:
+                      validFrom: '2026-11-02T03:00:00Z'
+                      value: 105.00
+                      tokenPrice: 1.0500
+                      score: 0.194175
+                      strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                executedQuantity: 4
+                executedTotal: 4.20
+                balance: 1004.20
+                availableBalance: 1004.20
+                reservedBalance: 0.00
+        '400':
+          $ref: '#/components/responses/InvalidOrderRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AdminCannotTrade'
+        '404':
+          $ref: '#/components/responses/PlayerNotFound'
+        '409':
+          description: |
+            Venta bloqueada porque la orden inicial todavía tiene tokens; tokens libres insuficientes;
+            compras propias pendientes de ese jugador; jugador no operable; mercado ocupado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                bloqueada:
+                  value:
+                    timestamp: '2026-10-28T15:00:00Z'
+                    status: 409
+                    error: Conflict
+                    message: 'Todavía no se puede vender: al administrador le quedan 1 tokens de este jugador.'
+                    path: /orders/sell
+                tokens:
+                  value:
+                    timestamp: '2026-10-28T15:00:00Z'
+                    status: 409
+                    error: Conflict
+                    message: 'Tokens insuficientes: tiene 4 tokens libres de este jugador.'
+                    path: /orders/sell
+  /orders/{id}/cancel:
+    post:
+      tags: [Órdenes]
+      operationId: cancelOrder
+      summary: Cancela el remanente pendiente de una orden propia
+      description: |
+        Lo ejecutado se conserva. Una compra libera sus créditos reservados; una venta, sus tokens
+        comprometidos. Se puede cancelar aunque el jugador no sea operable. La orden inicial del
+        superusuario no se cancela.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: La orden cancelada y el saldo posterior.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderCancellation'
+              example:
+                order:
+                  id: 2602
+                  player: { id: 12, name: Harry Kane, team: FC Bayern München, league: BUNDESLIGA }
+                  side: BUY
+                  ownerType: USER
+                  status: CANCELLED
+                  requestedQuantity: 10
+                  executedQuantity: 3
+                  cancelledQuantity: 7
+                  pendingQuantity: 0
+                  reservedCredits: 0.00
+                  createdAt: '2026-10-28T15:00:00Z'
+                balance: 997.00
+                availableBalance: 997.00
+                reservedBalance: 0.00
+        '400':
+          $ref: '#/components/responses/BadRequestParameters'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            El administrador (antes del controller), o una orden de otro usuario o la orden inicial del
+            superusuario.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-28T15:00:00Z'
+                status: 403
+                error: Forbidden
+                message: La orden no pertenece al usuario.
+                path: /orders/7/cancel
+        '404':
+          description: No existe la orden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-28T15:00:00Z'
+                status: 404
+                error: Not Found
+                message: No se encontró la orden con id 9999.
+                path: /orders/9999/cancel
+        '409':
+          description: La orden ya está ejecutada o ya está cancelada; mercado ocupado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-28T15:00:00Z'
+                status: 409
+                error: Conflict
+                message: La orden ya está ejecutada.
+                path: /orders/2601/cancel
+  /orders:
+    get:
+      tags: [Mercado]
+      operationId: listMarketOrders
+      summary: Listado público del mercado
+      description: |
+        Las órdenes con remanente pendiente (`PENDING` o `PARTIAL`), de la más vieja a la más nueva
+        (fecha de creación y después id), con la paginación del catálogo. No hay filtro de estado: las
+        ejecutadas y canceladas no se listan. Nunca informa la identidad del dueño, solo su tipo. Los
+        filtros son opcionales y combinables; con `ownerType=ADMIN` se ven las órdenes iniciales con los
+        tokens que le quedan al superusuario de cada jugador. La ficha del jugador lo usa con `playerId`.
+      parameters:
+        - name: side
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OrderSide'
+        - $ref: '#/components/parameters/League'
+        - $ref: '#/components/parameters/Team'
+        - name: ownerType
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OwnerType'
+        - name: playerId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Una hoja del listado; puede estar vacía.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketOrderPage'
+              example:
+                content:
+                  - id: 12
+                    player: { id: 12, name: Harry Kane, team: FC Bayern München, league: BUNDESLIGA }
+                    side: SELL
+                    ownerType: ADMIN
+                    status: PARTIAL
+                    requestedQuantity: 100
+                    executedQuantity: 13
+                    pendingQuantity: 87
+                    createdAt: '2026-10-28T12:00:00Z'
+                page: 0
+                size: 10
+                totalElements: 1
+                totalPages: 1
+                hasPrevious: false
+                hasNext: false
+        '400':
+          $ref: '#/components/responses/BadRequestParameters'
+  /users/{id}/portfolio:
+    get:
+      tags: [Portfolio]
+      operationId: getPortfolio
+      summary: Portfolio actual o a una fecha
+      description: |
+        Sin `date`: las tenencias con la cotización vigente de cada jugador (un jugador inactivo, con su
+        última cotización), el saldo libre y reservado y los tokens comprometidos.
+
+        Con `date`: las tenencias, el saldo total y la ganancia realizada reconstruidos con las
+        operaciones del usuario hasta el final de ese día (hora de Argentina), valuados con la cotización
+        que regía en esa fecha. No informa saldo libre, reservado ni tokens comprometidos. Se rechazan la
+        fecha futura, la de formato inválido y la anterior al día de registro del usuario.
+
+        Para el superusuario las posiciones son los tokens sin vender de cada jugador y no informan precio
+        promedio, invertido, ganancia ni rentabilidad.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - name: date
+          in: query
+          required: false
+          description: AAAA-MM-DD, hora de Argentina. No puede ser futura ni anterior al registro.
+          schema:
+            type: string
+            format: date
+            example: '2026-08-25'
+      responses:
+        '200':
+          description: El portfolio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Portfolio'
+              examples:
+                actual:
+                  summary: Portfolio actual (US2.1 y US2.5; se muestra una de sus dos posiciones)
+                  value:
+                    userId: 7
+                    date: null
+                    positions:
+                      - player: { id: 12, name: Harry Kane, position: FORWARD, team: FC Bayern München, league: BUNDESLIGA, active: true }
+                        tokens: 10
+                        sharePercent: 10
+                        committed: 0
+                        averagePrice: 1.0000
+                        invested: 10.00
+                        quote:
+                          validFrom: '2026-10-26T03:00:00Z'
+                          value: 103.00
+                          tokenPrice: 1.0300
+                          score: 0.300000
+                          strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                        value: 10.30
+                        profit: 0.30
+                        profitPercent: 3.00
+                    totals:
+                      balance: 996.18
+                      availableBalance: 990.00
+                      reservedBalance: 6.18
+                      invested: 20.00
+                      value: 20.60
+                      profit: 0.60
+                      realizedProfit: 0.00
+                      equity: 1016.78
+                aUnaFecha:
+                  summary: Portfolio al 25/08/2026 (US7.1)
+                  value:
+                    userId: 7
+                    date: '2026-08-25'
+                    positions:
+                      - player: { id: 12, name: Harry Kane, position: FORWARD, team: FC Bayern München, league: BUNDESLIGA, active: true }
+                        tokens: 10
+                        sharePercent: 10
+                        averagePrice: 1.0000
+                        invested: 10.00
+                        quote:
+                          validFrom: '2026-08-24T03:00:00Z'
+                          value: 103.00
+                          tokenPrice: 1.0300
+                          score: 0.300000
+                          strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                        value: 10.30
+                        profit: 0.30
+                        profitPercent: 3.00
+                    totals:
+                      balance: 990.00
+                      invested: 10.00
+                      value: 10.30
+                      profit: 0.30
+                      realizedProfit: 0.00
+                      equity: 1000.30
+        '400':
+          description: Fecha con formato inválido, futura o anterior al registro; identificador inválido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-28T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: La fecha 2026-08-01 es anterior al registro del usuario (2026-08-17).
+                path: /users/7/portfolio
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AccountForbidden'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+  /users/{id}/transactions:
+    get:
+      tags: [Portfolio]
+      operationId: getTransactions
+      summary: Historial de operaciones de un usuario
+      description: |
+        De la más nueva a la más vieja, con la paginación del catálogo. Filtros opcionales y combinables:
+        jugador, lado (desde el punto de vista del usuario) y rango de fechas, los dos extremos incluidos.
+        La contraparte se informa como `ADMIN` (el superusuario) o `USER` (otro usuario), nunca quién.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - name: playerId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: side
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OrderSide'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Una hoja del historial; puede estar vacía.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionPage'
+              example:
+                content:
+                  - id: 40
+                    executedAt: '2026-11-02T15:00:00Z'
+                    player: { id: 12, name: Harry Kane, team: FC Bayern München, league: BUNDESLIGA }
+                    side: SELL
+                    quantity: 5
+                    tokenPrice: 1.0500
+                    total: 5.25
+                    counterparty: USER
+                    orderId: 2650
+                    quote:
+                      validFrom: '2026-11-02T03:00:00Z'
+                      value: 105.00
+                      tokenPrice: 1.0500
+                      score: 0.194175
+                      strategy: { id: 1, name: Rendimiento de partido, version: 1 }
+                    realizedProfit: 0.20
+                page: 0
+                size: 10
+                totalElements: 1
+                totalPages: 1
+                hasPrevious: false
+                hasNext: false
+        '400':
+          description: Filtro o fecha no admitidos, o rango con el inicio posterior al final.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                timestamp: '2026-10-28T15:00:00Z'
+                status: 400
+                error: Bad Request
+                message: El inicio del rango (2026-09-10) es posterior al final (2026-09-01).
+                path: /users/7/transactions
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AccountForbidden'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+  /users/{id}/orders:
+    get:
+      tags: [Portfolio]
+      operationId: getUserOrders
+      summary: Órdenes de un usuario
+      description: Todas sus órdenes, en cualquier estado, de la más nueva a la más vieja, paginadas.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Una hoja de órdenes; puede estar vacía.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserOrderPage'
+        '400':
+          $ref: '#/components/responses/BadRequestParameters'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/AccountForbidden'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+  /audit:
+    get:
+      tags: [Auditoría]
+      operationId: getAudit
+      summary: Auditoría del mercado (solo administrador)
+      description: |
+        Cada orden creada (también las iniciales), cada operación ejecutada y cada cancelación, con autor,
+        fecha y hora, detalle y el estado anterior y posterior de cada parte: saldo libre, saldo reservado
+        y tenencia del jugador. De la más nueva a la más vieja, paginada. Ningún registro se puede
+        modificar ni borrar: la API no ofrece ninguna operación para hacerlo. `userId` filtra por autor o
+        por cualquiera de las partes.
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: eventType
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AuditEventType'
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: playerId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Una hoja de la auditoría.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditPage'
+              example:
+                content:
+                  - id: 2602
+                    occurredAt: '2026-10-28T15:00:00Z'
+                    eventType: TRADE_EXECUTED
+                    actorType: USER
+                    actorId: 7
+                    playerId: 12
+                    orderId: 2601
+                    tradeId: 1
+                    side: BUY
+                    quantity: 10
+                    tokenPrice: 1.0000
+                    total: 10.00
+                    quoteId: 5300
+                    cancelReason: null
+                    detail: Compra de 10 tokens de Harry Kane a 1,0000 por 10,00 contra la orden inicial.
+                    parties:
+                      - role: BUYER
+                        userId: 7
+                        before: { availableBalance: 990.00, reservedBalance: 10.00, tokens: 0 }
+                        after: { availableBalance: 990.00, reservedBalance: 0.00, tokens: 10 }
+                      - role: SELLER
+                        userId: 1
+                        before: { availableBalance: 0.00, reservedBalance: 0.00, tokens: 100 }
+                        after: { availableBalance: 10.00, reservedBalance: 0.00, tokens: 90 }
+                page: 0
+                size: 10
+                totalElements: 1
+                totalPages: 1
+                hasPrevious: false
+                hasNext: false
+        '400':
+          $ref: '#/components/responses/BadRequestParameters'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El usuario no es administrador (antes del controller).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /auth/me:
+    get:
+      tags: [Cuenta]
+      operationId: getProfile
+      summary: Perfil propio (cambio a la 001)
+      description: |
+        El perfil de la 001 suma el saldo libre y el reservado (FR-057). `balance` sigue siendo el saldo
+        total. `AccountControllerIT` fija las claves exactas del perfil; el equipo autorizó sumar estas
+        dos el 2026-10-28 (puerta G3 del plan, registrada en Clarifications).
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: Perfil del usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+              example:
+                id: 7
+                username: lionel10
+                email: lionel@correo.com
+                role: USER
+                balance: 996.18
+                availableBalance: 990.00
+                reservedBalance: 6.18
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de sesión obtenido en POST /auth/login.
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clave de API entregada en el registro o en la regeneración.
+  parameters:
+    OrderId:
+      name: id
+      in: path
+      required: true
+      description: Identificador de la orden, mayor o igual a 1.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    UserId:
+      name: id
+      in: path
+      required: true
+      description: Identificador del usuario, mayor o igual a 1.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    League:
+      name: league
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/League'
+    Team:
+      name: team
+      in: query
+      required: false
+      description: Nombre oficial exacto del equipo. No puede estar vacío.
+      schema:
+        type: string
+        pattern: '\S'
+    From:
+      name: from
+      in: query
+      required: false
+      description: Primer día del rango, AAAA-MM-DD en hora de Argentina, incluido.
+      schema:
+        type: string
+        format: date
+    To:
+      name: to
+      in: query
+      required: false
+      description: Último día del rango, AAAA-MM-DD en hora de Argentina, incluido.
+      schema:
+        type: string
+        format: date
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Número de página. La primera es la 0.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      required: false
+      description: Tamaño de página, de 1 a 50, como el catálogo.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
+  responses:
+    InvalidOrderRequest:
+      description: |
+        Cuerpo inválido: falta el jugador o la cantidad, o la cantidad no es un entero entre 1 y 100
+        (0, negativa, decimal o mayor que 100). No se crea nada.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-28T15:00:00Z'
+            status: 400
+            error: Bad Request
+            message: El request tiene datos inválidos.
+            path: /orders/buy
+            violations:
+              - field: quantity
+                message: La cantidad tiene que ser un entero entre 1 y 100.
+    BadRequestParameters:
+      description: Un parámetro con un valor no admitido, igual que en el catálogo.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-28T15:00:00Z'
+            status: 400
+            error: Bad Request
+            message: Los parámetros enviados no son válidos.
+            path: /orders
+    Unauthorized:
+      description: No hay credencial, o la credencial es inválida o está vencida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    AdminCannotTrade:
+      description: El administrador no compra ni vende (FR-010). Se rechaza antes del controller.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-28T15:00:00Z'
+            status: 403
+            error: Forbidden
+            message: No tiene permisos para acceder a este recurso.
+            path: /orders/buy
+    AccountForbidden:
+      description: Un usuario común pidió los datos de otro usuario.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-28T15:00:00Z'
+            status: 403
+            error: Forbidden
+            message: No tiene permiso para ver la cuenta de otro usuario.
+            path: /users/8/portfolio
+    UserNotFound:
+      description: No existe el usuario (solo lo recibe el administrador; un usuario común recibe 403).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-28T15:00:00Z'
+            status: 404
+            error: Not Found
+            message: No se encontró el usuario con id 999.
+            path: /users/999/portfolio
+    PlayerNotFound:
+      description: No existe el jugador. No se crea nada.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: '2026-10-28T15:00:00Z'
+            status: 404
+            error: Not Found
+            message: No se encontró el jugador con id 9999.
+            path: /orders/buy
+  schemas:
+    League:
+      type: string
+      enum: [PREMIER, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1]
+    Position:
+      type: string
+      enum: [GOALKEEPER, DEFENDER, MIDFIELDER, FORWARD]
+    Role:
+      type: string
+      enum: [USER, ADMIN]
+    OrderSide:
+      type: string
+      enum: [BUY, SELL]
+      description: '`BUY`: compra. `SELL`: venta. En el historial, el lado del usuario.'
+    OrderStatus:
+      type: string
+      enum: [PENDING, PARTIAL, EXECUTED, CANCELLED]
+      description: |
+        `PENDING`: nada ejecutado. `PARTIAL`: algo ejecutado y remanente pendiente. `EXECUTED`: todo
+        ejecutado. `CANCELLED`: remanente cancelado, con o sin parte ejecutada.
+    OwnerType:
+      type: string
+      enum: [USER, ADMIN]
+      description: '`USER`: usuario común. `ADMIN`: el superusuario (sus órdenes iniciales).'
+    AuditEventType:
+      type: string
+      enum: [ORDER_CREATED, TRADE_EXECUTED, ORDER_CANCELLED]
+    AuditActorType:
+      type: string
+      enum: [USER, SUPERUSER, SYSTEM]
+      description: '`SYSTEM` es el autor de las cancelaciones por saldo insuficiente.'
+    CancelReason:
+      type: string
+      enum: [USER_REQUEST, INSUFFICIENT_CREDITS]
+    StrategyRef:
+      type: object
+      description: La estrategia y la versión con que se calculó una cotización (igual que en la 007).
+      required: [id, name, version]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+    PageInfo:
+      type: object
+      description: Los datos de paginación del catálogo.
+      required: [page, size, totalElements, totalPages, hasPrevious, hasNext]
+      properties:
+        page:
+          type: integer
+          description: Índice base cero.
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        hasPrevious:
+          type: boolean
+        hasNext:
+          type: boolean
+    OrderRequest:
+      type: object
+      required: [playerId, quantity]
+      properties:
+        playerId:
+          type: integer
+          format: int64
+          minimum: 1
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Un entero entre 1 y 100. Un decimal (`1.5`) se rechaza.
+      description: Cualquier otro campo, por ejemplo un `userId`, se ignora.
+    PlayerRef:
+      type: object
+      required: [id, name, team, league]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        team:
+          type: string
+        league:
+          $ref: '#/components/schemas/League'
+    PositionPlayer:
+      allOf:
+        - $ref: '#/components/schemas/PlayerRef'
+        - type: object
+          required: [position, active]
+          properties:
+            position:
+              $ref: '#/components/schemas/Position'
+            active:
+              type: boolean
+    QuoteUsed:
+      type: object
+      description: La cotización usada por una operación o una posición, con su score.
+      required: [validFrom, value, tokenPrice, score, strategy]
+      properties:
+        validFrom:
+          type: string
+          format: date-time
+        value:
+          type: number
+          description: Valor del 100 % del jugador, dos decimales.
+        tokenPrice:
+          type: number
+          description: Precio por token de la cotización (valor / 100), cuatro decimales.
+        score:
+          type: number
+          minimum: -1
+          maximum: 1
+          description: Score de la cotización, seis decimales.
+        strategy:
+          $ref: '#/components/schemas/StrategyRef'
+    MarketOrder:
+      type: object
+      description: Una orden del listado público. No informa la identidad del dueño.
+      required: [id, player, side, ownerType, status, requestedQuantity, executedQuantity, pendingQuantity, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        player:
+          $ref: '#/components/schemas/PlayerRef'
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        ownerType:
+          $ref: '#/components/schemas/OwnerType'
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        requestedQuantity:
+          type: integer
+        executedQuantity:
+          type: integer
+        pendingQuantity:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    UserOrder:
+      allOf:
+        - $ref: '#/components/schemas/MarketOrder'
+        - type: object
+          required: [cancelledQuantity, reservedCredits]
+          properties:
+            cancelledQuantity:
+              type: integer
+            reservedCredits:
+              type: number
+              description: Créditos reservados para el remanente de una compra; 0 en las ventas.
+    TradeSummary:
+      type: object
+      required: [id, executedAt, quantity, tokenPrice, total, counterparty, quote]
+      properties:
+        id:
+          type: integer
+          format: int64
+        executedAt:
+          type: string
+          format: date-time
+        quantity:
+          type: integer
+        tokenPrice:
+          type: number
+          description: 1,0000 contra la orden inicial; si no, el de la cotización vigente.
+        total:
+          type: number
+          description: cantidad × precio por token, dos decimales.
+        counterparty:
+          $ref: '#/components/schemas/OwnerType'
+        quote:
+          $ref: '#/components/schemas/QuoteUsed'
+    Balances:
+      type: object
+      required: [balance, availableBalance, reservedBalance]
+      properties:
+        balance:
+          type: number
+          description: Saldo total, dos decimales.
+        availableBalance:
+          type: number
+          description: Saldo libre (total − reservado).
+        reservedBalance:
+          type: number
+          description: Créditos reservados para compras pendientes.
+    OrderExecution:
+      allOf:
+        - $ref: '#/components/schemas/Balances'
+        - type: object
+          required: [order, trades, executedQuantity, executedTotal]
+          properties:
+            order:
+              $ref: '#/components/schemas/UserOrder'
+            trades:
+              type: array
+              description: Las operaciones ejecutadas en el acto, en orden; puede estar vacía.
+              items:
+                $ref: '#/components/schemas/TradeSummary'
+            executedQuantity:
+              type: integer
+            executedTotal:
+              type: number
+              description: Suma de los totales de las operaciones.
+    OrderCancellation:
+      allOf:
+        - $ref: '#/components/schemas/Balances'
+        - type: object
+          required: [order]
+          properties:
+            order:
+              $ref: '#/components/schemas/UserOrder'
+    MarketOrderPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/MarketOrder'
+    UserOrderPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserOrder'
+    PortfolioPosition:
+      type: object
+      required: [player, tokens, sharePercent, quote, value]
+      properties:
+        player:
+          $ref: '#/components/schemas/PositionPlayer'
+        tokens:
+          type: integer
+          minimum: 1
+        sharePercent:
+          type: integer
+          description: Participación % del jugador (cada token es el 1 %).
+        committed:
+          type: integer
+          description: Tokens comprometidos en ventas pendientes. Solo en el portfolio actual.
+        averagePrice:
+          type: number
+          nullable: true
+          description: Precio promedio de compra, cuatro decimales. Nulo en el portfolio del superusuario.
+        invested:
+          type: number
+          nullable: true
+          description: tokens × precio promedio. Nulo en el portfolio del superusuario.
+        quote:
+          $ref: '#/components/schemas/QuoteUsed'
+        value:
+          type: number
+          description: tokens × precio por token de la cotización usada.
+        profit:
+          type: number
+          nullable: true
+          description: valor − invertido, con signo.
+        profitPercent:
+          type: number
+          nullable: true
+          description: ganancia / invertido × 100, con signo. Nulo si el invertido es 0.
+    PortfolioTotals:
+      type: object
+      required: [balance, invested, value, profit, equity]
+      properties:
+        balance:
+          type: number
+          description: Saldo total (a la fecha, si se pidió una).
+        availableBalance:
+          type: number
+          description: Solo en el portfolio actual.
+        reservedBalance:
+          type: number
+          description: Solo en el portfolio actual.
+        invested:
+          type: number
+        value:
+          type: number
+        profit:
+          type: number
+        realizedProfit:
+          type: number
+          nullable: true
+          description: Ganancia realizada acumulada en ventas. Nula en el portfolio del superusuario.
+        equity:
+          type: number
+          description: Patrimonio = saldo total + valor de las posiciones.
+    Portfolio:
+      type: object
+      required: [userId, date, positions, totals]
+      properties:
+        userId:
+          type: integer
+          format: int64
+        date:
+          type: string
+          format: date
+          nullable: true
+          description: La fecha pedida; nula en el portfolio actual.
+        positions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortfolioPosition'
+        totals:
+          $ref: '#/components/schemas/PortfolioTotals'
+    Transaction:
+      type: object
+      required: [id, executedAt, player, side, quantity, tokenPrice, total, counterparty, orderId, quote]
+      properties:
+        id:
+          type: integer
+          format: int64
+        executedAt:
+          type: string
+          format: date-time
+        player:
+          $ref: '#/components/schemas/PlayerRef'
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        quantity:
+          type: integer
+        tokenPrice:
+          type: number
+        total:
+          type: number
+        counterparty:
+          $ref: '#/components/schemas/OwnerType'
+        orderId:
+          type: integer
+          format: int64
+          description: La orden propia a la que pertenece.
+        quote:
+          $ref: '#/components/schemas/QuoteUsed'
+        realizedProfit:
+          type: number
+          nullable: true
+          description: Solo en las ventas de un usuario.
+    TransactionPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/Transaction'
+    PartyState:
+      type: object
+      required: [availableBalance, reservedBalance, tokens]
+      properties:
+        availableBalance:
+          type: number
+        reservedBalance:
+          type: number
+        tokens:
+          type: integer
+          description: Tenencia del jugador; para el superusuario, el pendiente de su orden inicial.
+    AuditParty:
+      type: object
+      required: [role, userId, before, after]
+      properties:
+        role:
+          type: string
+          enum: [OWNER, BUYER, SELLER]
+        userId:
+          type: integer
+          format: int64
+        before:
+          $ref: '#/components/schemas/PartyState'
+        after:
+          $ref: '#/components/schemas/PartyState'
+    AuditEntry:
+      type: object
+      required: [id, occurredAt, eventType, actorType, playerId, orderId, side, quantity, detail, parties]
+      properties:
+        id:
+          type: integer
+          format: int64
+        occurredAt:
+          type: string
+          format: date-time
+        eventType:
+          $ref: '#/components/schemas/AuditEventType'
+        actorType:
+          $ref: '#/components/schemas/AuditActorType'
+        actorId:
+          type: integer
+          format: int64
+          nullable: true
+        playerId:
+          type: integer
+          format: int64
+        orderId:
+          type: integer
+          format: int64
+        tradeId:
+          type: integer
+          format: int64
+          nullable: true
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        quantity:
+          type: integer
+        tokenPrice:
+          type: number
+          nullable: true
+        total:
+          type: number
+          nullable: true
+        quoteId:
+          type: integer
+          format: int64
+          nullable: true
+        cancelReason:
+          allOf:
+            - $ref: '#/components/schemas/CancelReason'
+          nullable: true
+        detail:
+          type: string
+        parties:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/AuditParty'
+    AuditPage:
+      allOf:
+        - $ref: '#/components/schemas/PageInfo'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditEntry'
+    Profile:
+      type: object
+      required: [id, username, email, role, balance, availableBalance, reservedBalance]
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        balance:
+          type: number
+          description: Saldo total, como en la 001.
+        availableBalance:
+          type: number
+          description: Saldo libre. Nuevo (FR-057).
+        reservedBalance:
+          type: number
+          description: Saldo reservado. Nuevo (FR-057).
+    ApiError:
+      type: object
+      description: Formato de error común del backend.
+      required: [timestamp, status, error, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          format: int32
+        error:
+          type: string
+        message:
+          type: string
+          description: Mensaje claro en español, sin detalles internos.
+        path:
+          type: string
+        violations:
+          type: array
+          description: Solo en errores de validación del cuerpo.
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string

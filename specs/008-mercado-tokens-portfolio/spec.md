@@ -109,6 +109,19 @@ Puerta del proceso antes de implementar (no es una duda de comportamiento):
   El plan lista qué tests y qué
   aserciones cambian y por qué (FR-060).
 
+### Session 2026-10-28
+
+Puerta del proceso que encontró el plan (G3; no es una duda de comportamiento):
+
+- Q: FR-057 pide que el perfil informe el saldo libre y el reservado, pero
+  `AccountControllerIT.elPerfilTieneExactamenteLasClavesDelContratoYNingunSecreto` fija las claves exactas
+  de `GET /auth/me` (`id`, `username`, `email`, `role` y `balance`), y el "sí" del 2026-10-27 no cubre esa
+  aserción. ¿Se puede modificar? → A: Sí. **"Sí" explícito del equipo (Principio IV), dado por Lucas y
+  Valentin el 2026-10-28.** Alcanza solo a sumar `availableBalance` y `reservedBalance` al conjunto exacto
+  de claves de esa aserción (FR-057 y FR-060). No autoriza borrar tests, cambiar otras aserciones de
+  `AccountControllerIT` ni de otros tests, ni quitar las verificaciones de que el perfil no trae la
+  contraseña, la clave de API ni el hash.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Comprar tokens al superusuario (Priority: P1)
@@ -736,9 +749,10 @@ forma de modificarlo ni borrarlo, y que solo el administrador lo consulta.
   lo que prohíben compra, venta, órdenes, portfolio, presupuesto, tokens y puntajes. Se mantiene
   la prohibición de "sumar al plantel".
 - **FR-060**: El plan MUST listar cada test existente que cambia (`NoPurchaseActions.test.tsx`,
-  `NoMarketActions.test.tsx` y los de la 007 que verifican que el score no se expone), qué
-  aserciones cambian y por qué. Ningún test MUST modificarse ni borrarse hasta que el "sí"
-  explícito del equipo figure en Clarifications.
+  `NoMarketActions.test.tsx`, los de la 007 que verifican que el score no se expone y la aserción
+  de `AccountControllerIT` que fija las claves del perfil, por FR-057), qué aserciones cambian y
+  por qué. Ningún test MUST modificarse ni borrarse hasta que el "sí" explícito del equipo figure
+  en Clarifications.
 
 #### Aplicación web
 
