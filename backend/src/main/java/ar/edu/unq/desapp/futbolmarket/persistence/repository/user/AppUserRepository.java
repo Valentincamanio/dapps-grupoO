@@ -1,16 +1,22 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.repository.user;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeSet;
 
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateEmailException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameException;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.user.AppUserMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.market.MarketLocks;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.user.AppUserSQLDAO;
 import lombok.RequiredArgsConstructor;
 
@@ -63,6 +69,39 @@ public class AppUserRepository {
 
     public boolean existsByEmail(String email) {
         return appUserSQLDAO.existsByEmailIgnoreCase(email);
+    }
+
+    /**
+     * La cuenta con su fila bloqueada hasta que termine la transacción de quien la pide, que tiene
+     * que existir (research D13 de la 008). Si otro pedido la tiene bloqueada más que el tiempo de
+     * espera de la base, lanza {@code MarketBusyException}.
+     */
+    public Optional<AppUser> lockById(Long id) {
+        return MarketLocks.orBusy(() -> appUserSQLDAO.findWithLockById(id)).map(appUserMapper::toDomain);
+    }
+
+    /**
+     * Bloquea las cuentas de a una y de menor a mayor id: dos pedidos que comparten cuentas las
+     * piden en el mismo orden y no se traban entre sí (research D13). Repetir un id no lo bloquea
+     * dos veces, y las cuentas que no existen no figuran.
+     *
+     * @return las cuentas por id, en el orden en que se bloquearon
+     */
+    public Map<Long, AppUser> lockAllInOrder(Collection<Long> ids) {
+        Map<Long, AppUser> locked = new LinkedHashMap<>();
+        for (Long id : new TreeSet<>(ids)) {
+            lockById(id).ifPresent(user -> locked.put(id, user));
+        }
+        return locked;
+    }
+
+    /**
+     * El superusuario del mercado: la primera cuenta {@code ADMIN}, la del alta de arranque. No se
+     * busca por el nombre configurado porque, si la configuración cambia, la cuenta original sigue
+     * siendo la dueña de las órdenes iniciales (research D7 de la 008).
+     */
+    public Optional<AppUser> findSuperuser() {
+        return appUserSQLDAO.findFirstByRoleOrderByIdAsc(Role.ADMIN.name()).map(appUserMapper::toDomain);
     }
 
     /**

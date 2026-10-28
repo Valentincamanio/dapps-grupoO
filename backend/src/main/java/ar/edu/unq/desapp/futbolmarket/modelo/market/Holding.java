@@ -38,6 +38,13 @@ public class Holding {
         return new Holding(null, ownerId, playerId, CostBasis.EMPTY, 0);
     }
 
+    /**
+     * Reconstruye el estado leído de la base. La usa únicamente {@code HoldingMapper}.
+     */
+    public static Holding reconstitute(Long id, long ownerId, long playerId, CostBasis basis, int committed) {
+        return new Holding(id, ownerId, playerId, basis, committed);
+    }
+
     public int getQuantity() {
         return basis.quantity();
     }

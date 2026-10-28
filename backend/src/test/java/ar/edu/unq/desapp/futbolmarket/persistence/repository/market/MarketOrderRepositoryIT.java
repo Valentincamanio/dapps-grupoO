@@ -1,0 +1,285 @@
+package ar.edu.unq.desapp.futbolmarket.persistence.repository.market;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.NestedExceptionUtils;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import ar.edu.unq.desapp.futbolmarket.modelo.market.CancelReason;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrder;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderSide;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OwnerType;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.market.MarketOrderSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.user.AppUserSQLDAO;
+import ar.edu.unq.desapp.futbolmarket.service.quote.QuoteDatabase;
+
+/**
+ * Las órdenes contra la base, con una H2 propia.
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+@TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:market-order-repository-it;DB_CLOSE_DELAY=-1")
+class MarketOrderRepositoryIT {
+    private static final Instant AT = Instant.parse("2026-08-24T15:00:00Z");
+    private static final String PASSWORD_HASH = "$2a$10$abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0";
+    private static final BigDecimal RESERVATION_PRICE = new BigDecimal("1.0300");
+    private static final String INITIAL_INDEX = "ux_market_orders_initial_player";
+
+    @Autowired
+    private ApplicationContext context;
+
+    @Autowired
+    private MarketOrderRepository repository;
+
+    @Autowired
+    private AppUserRepository appUserRepository;
+
+    @Autowired
+    private MarketOrderSQLDAO orderDAO;
+
+    @Autowired
+    private AppUserSQLDAO appUserDAO;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
+    private QuoteDatabase database;
+    private long superuser;
+    private long buyer;
+    private long seller;
+    private Player kane;
+    private Player salah;
+    private Player son;
+
+    @BeforeEach
+    void prepareDatabase() {
+        database = new QuoteDatabase(context);
+        cleanDatabase();
+        Team team = database.team("57", "Arsenal FC");
+        kane = database.player("8300", "Harry Kane", Position.FORWARD, team);
+        salah = database.player("8301", "Mohamed Salah", Position.FORWARD, team);
+        son = database.player("8302", "Son Heung-min", Position.FORWARD, team);
+        superuser = user("administrador", Role.ADMIN, "0.00");
+        buyer = user("comprador", Role.USER, "1000.00");
+        seller = user("vendedor", Role.USER, "1000.00");
+    }
+
+    @AfterEach
+    void cleanDatabaseAfter() {
+        cleanDatabase();
+    }
+
+    @Test
+    void idaYVueltaDeUnaCompraConservaCantidadesReservaYPrecio() {
+        MarketOrder buy = MarketOrder.buy(buyer, kane.id(), 10, new BigDecimal("10.30"), RESERVATION_PRICE, AT);
+        buy.fill(3);
+        buy.consumeReservation(new BigDecimal("3.09"));
+
+        MarketOrder saved = repository.save(buy);
+        MarketOrder read = repository.findById(saved.getId()).orElseThrow();
+
+        assertThat(read.getId()).isNotNull();
+        assertThat(read.getSide()).isEqualTo(OrderSide.BUY);
+        assertThat(read.getOwnerId()).isEqualTo(buyer);
+        assertThat(read.getPlayerId()).isEqualTo(kane.id());
+        assertThat(read.getRequested()).isEqualTo(10);
+        assertThat(read.getExecuted()).isEqualTo(3);
+        assertThat(read.getCancelled()).isZero();
+        assertThat(read.getReservedCredits()).isEqualTo(new BigDecimal("7.21"));
+        assertThat(read.getReservationPrice()).isEqualTo(RESERVATION_PRICE);
+        assertThat(read.getCreatedAt()).isEqualTo(AT);
+        assertThat(read.isInitial()).isFalse();
+        assertThat(read.getCancelReason()).isNull();
+        assertThat(read.status()).isEqualTo(OrderStatus.PARTIAL);
+    }
+
+    @Test
+    void idaYVueltaDeUnaVentaCanceladaConservaElMotivo() {
+        MarketOrder sell = MarketOrder.sell(seller, kane.id(), 10, AT);
+        sell.fill(4);
+        sell.cancelRemainder(CancelReason.USER_REQUEST);
+
+        MarketOrder saved = repository.save(sell);
+        MarketOrder read = repository.findById(saved.getId()).orElseThrow();
+
+        assertThat(read.getSide()).isEqualTo(OrderSide.SELL);
+        assertThat(read.getExecuted()).isEqualTo(4);
+        assertThat(read.getCancelled()).isEqualTo(6);
+        assertThat(read.getCancelReason()).isEqualTo(CancelReason.USER_REQUEST);
+        assertThat(read.getReservedCredits()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(read.getReservationPrice()).isNull();
+        assertThat(read.status()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void laOrdenInicialSeGuardaConElJugadorComoMarca() {
+        MarketOrder saved = repository.save(MarketOrder.initialFor(superuser, kane.id(), AT));
+
+        MarketOrder read = repository.findById(saved.getId()).orElseThrow();
+        Long initialPlayerId = jdbcTemplate.queryForObject(
+                "SELECT initial_player_id FROM market_orders WHERE id = ?", Long.class, saved.getId());
+
+        assertThat(read.isInitial()).isTrue();
+        assertThat(read.ownerType()).isEqualTo(OwnerType.ADMIN);
+        assertThat(read.pending()).isEqualTo(100);
+        assertThat(initialPlayerId).isEqualTo(kane.id());
+    }
+
+    /**
+     * Se consulta la columna porque desde el modelo el estado siempre se deriva de las cantidades:
+     * así se ve la copia que se guarda para filtrar.
+     */
+    @Test
+    void elEstadoDerivadoSeGuardaComoTexto() {
+        MarketOrder sell = MarketOrder.sell(seller, kane.id(), 10, AT);
+        sell.fill(4);
+
+        MarketOrder saved = repository.save(sell);
+        String status = jdbcTemplate.queryForObject("SELECT status FROM market_orders WHERE id = ?", String.class,
+                saved.getId());
+
+        assertThat(status).isEqualTo(OrderStatus.PARTIAL.name());
+    }
+
+    @Test
+    void guardarDeNuevoUnaOrdenLaActualiza() {
+        MarketOrder saved = repository.save(MarketOrder.sell(seller, kane.id(), 10, AT));
+        saved.fill(10);
+
+        repository.save(saved);
+
+        MarketOrder read = repository.findById(saved.getId()).orElseThrow();
+        assertThat(read.status()).isEqualTo(OrderStatus.EXECUTED);
+        assertThat(orderDAO.count()).isEqualTo(1);
+    }
+
+    @Test
+    void unaSegundaOrdenInicialDelMismoJugadorViolaElIndiceUnico() {
+        repository.save(MarketOrder.initialFor(superuser, kane.id(), AT));
+
+        assertThatThrownBy(() -> repository.save(MarketOrder.initialFor(superuser, kane.id(), AT)))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .satisfies(e -> assertThat(mostSpecificCauseMessage(e)).contains(INITIAL_INDEX));
+    }
+
+    @Test
+    void variasOrdenesNoInicialesDelMismoJugadorConviven() {
+        repository.save(MarketOrder.initialFor(superuser, kane.id(), AT));
+
+        List<MarketOrder> saved = repository.saveAll(List.of(
+                MarketOrder.sell(seller, kane.id(), 5, AT),
+                MarketOrder.sell(seller, kane.id(), 3, AT),
+                MarketOrder.buy(buyer, kane.id(), 2, new BigDecimal("2.06"), RESERVATION_PRICE, AT)));
+
+        assertThat(saved).allSatisfy(order -> assertThat(order.getId()).isNotNull());
+        assertThat(orderDAO.count()).isEqualTo(4);
+    }
+
+    @Test
+    void lasAbiertasDeUnJugadorSonLasNoInicialesPendientesOParcialesEnOrdenDeLlegadaYDeId() {
+        repository.save(MarketOrder.initialFor(superuser, kane.id(), AT));
+        MarketOrder newest = repository.save(MarketOrder.sell(seller, kane.id(), 5, AT.plusSeconds(120)));
+        MarketOrder partial = MarketOrder.sell(seller, kane.id(), 5, AT.plusSeconds(60));
+        partial.fill(2);
+        partial = repository.save(partial);
+        MarketOrder sameInstant = repository.save(MarketOrder.sell(seller, kane.id(), 5, AT.plusSeconds(60)));
+        MarketOrder executed = MarketOrder.sell(seller, kane.id(), 5, AT);
+        executed.fill(5);
+        repository.save(executed);
+        MarketOrder cancelled = MarketOrder.sell(seller, kane.id(), 5, AT);
+        cancelled.cancelRemainder(CancelReason.USER_REQUEST);
+        repository.save(cancelled);
+        repository.save(MarketOrder.sell(seller, salah.id(), 5, AT));
+
+        List<MarketOrder> open = repository.findOpenOfPlayer(kane.id());
+
+        assertThat(open).extracting(MarketOrder::getId)
+                .containsExactly(partial.getId(), sameInstant.getId(), newest.getId());
+    }
+
+    @Test
+    void losJugadoresSinOrdenInicialSonLosQueNoLaTienen() {
+        repository.save(MarketOrder.initialFor(superuser, salah.id(), AT));
+
+        List<Long> withoutInitial = repository.playerIdsWithoutInitialOrder();
+
+        assertThat(withoutInitial).containsExactly(kane.id(), son.id());
+    }
+
+    @Test
+    void entreLosJugadoresPedidosSoloFiguranLosQueNoTienenOrdenInicial() {
+        repository.save(MarketOrder.initialFor(superuser, salah.id(), AT));
+
+        List<Long> withoutInitial = repository.playerIdsWithoutInitialOrderIn(List.of(salah.id(), son.id()));
+
+        assertThat(withoutInitial).containsExactly(son.id());
+    }
+
+    @Test
+    void sinJugadoresPedidosNoHayNingunoSinOrdenInicial() {
+        List<Long> withoutInitial = repository.playerIdsWithoutInitialOrderIn(List.of());
+
+        assertThat(withoutInitial).isEmpty();
+    }
+
+    @Test
+    void elLibroDeUnJugadorEsSuOrdenInicial() {
+        MarketOrder initial = repository.save(MarketOrder.initialFor(superuser, kane.id(), AT));
+
+        Optional<MarketOrder> book = transactionTemplate.execute(status -> repository.lockBook(kane.id()));
+
+        assertThat(book).isPresent();
+        assertThat(book.get().getId()).isEqualTo(initial.getId());
+        assertThat(book.get().pending()).isEqualTo(100);
+    }
+
+    @Test
+    void unJugadorSinOrdenInicialNoTieneLibro() {
+        Optional<MarketOrder> book = transactionTemplate.execute(status -> repository.lockBook(kane.id()));
+
+        assertThat(book).isEmpty();
+    }
+
+    private long user(String username, Role role, String balance) {
+        AppUser user = AppUser.reconstitute(null, username, username + "@correo.com", PASSWORD_HASH, null, role,
+                new BigDecimal(balance));
+        return appUserRepository.save(user).getId();
+    }
+
+    private static String mostSpecificCauseMessage(Throwable e) {
+        return NestedExceptionUtils.getMostSpecificCause(e).getMessage().toLowerCase(Locale.ROOT);
+    }
+
+    private void cleanDatabase() {
+        orderDAO.deleteAll();
+        appUserDAO.deleteAll();
+        database.clean();
+    }
+}

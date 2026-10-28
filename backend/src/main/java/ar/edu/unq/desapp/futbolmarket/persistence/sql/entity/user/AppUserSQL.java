@@ -1,6 +1,9 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.user;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+
+import org.hibernate.annotations.ColumnDefault;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
 import jakarta.persistence.Column;
@@ -37,6 +40,7 @@ public class AppUserSQL {
     private static final int API_KEY_HASH_LENGTH = 64;
     private static final int ROLE_LENGTH = 20;
     private static final int BALANCE_PRECISION = 19;
+    private static final String NO_RESERVATION = "0.00";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -67,4 +71,18 @@ public class AppUserSQL {
 
     @Column(nullable = false, precision = BALANCE_PRECISION, scale = CredentialPolicy.BALANCE_SCALE)
     private BigDecimal balance;
+
+    /**
+     * El saldo reservado para compras pendientes (research D5 de la 008). El valor por defecto es
+     * para {@code ddl-auto: update}: así la columna se agrega a una base existente con 0 en las
+     * cuentas que ya estaban.
+     */
+    @ColumnDefault(NO_RESERVATION)
+    @Column(name = "reserved_balance", nullable = false, precision = BALANCE_PRECISION,
+            scale = CredentialPolicy.BALANCE_SCALE)
+    private BigDecimal reservedBalance;
+
+    /** Nulo en las cuentas creadas antes de la 008 (research D6). */
+    @Column(name = "registered_at", updatable = false)
+    private Instant registeredAt;
 }

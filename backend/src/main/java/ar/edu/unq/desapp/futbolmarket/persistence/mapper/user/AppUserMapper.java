@@ -21,7 +21,9 @@ public class AppUserMapper {
                 entity.getPasswordHash(),
                 entity.getApiKeyHash(),
                 Role.valueOf(entity.getRole()),
-                entity.getBalance());
+                entity.getBalance(),
+                entity.getReservedBalance(),
+                entity.getRegisteredAt());
     }
 
     /** Si el id viene en {@code null}, JPA inserta; si no, actualiza. */
@@ -34,6 +36,8 @@ public class AppUserMapper {
         entity.setApiKeyHash(user.getApiKeyHash());
         entity.setRole(user.getRole().name());
         entity.setBalance(user.getBalance());
+        entity.setReservedBalance(user.getReserved());
+        entity.setRegisteredAt(user.getRegisteredAt());
         return entity;
     }
 }

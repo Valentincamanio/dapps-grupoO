@@ -1,7 +1,10 @@
 package ar.edu.unq.desapp.futbolmarket.service.user;
 
+import java.time.Clock;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
@@ -13,7 +16,6 @@ import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DuplicateUsernameExc
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidUserDataException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.config.AuthProperties;
-import lombok.RequiredArgsConstructor;
 
 /**
  * Alta del administrador inicial al arrancar (research D12).
@@ -29,7 +31,6 @@ import lombok.RequiredArgsConstructor;
  * <p>Ningún log incluye la contraseña configurada.</p>
  */
 @Component
-@RequiredArgsConstructor
 public class AdminAccountInitializer implements ApplicationRunner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AdminAccountInitializer.class);
@@ -37,6 +38,29 @@ public class AdminAccountInitializer implements ApplicationRunner {
     private final AuthProperties authProperties;
     private final AppUserRepository appUserRepository;
     private final PasswordHasher passwordHasher;
+    private final Clock clock;
+
+    /**
+     * Se conserva para el test que construye el inicializador a mano: da de alta con la hora del
+     * sistema.
+     */
+    public AdminAccountInitializer(AuthProperties authProperties, AppUserRepository appUserRepository,
+                                   PasswordHasher passwordHasher) {
+        this(authProperties, appUserRepository, passwordHasher, Clock.systemUTC());
+    }
+
+    /**
+     * El que usa Spring: el instante del alta sale del reloj de la aplicación (research D6 de la
+     * 008).
+     */
+    @Autowired
+    public AdminAccountInitializer(AuthProperties authProperties, AppUserRepository appUserRepository,
+                                   PasswordHasher passwordHasher, Clock clock) {
+        this.authProperties = authProperties;
+        this.appUserRepository = appUserRepository;
+        this.passwordHasher = passwordHasher;
+        this.clock = clock;
+    }
 
     @Override
     public void run(ApplicationArguments args) {
@@ -86,7 +110,8 @@ public class AdminAccountInitializer implements ApplicationRunner {
     private void create(AuthProperties.Admin admin) {
         try {
             AppUser saved = appUserRepository.save(
-                    AppUser.createAdmin(admin.username(), admin.email(), admin.password(), passwordHasher));
+                    AppUser.createAdmin(admin.username(), admin.email(), admin.password(), passwordHasher,
+                            clock.instant()));
             LOGGER.info("Se creó la cuenta de administrador '{}'.", saved.getUsername());
         } catch (InvalidUserDataException e) {
             LOGGER.warn("La configuración del administrador no es válida: {} Se omite el alta.", e.getMessage());

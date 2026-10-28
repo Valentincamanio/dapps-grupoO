@@ -68,6 +68,16 @@ public class MarketOrder {
                 null, at, false, null);
     }
 
+    /**
+     * Reconstruye el estado leído de la base. No valida porque ese estado ya se validó al crearse.
+     * La usa únicamente {@code MarketOrderMapper}.
+     */
+    public static MarketOrder reconstitute(State state) {
+        return new MarketOrder(state.id(), state.side(), state.ownerId(), state.playerId(), state.requested(),
+                state.executed(), state.cancelled(), state.reservedCredits(), state.reservationPrice(),
+                state.createdAt(), state.initial(), state.cancelReason());
+    }
+
     public int pending() {
         return requested - executed - cancelled;
     }
@@ -189,5 +199,14 @@ public class MarketOrder {
             throw new MarketInvariantException("La cantidad de una orden tiene que estar entre 1 y "
                     + MarketMath.MAX_ORDER_QUANTITY + ": " + quantity + ".");
         }
+    }
+
+    /**
+     * El estado de una orden tal como se guarda, para {@link #reconstitute}. Es un record para no
+     * tener una fábrica de doce parámetros.
+     */
+    public record State(Long id, OrderSide side, long ownerId, long playerId, int requested, int executed,
+                        int cancelled, BigDecimal reservedCredits, BigDecimal reservationPrice, Instant createdAt,
+                        boolean initial, CancelReason cancelReason) {
     }
 }

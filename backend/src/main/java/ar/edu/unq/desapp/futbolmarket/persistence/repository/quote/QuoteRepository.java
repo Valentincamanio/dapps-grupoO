@@ -124,6 +124,16 @@ public class QuoteRepository {
     }
 
     /**
+     * La cotización que rige en ese instante, incluido: el precio de una operación del mercado
+     * (research D14 de la 008). Considera también a un jugador inactivo; vacía si todavía no tiene
+     * ninguna.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Quote> findInForceAt(long playerId, Instant instant) {
+        return quoteDAO.findInForceAt(playerId, instant).map(quoteMapper::toDomain);
+    }
+
+    /**
      * Las cotizaciones del jugador con vigencia desde {@code from} (incluido) hasta {@code to}
      * (excluido), de la más vieja a la más nueva, paginadas. Incluye todas: también las calculadas
      * que una recotización reemplazó.
