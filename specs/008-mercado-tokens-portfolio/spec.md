@@ -48,28 +48,56 @@ Decisiones del equipo que llegaron con el pedido de la funcionalidad (firmes):
   más los que hagan falta para el listado del mercado, las órdenes propias y la auditoría.
 - Q: El frontend va aparte? -> A: No, va en esta misma funcionalidad.
 
-Reglas que el equipo propuso con el pedido, a confirmar en la clarificación (este spec las
-escribe como requisitos tal cual):
+Reglas que el equipo propuso con el pedido. Las confirmó en la clarificación (ver abajo), salvo
+la de la reserva de créditos, que tiene su propia respuesta:
 
-- Q: Qué pasa con los créditos de una compra pendiente? -> A (propuesta): Quedan reservados al
-  precio vigente al crearla. Si al ejecutarse el precio es mayor y el saldo no alcanza, se
-  ejecuta la parte que alcanza y el resto se cancela (FR-019 y FR-027).
+- Q: Qué pasa con los créditos de una compra pendiente? -> A (confirmada): Quedan reservados al
+  precio vigente al crearla. Si al ejecutarse el precio es mayor y el saldo (la reserva de esa
+  orden más el saldo libre) no alcanza, se ejecuta la parte que alcanza y el resto se cancela
+  (FR-019 y FR-027).
 - Q: Un usuario puede tener a la vez compras y ventas pendientes del mismo jugador? -> A
-  (propuesta): No, y sus órdenes nunca se cruzan entre sí (FR-017).
-- Q: Las órdenes vencen? -> A (propuesta): No (FR-021).
-- Q: Qué cantidades se admiten? -> A (propuesta): Un entero entre 1 y 100; una venta no puede
+  (confirmada): No, y sus órdenes nunca se cruzan entre sí (FR-017).
+- Q: Las órdenes vencen? -> A (confirmada): No (FR-021).
+- Q: Qué cantidades se admiten? -> A (confirmada): Un entero entre 1 y 100; una venta no puede
   superar los tokens libres del usuario (FR-014 y FR-016).
-- Q: Hay comisiones? -> A (propuesta): No (FR-004).
-- Q: El listado del mercado es público? -> A (propuesta): Sí, como el ranking, y nunca muestra
+- Q: Hay comisiones? -> A (confirmada): No (FR-004).
+- Q: El listado del mercado es público? -> A (confirmada): Sí, como el ranking, y nunca muestra
   quién es el dueño de una orden, solo su tipo de usuario. El portfolio, el historial y las
   órdenes propias son privados (FR-047 y FR-055).
-- Q: Qué fechas admite el portfolio a una fecha? -> A (propuesta): Se rechazan la fecha futura,
+- Q: Qué fechas admite el portfolio a una fecha? -> A (confirmada): Se rechazan la fecha futura,
   la de formato inválido y la anterior al registro del usuario (FR-041).
-- Q: Cuándo "inicia el mercado"? -> A (propuesta): Al arrancar la aplicación y después de cada
+- Q: Cuándo "inicia el mercado"? -> A (confirmada): Al arrancar la aplicación y después de cada
   sincronización del catálogo, solo para los jugadores que todavía no tienen su orden del
   superusuario (FR-008).
 
-Pendiente antes de implementar (no es una duda de comportamiento, es una puerta del proceso):
+Respuestas de la clarificación:
+
+- Q: ¿Se confirman tal cual las reglas propuestas (sin vencimiento, cantidad entera entre 1 y 100,
+  sin compras y ventas pendientes del mismo jugador a la vez, sin comisiones, listado público sin
+  revelar al dueño, rechazo de fechas futuras, inválidas o anteriores al registro, y generación de
+  las órdenes del superusuario al arrancar y después de cada sincronización)? → A: Sí, todas tal
+  cual (FR-008, FR-014, FR-017, FR-021, FR-041 y FR-047).
+- Q: Cuando una compra pendiente se ejecuta a un precio mayor que el de su reserva, ¿con qué
+  créditos puede pagar el comprador antes de cancelar lo que no alcanza? → A: Con la reserva de
+  esa orden más su saldo libre; si no alcanza ni así, se ejecuta lo que alcanza y el resto se
+  cancela. Nunca usa créditos reservados para otras órdenes (FR-027).
+- Q: En el portfolio a una fecha pasada, ¿alcanza con el saldo total o hay que reconstruir saldo
+  libre, reservado y tokens comprometidos de ese día? → A: Solo el saldo total, sin libre,
+  reservado ni tokens comprometidos; el patrimonio a esa fecha es saldo total + valor de las
+  posiciones (FR-040).
+- Q: ¿El listado público del mercado muestra solo las órdenes con tokens pendientes o todas, con
+  filtro de estado? → A: Solo las órdenes con remanente pendiente (estado pendiente o parcial),
+  sin filtro de estado; las ejecutadas y canceladas se ven en las órdenes propias y en la
+  auditoría (FR-047).
+- Q: ¿El equipo da el "sí" explícito (Principio IV) para modificar `NoPurchaseActions.test.tsx`,
+  `NoMarketActions.test.tsx` y los tests de la 007 que verifican que el score no se expone? → A:
+  Sí. **"Sí" explícito del equipo (Principio IV), dado por Valentin el 2026-10-27.** Alcanza solo
+  a los cambios que liste el plan (FR-060): quitar de las expresiones prohibidas comprar, vender,
+  orden, portfolio, presupuesto, tokens y puntaje, conservar la prohibición de "sumar al
+  plantel", ajustar las aserciones que verifican que el score no se expone y actualizar las
+  descripciones de esos tests. No autoriza borrar tests ni cambiar otras aserciones.
+
+Puerta del proceso antes de implementar (no es una duda de comportamiento):
 
 - Q: Se pueden modificar los tests que hoy prohíben comprar, vender, órdenes, portfolio,
   presupuesto, tokens y puntaje en el frontend (`NoPurchaseActions.test.tsx` de la 004, CE-009;
@@ -77,7 +105,8 @@ Pendiente antes de implementar (no es una duda de comportamiento, es una puerta 
   no se expone? -> A: El equipo decidió que deben modificarse, porque esta funcionalidad muestra
   operaciones de mercado y el score. Se mantiene solo la prohibición de "sumar al plantel". El
   Principio IV de la constitución exige el "sí" explícito del equipo registrado acá antes de
-  implementar. **Pendiente: el "sí" todavía no está registrado.** El plan lista qué tests y qué
+  implementar. **El "sí" quedó registrado el 2026-10-27 (Valentin), en las respuestas de arriba.**
+  El plan lista qué tests y qué
   aserciones cambian y por qué (FR-060).
 
 ## User Scenarios & Testing *(mandatory)*
@@ -581,7 +610,8 @@ forma de modificarlo ni borrarlo, y que solo el administrador lo consulta.
   incluido) MUST ser siempre 100.
 - **FR-027**: Si al ejecutarse una compra pendiente el precio es mayor que el de su reserva y la
   reserva más el saldo libre del comprador no alcanzan, MUST ejecutarse la mayor cantidad de
-  tokens que alcance y el resto del remanente MUST cancelarse, liberando la reserva sobrante. Si
+  tokens que alcance y el resto del remanente MUST cancelarse, liberando la reserva sobrante.
+  MUST NOT usarse créditos reservados para otras órdenes del comprador. Si
   el precio es menor, la diferencia reservada de los tokens ejecutados MUST volver al saldo
   libre.
 - **FR-028**: Cada operación ejecutada MUST registrar fecha y hora, jugador, comprador,
@@ -632,8 +662,8 @@ forma de modificarlo ni borrarlo, y que solo el administrador lo consulta.
 - **FR-040**: Con fecha, las tenencias, el saldo y la ganancia realizada MUST reconstruirse con
   las operaciones del usuario hasta el final de ese día, hora de Argentina, y cada posición MUST
   valuarse con la cotización que regía en esa fecha (la "cotización a una fecha" de la 007,
-  FR-043). El saldo a una fecha se informa total, sin separar libre de reservado, y sin tokens
-  comprometidos.
+  FR-043). El saldo a una fecha MUST informarse total, sin separar libre de reservado y sin tokens
+  comprometidos; el patrimonio a esa fecha es ese saldo total más el valor de las posiciones.
 - **FR-041**: Una fecha futura, con formato inválido o anterior al día de registro del usuario
   MUST rechazarse indicando el valor no admitido.
 - **FR-042**: El portfolio MUST verlo solo su dueño o el administrador. Otro usuario MUST
@@ -658,7 +688,8 @@ forma de modificarlo ni borrarlo, y que solo el administrador lo consulta.
 
 - **FR-047**: El listado del mercado MUST ser público, como el ranking, y MUST listar las
   órdenes con remanente pendiente (estado pendiente o parcial), de la más vieja a la más nueva,
-  con la paginación del catálogo.
+  con la paginación del catálogo. MUST NOT incluir órdenes ejecutadas ni canceladas ni ofrecer un
+  filtro de estado.
 - **FR-048**: El listado MUST admitir filtros opcionales y combinables de tipo de orden (compra o
   venta), liga, equipo, tipo de usuario dueño (usuario común o administrador) y jugador. Un
   filtro con valor no admitido MUST rechazarse, igual que en el catálogo.
@@ -822,17 +853,10 @@ forma de modificarlo ni borrarlo, y que solo el administrador lo consulta.
 - Para verificar el saldo de una compra, la parte contra el superusuario se cobra a 1 crédito y
   el remanente se reserva al precio vigente; la orden se rechaza entera si no alcanza para las
   dos cosas.
-- En la ejecución de una compra pendiente a un precio mayor que el de su reserva, el comprador
-  puede usar, además de la reserva, su saldo libre (FR-027). Es una interpretación de "si el
-  saldo no alcanza" a confirmar en la clarificación.
 - La mayor cantidad que alcanza es la mayor cantidad entera de tokens cuyo total redondeado
   (FR-003) no supera lo disponible.
-- El portfolio a una fecha informa el saldo total, sin separar libre de reservado ni tokens
-  comprometidos, porque las reservas no se reconstruyen hacia atrás. La fecha de hoy se admite.
-- El listado del mercado muestra solo órdenes con remanente pendiente (estado pendiente o
-  parcial), que es lo que sirve para ver qué queda de cada jugador; las ejecutadas y canceladas
-  se ven en las órdenes propias y en la auditoría. Suma el filtro de jugador para alimentar la
-  ficha.
+- El portfolio a la fecha de hoy se admite y se calcula como cualquier otra fecha (FR-040).
+- El listado del mercado suma el filtro de jugador para alimentar la ficha (FR-048).
 - La operación contra el superusuario registra la cotización vigente de ese momento como
   referencia, aunque el precio sea 1,0000.
 - El precio promedio de compra de los tokens comprados al superusuario es 1,0000.
