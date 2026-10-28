@@ -5,7 +5,8 @@
 
 Este documento fija las clases del modelo, sus invariantes, las tablas, las consultas y los tipos del frontend.
 No contiene cuerpos de métodos: el comportamiento se describe con reglas y ejemplos. Las decisiones están
-justificadas en `research.md` (D1 a D31).
+justificadas en `research.md` (D1 a D31). Las diferencias con el código relevadas antes de implementar (T002) están
+en la sección 12.
 
 ## 1. Vista general
 
@@ -636,4 +637,65 @@ estimado) y `TradeBlock` (`'not-tradable' | 'sale-blocked' | null`, con el motiv
 
 `config/MarketProperties` (`record` con `@ConfigurationProperties("futbolmarket.market")`) se registra en
 `ApplicationConfig`. La URL de H2 de `application-local.yml` suma `;LOCK_TIMEOUT=10000` (D13); los IT del mercado lo
-ponen en su `@TestPropertySource`. No se agrega ninguna otra clave.
+ponen en la URL de su base propia (sección 12.3). No se agrega ninguna otra clave.
+
+## 12. Contraste con el código (T002, 2026-10-28)
+
+Antes de implementar se contrastaron con el código de la rama (con `develop` y `cf0a0dd` ya integrados) los nombres
+que usa este diseño. Lo que coincide no cambia nada; lo que difiere, o lo que el diseño no precisaba, queda anotado
+acá. Donde dice "a decidir", el punto queda abierto para el equipo.
+
+### 12.1 Coinciden
+
+- `Quote.tokenPrice()` (valor / 100, con 4 decimales exactos), `Quote.score()` (6 decimales, de −1 a +1) y
+  `Quote.validFrom()`.
+- `QuotePage<T>` (`modelo/quote/`), con el constructor `(content, page, size, totalElements)` que calcula el resto.
+- `PlayerNotFoundException(Long playerId)` (`modelo/player/exception/`, 404): "No se encontró el jugador con id N."
+- `CatalogInvariantException` (`modelo/player/exception/`, extiende `BadRequestException`): "El equipo del filtro no
+  puede estar vacío."
+- El bean `Clock` de `ApplicationConfig` (`Clock.systemUTC()`). La misma clase ya tiene `@EnableAsync` y la lista de
+  `@EnableConfigurationProperties` a la que se suma `MarketProperties`.
+- `QuoteStartupRecalculation` (`@Async` y `@EventListener(ApplicationReadyEvent.class)`), el patrón de
+  `InitialOrderStartup`.
+- En el frontend existen con esos nombres `useMutation`, `useAsync`, `refreshProfile`, `request()`,
+  `useBoardFilters`, `Pager`, `DateRangePicker`, `TeamSelect`, `VariationBadge` y `RequoteChoice` (sus formas, en
+  12.4).
+
+### 12.2 Backend: modelo, persistencia y `shared/`
+
+| Diseño | Código | Consecuencia |
+|---|---|---|
+| "La estrategia y su versión" de `Quote` | Un solo campo: `Quote.strategy()`, `StrategyVersionRef(versionId, strategyId, name, version)`. `StrategyRefResponse.from(ref)` de la 007 expone `id` = `strategyId` (no el de la versión), `name` y `version` | `TradeView` y `QuoteUsedResponse` leen `quote.strategy()`; `QuoteUsedResponse.strategy` usa `StrategyRefResponse.from` |
+| `MarketMath.PRICE_SCALE = 4`, `PERCENT_SCALE = 2` y `TOKENS_PER_PLAYER = 100` (2.2) | `Quote` ya tiene públicas `TOKEN_PRICE_SCALE = 4` y `PERCENT_SCALE = 2`, y privada `TOKENS_PER_PLAYER` | Propuesta: `MarketMath` toma las dos escalas de `Quote` en vez de repetir el literal; `TOKENS_PER_PLAYER` queda en `MarketMath` porque la de `Quote` es privada |
+| `QuoteDay.parse`, `requireNotFuture`, `requireOrdered`, `startOf` y `endOf` (2.13) | `requireNotFuture(LocalDate day, LocalDate today)` recibe el día de hoy y devuelve `day`; `QuoteDay.today(Instant)` da ese día en hora de Argentina. `endOf(day)` es el 00:00 del día siguiente, **excluido**. `parse(null)` lanza `InvalidQuoteDateException` | El día de hoy sale de `QuoteDay.today(clock.instant())`. Los rangos se consultan con `>= startOf(from)` y `< endOf(to)`, y el portfolio a una fecha corta en `< endOf(day)`. Los filtros parsean solo las fechas que vienen |
+| `team` normalizado "como en `PlayerFilter`" (2.13) | La regla es un `private static normalizeTeam` del constructor compacto de `PlayerFilter`: no se puede llamar desde afuera | Propuesta: `MarketOrderFilter` normaliza con `new PlayerFilter(league, team, null).team()`, sin duplicar la regla ni el mensaje |
+| `QuoteRepository.findCurrentOf` (D19) | `List<Quote> findCurrentOf(Collection<Long> playerIds)`: una consulta, sin tope; los jugadores sin cotización no figuran; sin ids no consulta la base. Ya existen `findCurrent(playerId)` y `findAt(playerId, exclusiveEnd)`, la última con vigencia **anterior** al instante | `PortfolioService` indexa la lista por `playerId`. `findInForceAt(playerId, instant)` hace falta porque incluye el instante (`<=`), a diferencia de `findAt`; `findAtOf(playerIds, exclusiveEnd)` es `findAt` para varios jugadores y conserva su semántica |
+| `AppUserRepository.translate` (patrón para `MarketBusyException`) | `private RuntimeException translate(DataIntegrityViolationException)`: devuelve (no lanza) la excepción de modelo según el nombre del índice. El repository no tiene `@Transactional` | No se reutiliza: la traducción de `PessimisticLockingFailureException` va en un método privado nuevo con la misma forma (`catch` y `throw` de lo que devuelve). `lockById` y `lockAllInOrder` corren en la transacción de quien llama: `MarketOrderService`, `InitialOrderService.openMissing` y `openFor` tienen que ser `@Transactional`, porque un `@Lock` sin transacción falla |
+| Bases de `shared/`; `ForbiddenException` "abstracta, como `ConflictException`" (T005) y "como las otras cuatro" (sección 4) | Las bases son **cinco** (`BadRequestException` 400, `UnauthorizedException` 401, `NotFoundException` 404, `ConflictException` 409 y `ServiceUnavailableException` 503), todas `public class` **concretas** con un constructor `(String message)`. El advice tiene un `@ExceptionHandler` por base | Propuesta: `ForbiddenException` igual que las demás (concreta, con `(String message)`) y un `handleForbiddenException` con el mismo cuerpo que los otros handlers |
+| Sobrecarga `AppUser.register(..., registeredAt)` (3.1) | `register` devuelve `RegisteredUser` (la cuenta y su clave de API), no `AppUser`. `createAdmin` deja el saldo en 0 | La sobrecarga también devuelve `RegisteredUser`. El superusuario arranca con saldo 0 y solo cobra |
+
+### 12.3 Backend: apoyo de tests y configuración de los IT
+
+| Diseño | Código | Consecuencia |
+|---|---|---|
+| `service/quote/QuoteDatabase` (T033) | No es un bean: se arma con `new QuoteDatabase(ApplicationContext)`. `clean()` borra cotizaciones, estadísticas, partidos, temporadas, jugadores y equipos; **no borra `app_user`** ni las estrategias. **No guarda cotizaciones**: los IT las guardan con `QuoteRepository.saveAll` sobre `strategyRepository.findCatalog().activeVersion().ref()` (como `QuoteControllerIT`) | `MarketDatabase` se arma igual, borra las cuatro tablas y delega en `clean()`. Como las cuentas no se borran, las invariantes de saldo se verifican sobre las cuentas del escenario |
+| Cotización "con valor, score y vigencia" (`MarketFixtures`, T032) | El constructor de `Quote` ata la vigencia al tipo: `INITIAL` rige desde el inicio de su semana y sin valor base; `CALCULATED`, desde el cierre de su semana; `REQUOTED`, desde cualquier instante, con valor base | Para una vigencia arbitraria, `REQUOTED` con valor base; si no, la vigencia es el inicio o el cierre de la semana |
+| `service/quote/MutableClock` | `new MutableClock(Instant)`, `set(Instant)`, zona UTC. Los IT lo publican con una `@TestConfiguration` anidada con `@Bean @Primary MutableClock testClock()` | Los IT del mercado lo publican igual |
+| Administrador y base propia de los IT "en `@TestPropertySource`" (T033 y T056) | Ningún IT usa `@TestPropertySource`: usan `@DynamicPropertySource` con `futbolmarket.auth.admin.username`, `.email` y `.password` (con un sufijo al azar de 8 caracteres) y `spring.datasource.url` = `jdbc:h2:mem:<nombre>-<sufijo>;DB_CLOSE_DELAY=-1` | Los IT del mercado siguen ese patrón, con la URL `jdbc:h2:mem:<nombre>-<sufijo>;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000`, y `InitialOrderIT` pone `futbolmarket.market.initial-orders.automatic=true` por el mismo registro |
+| El superusuario al arrancar (T047 y T056) | `AdminAccountInitializer` es un `ApplicationRunner`: corre **antes** de que se publique `ApplicationReadyEvent` | Cuando arranca `InitialOrderStartup`, la cuenta del administrador ya existe si está configurada |
+| Esperar al `@Async` del arranque "con el mecanismo de los IT existentes" (T056) | Ningún IT espera un proceso de arranque: el perfil test apaga los dos (`sync.on-startup` y `quotes.recalculation.on-startup` en `false`), y `StartupSync` y `QuoteStartupRecalculation` solo tienen tests unitarios. Awaitility 4.3.0 ya está en el classpath de test (llega con `spring-boot-starter-test` 4.1.1), pero ningún test lo usa | A decidir en T056: Awaitility (no es una dependencia nueva) o un sondeo con tope de tiempo |
+
+### 12.4 Frontend
+
+| Diseño | Código | Consecuencia |
+|---|---|---|
+| `useMutation` | `useMutation<A, T>(command)` devuelve `{ status, data, error, isConflict, run, reset }`; `run` devuelve `T \| undefined` y no lanza los `ApiRequestError`, que quedan en `error` | `useOrderCommands` llama a `refreshProfile` solo cuando `run` devolvió un resultado |
+| `useAsync` | `useAsync(task: (signal) => Promise<T>, deps)` devuelve el `AsyncState<T>` y `retry` | Sin cambios |
+| `refreshProfile` de `context/SessionContext.tsx` | Es parte de `SessionContextValue`; los hooks lo toman con `useSession()` (`hooks/useSession.ts`), no del contexto directo | `useOrderCommands` usa `useSession().refreshProfile` |
+| `request()` de `services/httpClient.ts` | `request<T>(method, path, { query, body, signal })`; antepone `/api` y **ya omite** de `query` los valores `undefined`, `null` y `''` | `marketService` y `portfolioService` pasan los filtros tal cual: no hace falta quitar los vacíos (T037) |
+| `useBoardFilters` | La hoja (`page`) de la dirección es **desde 1**: si falta vale 1, no se escribe si es 1, y `utils/filters.ts` la pasa a la API restando 1. Al cambiar un filtro vuelve a 1. Al cambiar de liga descarta el equipo que no es de esa liga (con `useCatalog`) | `useMarketFilters` sigue la misma convención: "la hoja vuelve a la primera" es `page` = 1 en la dirección y 0 en la API (el "vuelve a 0" de los casos del plan es la hoja de la API) |
+| `Pager` | Props `sheet`, `totalSheets`, `hasPrevious`, `hasNext`, `onPrevious` y `onNext`; su `aria-label` es fijo: "paginación de la pizarra" | Reutilizado sin cambios en Mercado y Operaciones, un lector de pantalla anuncia "pizarra". A decidir: aceptarlo o sumarle una prop opcional de etiqueta, que toca un componente existente |
+| `DateRangePicker` | Props `value: QuoteRange` (`from?` y `to?`, `AAAA-MM-DD`), `onChange` y `today?`. Rechaza por su cuenta el rango invertido (`La fecha "desde" no puede ser posterior a la fecha "hasta".`) y trae los rangos rápidos "Últimas 8 semanas", "Últimas 26 semanas" y "Todo el historial" | Sirve sin cambios para `from` y `to` de Operaciones, con el rechazo del rango invertido incluido (T108). No sirve para la fecha única del portfolio, que va con `input type="date"` (T121) |
+| `TeamSelect` | Props `teams`, `value`, `status`, `onOpen`, `onSelect` y `onRetry`: la lista de equipos la carga quien lo usa | `MarketFilters` recibe los equipos y su estado desde la página, que los carga con `useCatalog` como la pizarra |
+| `VariationBadge` | Props `variation?` y `tone?` (`'chalk'` o `'ink'`); triángulo, monto y porcentaje con signo y el texto "sube" o "baja" | `ProfitBadge` sigue esa forma con "gana", "pierde" y "sin cambios" |
+| `RequoteChoice` como patrón de `ConfirmDialog` (D27, T039) | **No es un diálogo**: es un grupo de opciones en línea con los botones "Confirmar" y "Cancelar" opcionales. No tiene `role="dialog"`, foco inicial, Enter ni Escape | De `RequoteChoice` se toma solo que nada se envía hasta confirmar y el par de botones; `role="dialog"`, `aria-labelledby`, el foco inicial y el manejo de Enter y Escape de `ConfirmDialog` son nuevos |
