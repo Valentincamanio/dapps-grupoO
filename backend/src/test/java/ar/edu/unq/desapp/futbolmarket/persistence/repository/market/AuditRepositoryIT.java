@@ -20,7 +20,10 @@ import org.springframework.test.context.TestPropertySource;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.AuditActor;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.AuditActorType;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.AuditEntry;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.AuditEventType;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.AuditFilter;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.CancelReason;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrder;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderSide;
@@ -30,6 +33,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.market.PartyState;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.Trade;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuotePage;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.market.AuditEntrySQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.market.AuditPartySQL;
@@ -52,6 +56,8 @@ class AuditRepositoryIT {
     private static final long INITIAL_ORDER = 12L;
     private static final long TRADE = 900L;
     private static final long QUOTE = 300L;
+    private static final long OTHER_PLAYER = 43L;
+    private static final long STRANGER = 99L;
     private static final Player KANE = new Player(PLAYER, "ext-42", "Harry Kane", Position.FORWARD,
             new Team(5L, "5", "FC Bayern München", null, League.BUNDESLIGA));
     private static final List<String> WRITE_PREFIXES = List.of("update", "delete", "remove", "set");
@@ -128,6 +134,92 @@ class AuditRepositoryIT {
     }
 
     @Test
+    void sinFiltrosLaAuditoriaVaDeLaMasNuevaALaMasViejaYEnElMismoInstantePorIdDescendente() {
+        List<AuditEntry> saved = repository.saveAll(List.of(
+                created(at("2026-08-24T15:00:00Z"), BUYER, PLAYER),
+                created(at("2026-08-26T15:00:00Z"), BUYER, PLAYER),
+                created(at("2026-08-26T15:00:00Z"), SELLER, PLAYER),
+                created(at("2026-08-25T15:00:00Z"), SELLER, PLAYER)));
+
+        QuotePage<AuditEntry> page = repository.findAudit(AuditFilter.none(), 0, 10);
+
+        assertThat(page.content()).extracting(AuditEntry::id).containsExactly(saved.get(2).id(), saved.get(1).id(),
+                saved.get(3).id(), saved.get(0).id());
+        assertThat(page.totalElements()).isEqualTo(4);
+    }
+
+    @Test
+    void elFiltroDeUsuarioEncuentraAlAutorYACualquieraDeLasDosPartes() {
+        List<AuditEntry> saved = repository.saveAll(List.of(
+                created(at("2026-08-24T15:00:00Z"), BUYER, PLAYER),
+                executed(at("2026-08-24T16:00:00Z"), BUYER, BUYER, SELLER),
+                executed(at("2026-08-24T17:00:00Z"), SELLER, BUYER, SUPERUSER),
+                systemCancellation(at("2026-08-24T18:00:00Z"), SELLER)));
+
+        List<Long> ofSeller = ids(new AuditFilter(null, SELLER, null, null, null));
+        List<Long> ofSuperuser = ids(new AuditFilter(null, SUPERUSER, null, null, null));
+        List<Long> ofStranger = ids(new AuditFilter(null, STRANGER, null, null, null));
+
+        assertThat(ofSeller).containsExactly(saved.get(3).id(), saved.get(2).id(), saved.get(1).id());
+        assertThat(ofSuperuser).containsExactly(saved.get(2).id());
+        assertThat(ofStranger).isEmpty();
+    }
+
+    @Test
+    void losFiltrosDeTipoJugadorYFechasSeCombinanYElRangoIncluyeLosDosDiasEnHoraDeArgentina() {
+        List<AuditEntry> saved = repository.saveAll(List.of(
+                created(at("2026-08-24T02:59:59Z"), BUYER, PLAYER),
+                created(at("2026-08-24T03:00:00Z"), BUYER, PLAYER),
+                executed(at("2026-08-25T12:00:00Z"), BUYER, BUYER, SELLER),
+                created(at("2026-08-26T02:59:59Z"), BUYER, OTHER_PLAYER),
+                created(at("2026-08-26T03:00:00Z"), BUYER, PLAYER)));
+
+        assertThat(ids(new AuditFilter(AuditEventType.TRADE_EXECUTED, null, null, null, null)))
+                .containsExactly(saved.get(2).id());
+        assertThat(ids(new AuditFilter(null, null, OTHER_PLAYER, null, null))).containsExactly(saved.get(3).id());
+        assertThat(ids(AuditFilter.of(null, null, null, "2026-08-24", "2026-08-25")))
+                .containsExactly(saved.get(3).id(), saved.get(2).id(), saved.get(1).id());
+        assertThat(ids(AuditFilter.of(null, null, null, "2026-08-26", null))).containsExactly(saved.get(4).id());
+        assertThat(ids(AuditFilter.of(null, null, null, null, "2026-08-23"))).containsExactly(saved.get(0).id());
+        assertThat(ids(AuditFilter.of(AuditEventType.ORDER_CREATED, BUYER, PLAYER, "2026-08-24", "2026-08-25")))
+                .containsExactly(saved.get(1).id());
+    }
+
+    @Test
+    void laAuditoriaSeRecorrePorHojasConSuConteo() {
+        List<AuditEntry> saved = repository.saveAll(List.of(
+                created(at("2026-08-24T15:00:00Z"), BUYER, PLAYER),
+                created(at("2026-08-24T16:00:00Z"), BUYER, PLAYER),
+                created(at("2026-08-24T17:00:00Z"), BUYER, PLAYER)));
+
+        QuotePage<AuditEntry> first = repository.findAudit(AuditFilter.none(), 0, 2);
+        QuotePage<AuditEntry> second = repository.findAudit(AuditFilter.none(), 1, 2);
+        QuotePage<AuditEntry> empty = repository.findAudit(new AuditFilter(null, STRANGER, null, null, null), 0, 2);
+
+        assertThat(first.content()).extracting(AuditEntry::id).containsExactly(saved.get(2).id(), saved.get(1).id());
+        assertThat(first.totalElements()).isEqualTo(3);
+        assertThat(first.totalPages()).isEqualTo(2);
+        assertThat(first.hasNext()).isTrue();
+        assertThat(second.content()).extracting(AuditEntry::id).containsExactly(saved.get(0).id());
+        assertThat(second.hasPrevious()).isTrue();
+        assertThat(second.hasNext()).isFalse();
+        assertThat(empty.content()).isEmpty();
+        assertThat(empty.totalElements()).isZero();
+    }
+
+    @Test
+    void laConsultaDevuelveCadaRegistroCompletoConSusDosPartes() {
+        AuditEntry executed = AuditEntry.tradeExecuted(trade(), KANE, AuditActor.user(BUYER),
+                change(BUYER, "989.70", "10.30", 0, "989.70", "0.30", 10),
+                change(SUPERUSER, "0.00", "0.00", 100, "10.00", "0.00", 90));
+        AuditEntry saved = repository.saveAll(List.of(executed)).getFirst();
+
+        QuotePage<AuditEntry> page = repository.findAudit(AuditFilter.none(), 0, 10);
+
+        assertThat(page.content()).containsExactly(withId(executed, saved.id()));
+    }
+
+    @Test
     void elRepositoryNoTieneMetodosParaModificarNiBorrarRegistros() {
         List<String> methods = publicMethodNames(AuditRepository.class);
 
@@ -143,6 +235,37 @@ class AuditRepositoryIT {
         assertThat(entryMethods).noneMatch(name -> name.startsWith("set"));
         assertThat(partyMethods).noneMatch(name -> name.startsWith("set"));
         assertThat(AuditEntrySQL.class.isAnnotationPresent(Immutable.class)).isTrue();
+    }
+
+    private List<Long> ids(AuditFilter filter) {
+        return repository.findAudit(filter, 0, 10).content().stream().map(AuditEntry::id).toList();
+    }
+
+    private static Instant at(String instant) {
+        return Instant.parse(instant);
+    }
+
+    /**
+     * Un registro de una orden creada por su dueño, armado sin fábrica: para filtrar solo importan
+     * el instante, el tipo, el autor, el jugador y las partes.
+     */
+    private static AuditEntry created(Instant occurredAt, long owner, long playerId) {
+        return new AuditEntry(null, occurredAt, AuditEventType.ORDER_CREATED, AuditActorType.USER, owner, playerId,
+                BUY_ORDER, null, OrderSide.BUY, 10, null, null, null, null,
+                change(owner, "1000.00", "0.00", 0, "989.70", "10.30", 0), null, "Orden de compra");
+    }
+
+    private static AuditEntry executed(Instant occurredAt, long actor, long buyer, long seller) {
+        return new AuditEntry(null, occurredAt, AuditEventType.TRADE_EXECUTED, AuditActorType.USER, actor, PLAYER,
+                BUY_ORDER, TRADE, OrderSide.BUY, 10, new BigDecimal("1.0000"), new BigDecimal("10.00"), QUOTE, null,
+                change(buyer, "989.70", "10.30", 0, "989.70", "0.30", 10),
+                change(seller, "0.00", "0.00", 100, "10.00", "0.00", 90), "Compra");
+    }
+
+    private static AuditEntry systemCancellation(Instant occurredAt, long owner) {
+        return new AuditEntry(null, occurredAt, AuditEventType.ORDER_CANCELLED, AuditActorType.SYSTEM, null, PLAYER,
+                BUY_ORDER, null, OrderSide.BUY, 1, null, null, null, CancelReason.INSUFFICIENT_CREDITS,
+                change(owner, "0.00", "10.30", 0, "10.30", "0.00", 0), null, "Cancelación");
     }
 
     private static MarketOrder buyOrder() {

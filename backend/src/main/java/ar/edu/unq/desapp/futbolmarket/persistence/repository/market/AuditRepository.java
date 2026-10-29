@@ -4,10 +4,14 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.market.AuditEntry;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.AuditFilter;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuotePage;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.market.AuditEntryMapper;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.market.AuditEntrySQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.market.AuditEntrySQLDAO;
@@ -34,5 +38,18 @@ public class AuditRepository {
 
     public Optional<AuditEntry> findById(long entryId) {
         return auditDAO.findById(entryId).map(mapper::toDomain);
+    }
+
+    /**
+     * Una hoja de la auditoría filtrada, de la más nueva a la más vieja ({@code occurredAt}, después
+     * {@code id}).
+     */
+    @Transactional(readOnly = true)
+    public QuotePage<AuditEntry> findAudit(AuditFilter filter, int page, int size) {
+        String eventType = filter.eventType() == null ? null : filter.eventType().name();
+        Page<AuditEntrySQL> rows = auditDAO.findAudit(eventType, filter.userId(), filter.playerId(),
+                filter.fromInstant(), filter.toExclusive(), PageRequest.of(page, size));
+        List<AuditEntry> entries = rows.getContent().stream().map(mapper::toDomain).toList();
+        return new QuotePage<>(entries, rows.getNumber(), rows.getSize(), rows.getTotalElements());
     }
 }

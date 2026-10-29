@@ -935,6 +935,15 @@ cotizaciones simuladas suman `score`; el perfil del administrador suma los dos s
 usa `onUnhandledRequest: 'error'`, así que sin los handlers del mercado la ficha existente fallaría al pedir sus
 órdenes pendientes.
 
+También cambian dos archivos de apoyo más, sin tocar ninguna aserción:
+
+- `frontend/tests/setup.ts` (en T088 a T096): suma `configure({ asyncUtilTimeout: 3000 })`, así `findBy` y
+  `waitFor` esperan hasta 3 s en vez de 1 s. Con la suite completa en paralelo, una pantalla que carga varias
+  cosas puede tardar más de 1 s en una máquina cargada; sigue por debajo de los 5 s que Vitest le da a cada test.
+- `backend/src/test/resources/application-test.yml` (en la fundacional): suma
+  `futbolmarket.market.initial-orders.automatic: false` (D8 y data-model, sección 11), para que la generación
+  automática no compita con los IT que crean las órdenes iniciales a mano.
+
 **Se conserva la prohibición de "sumar al plantel"** en los dos tests del frontend.
 
 ## D29. Estrategia de tests
