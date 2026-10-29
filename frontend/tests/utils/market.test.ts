@@ -6,6 +6,7 @@ import {
   estimateSell,
   formatScore,
   formatSigned,
+  formatPendingTokens,
   formatSignedPercent,
   formatTokens,
   ownerTypeLabel,
@@ -155,5 +156,11 @@ describe('market', () => {
     const texts = [formatTokens(1), formatTokens(0), formatTokens(10)];
 
     expect(texts).toEqual(['1 token', '0 tokens', '10 tokens']);
+  });
+
+  it('los pendientes concuerdan con la cantidad', () => {
+    const texts = [formatPendingTokens(1), formatPendingTokens(6)];
+
+    expect(texts).toEqual(['1 token pendiente', '6 tokens pendientes']);
   });
 });

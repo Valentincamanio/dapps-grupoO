@@ -47,16 +47,29 @@ import lombok.RequiredArgsConstructor;
 public class PortfolioController {
 
     // Los ejemplos del contrato. Son concatenaciones y no format() porque una anotación pide constantes.
+    // Los errores de credencial, permiso y cuenta son los mismos en las tres rutas: cambia solo el path.
     private static final String EXAMPLE_START = "{\"timestamp\": \"2026-10-28T15:00:00Z\", ";
-    private static final String UNAUTHORIZED_EXAMPLE = EXAMPLE_START
+    private static final String UNAUTHORIZED_START = EXAMPLE_START
             + "\"status\": 401, \"error\": \"Unauthorized\", \"message\": \"Se requiere una credencial: un token de "
-            + "sesión (Authorization: Bearer) o una clave de API (X-API-Key).\", \"path\": \"/users/7/portfolio\"}";
-    private static final String FORBIDDEN_EXAMPLE = EXAMPLE_START
+            + "sesión (Authorization: Bearer) o una clave de API (X-API-Key).\", \"path\": ";
+    private static final String FORBIDDEN_START = EXAMPLE_START
             + "\"status\": 403, \"error\": \"Forbidden\", \"message\": \"No tiene permiso para ver la cuenta de otro "
-            + "usuario.\", \"path\": \"/users/8/portfolio\"}";
-    private static final String NOT_FOUND_EXAMPLE = EXAMPLE_START
+            + "usuario.\", \"path\": ";
+    private static final String NOT_FOUND_START = EXAMPLE_START
             + "\"status\": 404, \"error\": \"Not Found\", \"message\": \"No se encontró el usuario con id 999.\", "
-            + "\"path\": \"/users/999/portfolio\"}";
+            + "\"path\": ";
+    private static final String UNAUTHORIZED_EXAMPLE = UNAUTHORIZED_START + "\"/users/7/portfolio\"}";
+    private static final String FORBIDDEN_EXAMPLE = FORBIDDEN_START + "\"/users/8/portfolio\"}";
+    private static final String NOT_FOUND_EXAMPLE = NOT_FOUND_START + "\"/users/999/portfolio\"}";
+    private static final String TRANSACTIONS_UNAUTHORIZED_EXAMPLE = UNAUTHORIZED_START + "\"/users/7/transactions\"}";
+    private static final String TRANSACTIONS_FORBIDDEN_EXAMPLE = FORBIDDEN_START + "\"/users/8/transactions\"}";
+    private static final String TRANSACTIONS_NOT_FOUND_EXAMPLE = NOT_FOUND_START + "\"/users/999/transactions\"}";
+    private static final String ORDERS_UNAUTHORIZED_EXAMPLE = UNAUTHORIZED_START + "\"/users/7/orders\"}";
+    private static final String ORDERS_FORBIDDEN_EXAMPLE = FORBIDDEN_START + "\"/users/8/orders\"}";
+    private static final String ORDERS_NOT_FOUND_EXAMPLE = NOT_FOUND_START + "\"/users/999/orders\"}";
+    private static final String ORDERS_INVALID_PARAMETERS_EXAMPLE = EXAMPLE_START
+            + "\"status\": 400, \"error\": \"Bad Request\", \"message\": \"Los parámetros enviados no son válidos.\", "
+            + "\"path\": \"/users/7/orders\"}";
     private static final String INVALID_DATE_EXAMPLE = EXAMPLE_START
             + "\"status\": 400, \"error\": \"Bad Request\", \"message\": \"La fecha '2026-13-01' no es válida: use "
             + "el formato AAAA-MM-DD.\", \"path\": \"/users/7/portfolio\"}";
@@ -123,11 +136,14 @@ public class PortfolioController {
             content = @Content(schema = @Schema(implementation = ApiError.class),
                     examples = @ExampleObject(value = INVALID_RANGE_EXAMPLE)))
     @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION,
-            content = @Content(schema = @Schema(implementation = ApiError.class)))
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = TRANSACTIONS_UNAUTHORIZED_EXAMPLE)))
     @ApiResponse(responseCode = "403", description = FORBIDDEN_DESCRIPTION,
-            content = @Content(schema = @Schema(implementation = ApiError.class)))
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = TRANSACTIONS_FORBIDDEN_EXAMPLE)))
     @ApiResponse(responseCode = "404", description = NOT_FOUND_DESCRIPTION,
-            content = @Content(schema = @Schema(implementation = ApiError.class)))
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = TRANSACTIONS_NOT_FOUND_EXAMPLE)))
     @GetMapping("/{id}/transactions")
     public TransactionPageResponse getTransactions(
             @AuthenticationPrincipal @Parameter(hidden = true) Long requesterId,
@@ -149,13 +165,17 @@ public class PortfolioController {
                     + "paginación del catálogo.")
     @ApiResponse(responseCode = "200", description = "Una hoja de órdenes; puede estar vacía.")
     @ApiResponse(responseCode = "400", description = "Identificador inválido o paginación fuera de rango.",
-            content = @Content(schema = @Schema(implementation = ApiError.class)))
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = ORDERS_INVALID_PARAMETERS_EXAMPLE)))
     @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION,
-            content = @Content(schema = @Schema(implementation = ApiError.class)))
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = ORDERS_UNAUTHORIZED_EXAMPLE)))
     @ApiResponse(responseCode = "403", description = FORBIDDEN_DESCRIPTION,
-            content = @Content(schema = @Schema(implementation = ApiError.class)))
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = ORDERS_FORBIDDEN_EXAMPLE)))
     @ApiResponse(responseCode = "404", description = NOT_FOUND_DESCRIPTION,
-            content = @Content(schema = @Schema(implementation = ApiError.class)))
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = ORDERS_NOT_FOUND_EXAMPLE)))
     @GetMapping("/{id}/orders")
     public UserOrderPageResponse getOrders(@AuthenticationPrincipal @Parameter(hidden = true) Long requesterId,
                                            @PathVariable @Min(1) Long id,

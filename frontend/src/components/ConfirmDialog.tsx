@@ -1,5 +1,5 @@
 // Confirmación de una acción que no se deshace, como comprar o vender (FR-063): nada se ejecuta hasta
-// confirmar. Toma el foco en "Confirmar" (Enter confirma) y Escape cancela. Del patrón de
+// confirmar. Toma el foco en "Confirmar" (Enter confirma), Escape cancela y Tab no sale del diálogo. Del patrón de
 // RequoteChoice toma el par de botones; no usa <dialog> porque jsdom no implementa showModal
 // (research D27). Al cerrarse, el foco vuelve a donde estaba.
 import { useEffect, useId, useRef, type ReactNode } from 'react';
@@ -43,6 +43,10 @@ export function ConfirmDialog({
     const dialog = dialogRef.current;
     if (!dialog) return;
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Tab') {
+        keepFocusInside(event);
+        return;
+      }
       if (busy) return;
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -53,6 +57,22 @@ export function ConfirmDialog({
         onConfirm();
       }
     }
+    // Es modal: Tab y Shift+Tab dan la vuelta entre sus botones y nunca llevan el foco a la pantalla
+    // tapada, donde Escape ya no cancelaría. Mientras espera no hay nada habilitado y el foco se queda
+    const keepFocusInside = (event: KeyboardEvent) => {
+      const buttons = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     dialog.addEventListener('keydown', handleKeyDown);
     return () => dialog.removeEventListener('keydown', handleKeyDown);
   }, [busy, onCancel, onConfirm]);

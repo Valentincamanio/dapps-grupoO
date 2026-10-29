@@ -9,6 +9,7 @@ import {
   counterpartyLabel,
   estimateBuy,
   estimateSell,
+  formatPendingTokens,
   formatTokens,
   INITIAL_TOKEN_PRICE,
   sideLabel,
@@ -190,7 +191,8 @@ function TradeResult({ execution }: { execution: OrderExecution }) {
     <div className={styles.result} role="status" aria-label="resultado de la operación">
       {executedQuantity > 0 ? (
         <p>
-          Se {verb} {formatTokens(executedQuantity)} por {formatCredits(executedTotal)}.
+          {/* El punto de "cr." cierra la oración */}
+          Se {verb} {formatTokens(executedQuantity)} por {formatCredits(executedTotal)}
         </p>
       ) : (
         <p>No se ejecutó nada en el acto.</p>
@@ -207,7 +209,8 @@ function TradeResult({ execution }: { execution: OrderExecution }) {
       ) : null}
       {order.pendingQuantity > 0 ? (
         <p>
-          Quedaron {formatTokens(order.pendingQuantity)} pendientes en tu orden de {sideLabel(order.side)}.
+          {order.pendingQuantity === 1 ? 'Quedó' : 'Quedaron'} {formatPendingTokens(order.pendingQuantity)} en tu
+          orden de {sideLabel(order.side)}.
         </p>
       ) : null}
     </div>

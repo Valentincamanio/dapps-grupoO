@@ -12,7 +12,7 @@ import { Pager } from '../components/Pager';
 import { useMyOrders } from '../hooks/useMyOrders';
 import { useOrderCommands } from '../hooks/useOrderCommands';
 import type { UserOrder } from '../types/market';
-import { formatTokens, sideLabel } from '../utils/market';
+import { formatPendingTokens, formatTokens, sideLabel } from '../utils/market';
 import { formatCredits } from '../utils/quotes';
 import styles from './MyOrdersPage.module.css';
 
@@ -29,7 +29,9 @@ function parseSheet(params: URLSearchParams): number {
 function releasedText(order: UserOrder): string {
   return order.side === 'BUY'
     ? `Se liberan ${formatCredits(order.reservedCredits)} reservados.`
-    : `Se liberan ${formatTokens(order.pendingQuantity)} comprometidos.`;
+    : order.pendingQuantity === 1
+      ? 'Se libera 1 token comprometido.'
+      : `Se liberan ${formatTokens(order.pendingQuantity)} comprometidos.`;
 }
 
 export function MyOrdersPage() {
@@ -68,8 +70,10 @@ export function MyOrdersPage() {
       const { order, availableBalance } = cancellation.data;
       return (
         <ChalkNote variant="success">
-          Cancelaste la {sideLabel(order.side)} de {order.player.name}: se cancelaron{' '}
-          {formatTokens(order.cancelledQuantity)}. Saldo libre: {formatCredits(availableBalance)}.
+          {/* El punto de "cr." cierra la oración */}
+          Cancelaste la {sideLabel(order.side)} de {order.player.name}:{' '}
+          {order.cancelledQuantity === 1 ? 'se canceló' : 'se cancelaron'} {formatTokens(order.cancelledQuantity)}.
+          Saldo libre: {formatCredits(availableBalance)}
         </ChalkNote>
       );
     }
@@ -131,7 +135,8 @@ export function MyOrdersPage() {
           onCancel={() => setConfirming(null)}
         >
           <p className={styles.detail}>
-            Se cancelan {formatTokens(confirming.pendingQuantity)} pendientes; lo ejecutado (
+            {confirming.pendingQuantity === 1 ? 'Se cancela' : 'Se cancelan'}{' '}
+            {formatPendingTokens(confirming.pendingQuantity)}; lo ejecutado (
             {formatTokens(confirming.executedQuantity)}) se conserva. {releasedText(confirming)}
           </p>
         </ConfirmDialog>

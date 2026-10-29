@@ -52,7 +52,7 @@ ADMIN=$(curl -s -X POST $API/auth/login -H "Content-Type: application/json" -d '
 Registrar cuatro usuarios y guardar su clave de API (la respuesta del registro la trae una sola vez):
 
 ```bash
-for U in ana beto caro dani; do curl -s -X POST $API/auth/register -H "Content-Type: application/json" -d "{\"username\":\"$U-mkt\",\"email\":\"$U@correo.com\",\"password\":\"clave12345\"}" | sed 's/.*"id":\([0-9]*\).*"apiKey":"\([^"]*\)".*/\1 \2/' > $U.key; done
+for U in ana beto caro dani; do curl -s -X POST $API/auth/register -H "Content-Type: application/json" -d "{\"username\":\"${U}_mkt\",\"email\":\"$U@correo.com\",\"password\":\"clave12345\"}" | sed 's/.*"id":\([0-9]*\).*"apiKey":"\([^"]*\)".*/\1 \2/' > $U.key; done
 ```
 
 Cada archivo `<usuario>.key` queda con `id clave`. Para los pasos siguientes:
@@ -71,7 +71,8 @@ curl -s "$API/orders?ownerType=ADMIN&size=5"
 
 Esperado (200, sin credencial): órdenes `SELL` con `ownerType: ADMIN`, `requestedQuantity: 100`,
 `pendingQuantity: 100` y `status: PENDING`, de la más vieja a la más nueva; `totalElements` igual a la cantidad de
-jugadores del catálogo. Ninguna orden trae nombre, correo ni id del dueño.
+jugadores del catálogo, activos e inactivos (los inactivos también tienen la suya, D15; `GET /players` lista solo los
+activos, así que su `totalElements` puede ser menor). Ninguna orden trae nombre, correo ni id del dueño.
 
 Guardar cinco jugadores para el escenario 3 (los ids de `player.id` de la respuesta):
 

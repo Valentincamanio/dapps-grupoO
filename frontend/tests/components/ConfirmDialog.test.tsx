@@ -84,6 +84,20 @@ describe('ConfirmDialog', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it('Tab y Shift+Tab dan la vuelta entre sus botones sin salir del diálogo', async () => {
+    render(<button type="button">Comprar</button>);
+    const { user } = renderDialog();
+    const confirm = screen.getByRole('button', { name: 'Confirmar' });
+    const cancel = screen.getByRole('button', { name: 'Cancelar' });
+
+    await user.tab();
+    expect(cancel).toHaveFocus();
+    await user.tab();
+    expect(confirm).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(cancel).toHaveFocus();
+  });
+
   it('mientras espera la respuesta no se puede confirmar de nuevo ni cancelar', () => {
     const { onConfirm, onCancel } = renderDialog(true);
 

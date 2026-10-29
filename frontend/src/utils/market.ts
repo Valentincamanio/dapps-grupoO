@@ -112,6 +112,11 @@ export function formatTokens(quantity: number): string {
   return quantity === 1 ? '1 token' : `${quantity} tokens`;
 }
 
+// Los tokens que quedan pendientes, con el adjetivo concordado: 1 token pendiente, 6 tokens pendientes
+export function formatPendingTokens(quantity: number): string {
+  return `${formatTokens(quantity)} ${quantity === 1 ? 'pendiente' : 'pendientes'}`;
+}
+
 // Ganancia, pérdida o diferencia con signo salvo el cero, p. ej. +0,30
 export function formatSigned(amount: number): string {
   return signedFormatter.format(amount);
