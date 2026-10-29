@@ -384,6 +384,12 @@ Dominio puro que reconstruye las posiciones a una fecha (D20).
 
 Las hojas se devuelven como `QuotePage<T>` (genérica, D17).
 
+Implementación (T088 a T091): `MarketOrderFilter` normaliza el equipo con `new PlayerFilter(league, team, null)` y
+suma `MarketOrderFilter.none()`. `MarketOrderSQLDAO.findMarket` recibe el tipo de usuario dueño como un `Boolean
+initial` (nulo: todos; verdadero: las iniciales; falso: las de usuarios), así el método queda en siete parámetros. En
+`OrderController`, el tag "Órdenes" y los requisitos de credencial pasaron de la clase a `buy` y `sell`, para que
+`GET /orders` tenga solo el tag "Mercado" y figure sin credencial en Swagger.
+
 ## 3. Modelo: cambios en otros contextos
 
 ### 3.1 `user`: `AppUser`

@@ -7,6 +7,7 @@ import { AppLayout } from '../pages/AppLayout';
 import { BoardPage } from '../pages/BoardPage';
 import { LockerRoomPage } from '../pages/LockerRoomPage';
 import { LoginPage } from '../pages/LoginPage';
+import { MarketPage } from '../pages/MarketPage';
 import { PlayerPage } from '../pages/PlayerPage';
 import { PortfolioPage } from '../pages/PortfolioPage';
 import { RankingPage } from '../pages/RankingPage';
@@ -24,6 +25,8 @@ export const appRoutes: RouteObject[] = [
       { path: 'pizarra', element: <BoardPage /> },
       { path: 'jugadores/:id', element: <PlayerPage /> },
       { path: 'ranking', element: <RankingPage /> },
+      // El listado del mercado es público, como en la API (FR-047)
+      { path: 'mercado', element: <MarketPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       {

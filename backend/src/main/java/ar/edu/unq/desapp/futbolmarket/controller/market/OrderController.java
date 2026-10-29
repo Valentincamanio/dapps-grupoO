@@ -2,16 +2,25 @@ package ar.edu.unq.desapp.futbolmarket.controller.market;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import ar.edu.unq.desapp.futbolmarket.config.OpenApiConfig;
+import ar.edu.unq.desapp.futbolmarket.controller.market.dto.MarketOrderPageResponse;
 import ar.edu.unq.desapp.futbolmarket.controller.market.dto.OrderExecutionResponse;
 import ar.edu.unq.desapp.futbolmarket.controller.market.dto.OrderRequest;
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrderFilter;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderSide;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OwnerType;
 import ar.edu.unq.desapp.futbolmarket.service.market.MarketOrderService;
+import ar.edu.unq.desapp.futbolmarket.service.market.MarketQueryService;
 import ar.edu.unq.desapp.futbolmarket.shared.ApiError;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -22,20 +31,24 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Los pedidos del mercado. Solo los usuarios comunes compran y venden: {@code SecurityConfig}
- * responde 403 al administrador antes de llegar acá (FR-010).
+ * Los pedidos del mercado y su listado público. Solo los usuarios comunes compran y venden:
+ * {@code SecurityConfig} responde 403 al administrador antes de llegar acá (FR-010). El listado
+ * ({@code GET /orders}) no pide credencial.
  *
  * <p>El usuario es siempre el de la credencial, nunca uno del cuerpo (FR-013). Los dos
- * requirements se declaran por separado: alcanza con cualquiera de los dos.</p>
+ * requirements se declaran por separado en cada pedido: alcanza con cualquiera de los dos. El tag y
+ * los requirements van en los métodos y no en la clase, porque el listado tiene otro tag y es
+ * público.</p>
  */
 @RestController
 @RequestMapping("/orders")
-@Tag(name = "Órdenes")
-@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
-@SecurityRequirement(name = OpenApiConfig.API_KEY_AUTH)
+@Validated
 @RequiredArgsConstructor
 public class OrderController {
 
@@ -78,8 +91,45 @@ public class OrderController {
             + "\"Tokens insuficientes: tiene 4 tokens libres de este jugador.\", " + SELL_PATH + "}";
     private static final String SELL_NOT_TRADABLE_EXAMPLE = NOT_TRADABLE + SELL_PATH + "}";
 
-    private final MarketOrderService marketOrderService;
+    private static final String INVALID_PARAMETERS_EXAMPLE = EXAMPLE_START
+            + "\"status\": 400, \"error\": \"Bad Request\", \"message\": \"Los parámetros enviados no son válidos.\", "
+            + "\"path\": \"/orders\"}";
 
+    private final MarketOrderService marketOrderService;
+    private final MarketQueryService marketQueryService;
+
+    @Tag(name = "Mercado")
+    @Operation(
+            summary = "Listado público del mercado",
+            description = "Las órdenes con remanente pendiente (PENDING o PARTIAL), de la más vieja a la más nueva "
+                    + "(fecha de creación y después id), con la paginación del catálogo. No hay filtro de estado: las "
+                    + "ejecutadas y canceladas no se listan. Nunca informa la identidad del dueño, solo su tipo. Los "
+                    + "filtros son opcionales y combinables; con ownerType=ADMIN se ven las órdenes iniciales con los "
+                    + "tokens que le quedan al superusuario de cada jugador. La ficha del jugador lo usa con "
+                    + "playerId.")
+    @ApiResponse(responseCode = "200", description = "Una hoja del listado; puede estar vacía.")
+    @ApiResponse(responseCode = "400",
+            description = "Un filtro con un valor no admitido (tipo, liga o tipo de usuario inexistente, jugador "
+                    + "menor que 1 o equipo vacío) o paginación fuera de rango.",
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = INVALID_PARAMETERS_EXAMPLE)))
+    @GetMapping
+    public MarketOrderPageResponse market(
+            @RequestParam(required = false) OrderSide side,
+            @RequestParam(required = false) League league,
+            @RequestParam(required = false) @Pattern(regexp = "\\s*\\S.*") String team,
+            @RequestParam(required = false) OwnerType ownerType,
+            @RequestParam(required = false) @Min(1) Long playerId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size
+    ) {
+        MarketOrderFilter filter = new MarketOrderFilter(side, league, team, ownerType, playerId);
+        return MarketOrderPageResponse.from(marketQueryService.market(filter, page, size));
+    }
+
+    @Tag(name = "Órdenes")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @SecurityRequirement(name = OpenApiConfig.API_KEY_AUTH)
     @Operation(
             summary = "Compra tokens de un jugador",
             description = "Se ejecuta en el acto contra la orden inicial del jugador (a 1,0000) y contra las ventas "
@@ -118,6 +168,9 @@ public class OrderController {
         return OrderExecutionResponse.from(marketOrderService.buy(userId, request.playerId(), quantity));
     }
 
+    @Tag(name = "Órdenes")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @SecurityRequirement(name = OpenApiConfig.API_KEY_AUTH)
     @Operation(
             summary = "Vende tokens de un jugador",
             description = "Se rechaza al crearla, sin crear nada, mientras la orden inicial del jugador tenga tokens "

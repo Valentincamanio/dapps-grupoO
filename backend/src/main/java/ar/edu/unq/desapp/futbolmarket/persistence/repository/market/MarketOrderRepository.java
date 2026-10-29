@@ -4,12 +4,17 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrder;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrderFilter;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderView;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OwnerType;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuotePage;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.market.MarketOrderMapper;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.player.PlayerMapper;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.market.MarketOrderSQL;
@@ -92,9 +97,25 @@ public class MarketOrderRepository {
      */
     @Transactional(readOnly = true)
     public List<OrderView> findInitialOrdersOf(long ownerId) {
-        return orderDAO.findInitialOrdersOf(ownerId, OPEN_STATUSES).stream()
-                .map(row -> new OrderView(mapper.toDomain(row), playerMapper.toDomain(row.getPlayer())))
-                .toList();
+        return orderDAO.findInitialOrdersOf(ownerId, OPEN_STATUSES).stream().map(this::toView).toList();
+    }
+
+    /**
+     * Una hoja del listado del mercado (research D22): las órdenes con tokens pendientes que cumplen
+     * el filtro, de la más vieja a la más nueva, cada una con su jugador, en una sola consulta.
+     */
+    @Transactional(readOnly = true)
+    public QuotePage<OrderView> findMarket(MarketOrderFilter filter, int page, int size) {
+        String side = filter.side() == null ? null : filter.side().name();
+        Boolean initial = filter.ownerType() == null ? null : filter.ownerType() == OwnerType.ADMIN;
+        Page<MarketOrderSQL> rows = orderDAO.findMarket(OPEN_STATUSES, side, filter.league(), filter.team(),
+                filter.playerId(), initial, PageRequest.of(page, size));
+        return new QuotePage<>(rows.getContent().stream().map(this::toView).toList(), rows.getNumber(),
+                rows.getSize(), rows.getTotalElements());
+    }
+
+    private OrderView toView(MarketOrderSQL row) {
+        return new OrderView(mapper.toDomain(row), playerMapper.toDomain(row.getPlayer()));
     }
 
     private MarketOrderSQL toSQL(MarketOrder order) {

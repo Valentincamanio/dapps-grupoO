@@ -22,17 +22,21 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.CancelReason;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrder;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrderFilter;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderSide;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderView;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OwnerType;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuotePage;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.team.TeamRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.market.MarketOrderSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.user.AppUserSQLDAO;
@@ -58,6 +62,9 @@ class MarketOrderRepositoryIT {
 
     @Autowired
     private AppUserRepository appUserRepository;
+
+    @Autowired
+    private TeamRepository teamRepository;
 
     @Autowired
     private MarketOrderSQLDAO orderDAO;
@@ -300,6 +307,139 @@ class MarketOrderRepositoryIT {
         List<OrderView> initialOrders = repository.findInitialOrdersOf(seller);
 
         assertThat(initialOrders).isEmpty();
+    }
+
+    @Test
+    void elListadoTraeSoloLasAbiertasDeLaMasViejaALaMasNuevaConSuJugadorYSuEquipo() {
+        Market market = seedMarket();
+
+        QuotePage<OrderView> listed = repository.findMarket(MarketOrderFilter.none(), 0, 10);
+
+        assertThat(idsOf(listed)).containsExactly(market.kaneInitial(), market.musialaInitial(), market.kaneSale(),
+                market.musialaPurchase());
+        assertThat(listed.content()).extracting(view -> view.player().team().name())
+                .containsExactly("Arsenal FC", "FC Bayern München", "Arsenal FC", "FC Bayern München");
+        assertThat(listed.content()).allSatisfy(view ->
+                assertThat(view.order().getPlayerId()).isEqualTo(view.player().id()));
+    }
+
+    @Test
+    void filtraPorTipoDeOrden() {
+        Market market = seedMarket();
+
+        QuotePage<OrderView> purchases = repository.findMarket(filter(OrderSide.BUY, null, null, null, null), 0, 10);
+        QuotePage<OrderView> sales = repository.findMarket(filter(OrderSide.SELL, null, null, null, null), 0, 10);
+
+        assertThat(idsOf(purchases)).containsExactly(market.musialaPurchase());
+        assertThat(idsOf(sales)).containsExactly(market.kaneInitial(), market.musialaInitial(), market.kaneSale());
+    }
+
+    @Test
+    void filtraPorLiga() {
+        Market market = seedMarket();
+
+        QuotePage<OrderView> listed = repository.findMarket(filter(null, League.BUNDESLIGA, null, null, null), 0, 10);
+
+        assertThat(idsOf(listed)).containsExactly(market.musialaInitial(), market.musialaPurchase());
+    }
+
+    @Test
+    void filtraPorEquipoConElNombreNormalizado() {
+        Market market = seedMarket();
+
+        QuotePage<OrderView> listed = repository.findMarket(filter(null, null, "  Arsenal   FC ", null, null), 0, 10);
+
+        assertThat(idsOf(listed)).containsExactly(market.kaneInitial(), market.kaneSale());
+    }
+
+    @Test
+    void conElTipoDeUsuarioDuenoAdministradorTraeLasInicialesYConUsuarioLasDemas() {
+        Market market = seedMarket();
+
+        QuotePage<OrderView> initials = repository.findMarket(filter(null, null, null, OwnerType.ADMIN, null), 0, 10);
+        QuotePage<OrderView> users = repository.findMarket(filter(null, null, null, OwnerType.USER, null), 0, 10);
+
+        assertThat(idsOf(initials)).containsExactly(market.kaneInitial(), market.musialaInitial());
+        assertThat(initials.content()).extracting(view -> view.order().pending()).containsExactly(87, 100);
+        assertThat(idsOf(users)).containsExactly(market.kaneSale(), market.musialaPurchase());
+    }
+
+    @Test
+    void filtraPorJugador() {
+        Market market = seedMarket();
+
+        QuotePage<OrderView> listed = repository.findMarket(filter(null, null, null, null, kane.id()), 0, 10);
+
+        assertThat(idsOf(listed)).containsExactly(market.kaneInitial(), market.kaneSale());
+    }
+
+    @Test
+    void losFiltrosSeCombinan() {
+        Market market = seedMarket();
+
+        QuotePage<OrderView> premierUserSales =
+                repository.findMarket(filter(OrderSide.SELL, League.PREMIER, null, OwnerType.USER, null), 0, 10);
+        QuotePage<OrderView> premierPurchases =
+                repository.findMarket(filter(OrderSide.BUY, League.PREMIER, null, null, null), 0, 10);
+
+        assertThat(idsOf(premierUserSales)).containsExactly(market.kaneSale());
+        assertThat(premierPurchases.content()).isEmpty();
+        assertThat(premierPurchases.totalElements()).isZero();
+    }
+
+    @Test
+    void elListadoSeRecorrePorHojasConLaPaginacionDelCatalogo() {
+        Market market = seedMarket();
+
+        QuotePage<OrderView> second = repository.findMarket(MarketOrderFilter.none(), 1, 3);
+
+        assertThat(idsOf(second)).containsExactly(market.musialaPurchase());
+        assertThat(second.page()).isEqualTo(1);
+        assertThat(second.totalElements()).isEqualTo(4);
+        assertThat(second.totalPages()).isEqualTo(2);
+        assertThat(second.hasPrevious()).isTrue();
+        assertThat(second.hasNext()).isFalse();
+    }
+
+    /**
+     * Órdenes en los cuatro estados, de dos ligas y de los dos tipos de usuario dueño. Las iniciales
+     * de Kane y Musiala tienen el mismo instante, así que las desempata el id.
+     */
+    private Market seedMarket() {
+        Team bayern = teamRepository.save(new Team(null, "5", "FC Bayern München", null, League.BUNDESLIGA, "37"));
+        Player musiala = database.player("8310", "Jamal Musiala", Position.MIDFIELDER, bayern);
+        MarketOrder kaneInitial = MarketOrder.initialFor(superuser, kane.id(), AT);
+        kaneInitial.fill(13);
+        long kaneInitialId = repository.save(kaneInitial).getId();
+        MarketOrder salahInitial = MarketOrder.initialFor(superuser, salah.id(), AT);
+        salahInitial.fill(100);
+        repository.save(salahInitial);
+        long musialaInitialId = repository.save(MarketOrder.initialFor(superuser, musiala.id(), AT)).getId();
+        long kaneSaleId = repository.save(MarketOrder.sell(seller, kane.id(), 5, AT.plusSeconds(60))).getId();
+        MarketOrder musialaPurchase = MarketOrder.buy(buyer, musiala.id(), 3, new BigDecimal("3.09"),
+                RESERVATION_PRICE, AT.plusSeconds(120));
+        musialaPurchase.fill(1);
+        long musialaPurchaseId = repository.save(musialaPurchase).getId();
+        MarketOrder executed = MarketOrder.sell(seller, kane.id(), 5, AT.plusSeconds(30));
+        executed.fill(5);
+        repository.save(executed);
+        MarketOrder cancelled = MarketOrder.sell(seller, son.id(), 5, AT.plusSeconds(30));
+        cancelled.cancelRemainder(CancelReason.USER_REQUEST);
+        repository.save(cancelled);
+        return new Market(kaneInitialId, musialaInitialId, kaneSaleId, musialaPurchaseId);
+    }
+
+    private static MarketOrderFilter filter(OrderSide side, League league, String team, OwnerType ownerType,
+                                            Long playerId) {
+        return new MarketOrderFilter(side, league, team, ownerType, playerId);
+    }
+
+    private static List<Long> idsOf(QuotePage<OrderView> page) {
+        return page.content().stream().map(view -> view.order().getId()).toList();
+    }
+
+    /** Las órdenes abiertas del listado de prueba. */
+    private record Market(long kaneInitial, long musialaInitial, long kaneSale, long musialaPurchase) {
     }
 
     private long user(String username, Role role, String balance) {
