@@ -60,6 +60,18 @@ public class MarketOrderService {
         return save(book.placeSell(requesterId, quantity, at));
     }
 
+    /**
+     * Cancela el remanente de una orden propia (US6, research D16), por el mismo camino: bloquea el
+     * libro de su jugador y la cuenta de quien pide, y el modelo decide. Una orden inexistente es 404
+     * antes de bloquear nada.
+     */
+    @Transactional
+    public BookOutcome cancel(long requesterId, long orderId) {
+        Instant at = clock.instant();
+        PlayerBookLoader.Cancellation loaded = bookLoader.loadForCancel(orderId, requesterId, at);
+        return save(loaded.book().cancel(loaded.order(), requesterId, at));
+    }
+
     private void requirePlayer(long playerId) {
         if (!playerRepository.existsById(playerId)) {
             throw new PlayerNotFoundException(playerId);

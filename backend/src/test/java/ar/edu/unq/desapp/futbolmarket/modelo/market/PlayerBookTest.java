@@ -29,6 +29,8 @@ import org.junit.jupiter.api.Test;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.InsufficientCreditsException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.InsufficientTokensException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.OppositeOrderPendingException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.OrderNotCancellableException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.OrderNotOwnedException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.PlayerNotTradableException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.SaleBlockedByInitialOrderException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.TradingNotAllowedException;
@@ -660,6 +662,124 @@ class PlayerBookTest {
 
         assertThat(outcome.order().pending()).isEqualTo(7);
         assertOneSideOpen(List.of(sale), outcome);
+    }
+
+    @Test
+    void cancelarUnaCompraParcialDevuelveSuReservaAlLibreYConservaLoEjecutadoUS67() {
+        MarketOrder purchase = MarketFixtures.buy(5L, USER_A, PLAYER, 10, "1.0300", CREATED);
+        purchase.fill(4);
+        purchase.consumeReservation(new BigDecimal("4.12"));
+        AppUser buyer = user(USER_A, "995.88", "6.18");
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(purchase),
+                List.of(holding(20L, USER_A, PLAYER, costBasis(4, "4.12"), 0)), buyer);
+
+        BookOutcome outcome = book.cancel(purchase, USER_A, NOW);
+
+        assertThat(outcome.order()).isSameAs(purchase);
+        assertThat(purchase.status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(purchase.getExecuted()).isEqualTo(4);
+        assertThat(purchase.getCancelled()).isEqualTo(6);
+        assertThat(purchase.getReservedCredits()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(buyer.getBalance()).isEqualTo(new BigDecimal("995.88"));
+        assertThat(buyer.getReserved()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(outcome.accounts()).containsExactly(buyer);
+        assertThat(outcome.trades()).isEmpty();
+        assertThat(outcome.auditEntries()).singleElement().satisfies(entry -> {
+            assertThat(entry.eventType()).isEqualTo(AuditEventType.ORDER_CANCELLED);
+            assertThat(entry.actorType()).isEqualTo(AuditActorType.USER);
+            assertThat(entry.actorId()).isEqualTo(USER_A);
+            assertThat(entry.quantity()).isEqualTo(6);
+            assertThat(entry.cancelReason()).isEqualTo(CancelReason.USER_REQUEST);
+            assertThat(entry.primary().before())
+                    .isEqualTo(new PartyState(USER_A, new BigDecimal("989.70"), new BigDecimal("6.18"), 4));
+            assertThat(entry.primary().after())
+                    .isEqualTo(new PartyState(USER_A, new BigDecimal("995.88"), new BigDecimal("0.00"), 4));
+        });
+    }
+
+    @Test
+    void cancelarUnaVentaLiberaSusTokensComprometidosUS68() {
+        MarketOrder sale = sell(6L, SELLER, PLAYER, 5, CREATED);
+        AppUser seller = user(SELLER, "1000.00");
+        Holding sellerHolding = holding(21L, SELLER, PLAYER, costBasis(10, "10.00"), 5);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(sale),
+                List.of(sellerHolding), seller);
+
+        BookOutcome outcome = book.cancel(sale, SELLER, NOW);
+
+        assertThat(sale.status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(sellerHolding.getCommitted()).isZero();
+        assertThat(sellerHolding.freeTokens()).isEqualTo(10);
+        assertThat(outcome.holdings()).containsExactly(sellerHolding);
+        assertThat(seller.availableBalance()).isEqualTo(new BigDecimal("1000.00"));
+        assertThat(outcome.auditEntries()).singleElement()
+                .satisfies(entry -> assertThat(entry.detail())
+                        .isEqualTo("Cancelación de 5 tokens de la orden de venta de Harry Kane a pedido del usuario"));
+    }
+
+    @Test
+    void unaOrdenEjecutadaNoSeCancelaYNoCambiaNadaUS69() {
+        MarketOrder sale = sell(6L, SELLER, PLAYER, 5, CREATED);
+        sale.fill(5);
+        Holding sellerHolding = holding(21L, SELLER, PLAYER, costBasis(5, "5.00"), 0);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(),
+                List.of(sellerHolding), user(SELLER, "1005.15"));
+
+        assertThatThrownBy(() -> book.cancel(sale, SELLER, NOW))
+                .isInstanceOf(OrderNotCancellableException.class)
+                .hasMessage("La orden ya está ejecutada.");
+        assertThat(sale.status()).isEqualTo(OrderStatus.EXECUTED);
+        assertThat(sellerHolding.getCommitted()).isZero();
+    }
+
+    @Test
+    void unaOrdenCanceladaNoSeVuelveACancelarUS69() {
+        MarketOrder purchase = MarketFixtures.buy(5L, USER_A, PLAYER, 10, "1.0300", CREATED);
+        purchase.cancelRemainder(CancelReason.USER_REQUEST);
+        AppUser buyer = user(USER_A, "1000.00");
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(), List.of(), buyer);
+
+        assertThatThrownBy(() -> book.cancel(purchase, USER_A, NOW))
+                .isInstanceOf(OrderNotCancellableException.class)
+                .hasMessage("La orden ya está cancelada.");
+        assertThat(buyer.getReserved()).isEqualTo(new BigDecimal("0.00"));
+    }
+
+    @Test
+    void unaOrdenDeOtroUsuarioNoSeCancelaUS610() {
+        MarketOrder sale = sell(6L, SELLER, PLAYER, 5, CREATED);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(sale),
+                List.of(holding(21L, SELLER, PLAYER, costBasis(10, "10.00"), 5)), user(SELLER, "1000.00"),
+                user(USER_A, "1000.00"));
+
+        assertThatThrownBy(() -> book.cancel(sale, USER_A, NOW))
+                .isInstanceOf(OrderNotOwnedException.class)
+                .hasMessage("La orden no pertenece al usuario.");
+        assertThat(sale.status()).isEqualTo(OrderStatus.PENDING);
+    }
+
+    @Test
+    void laOrdenInicialNoLaCancelaNiElSuperusuarioUS610() {
+        MarketOrder initial = initialOrder(INITIAL_ID, PLAYER, 87, CREATED);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(initial), List.of(), List.of(),
+                superuser("13.00"));
+
+        assertThatThrownBy(() -> book.cancel(initial, SUPERUSER_ID, NOW))
+                .isInstanceOf(OrderNotOwnedException.class);
+        assertThat(initial.pending()).isEqualTo(87);
+    }
+
+    @Test
+    void conElJugadorInactivoYSinCotizacionTambienSeCancelaFR032() {
+        MarketOrder sale = sell(6L, SELLER, PLAYER, 5, CREATED);
+        Holding sellerHolding = holding(21L, SELLER, PLAYER, costBasis(10, "10.00"), 5);
+        PlayerBook book = book(inactivePlayer(PLAYER, "Harry Kane"), Optional.empty(), Optional.of(soldOut()),
+                List.of(sale), List.of(sellerHolding), user(SELLER, "1000.00"));
+
+        BookOutcome outcome = book.cancel(sale, SELLER, NOW);
+
+        assertThat(outcome.order().status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(sellerHolding.getCommitted()).isZero();
     }
 
     /**

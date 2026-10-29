@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -21,8 +22,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrder;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderSide;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OwnerType;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.Trade;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.TradeFilter;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.TradeView;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuotePage;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.Quote;
@@ -184,6 +189,105 @@ class TradeRepositoryIT {
         BigDecimal realized = repository.realizedProfitOf(superuser);
 
         assertThat(realized).isEqualTo(new BigDecimal("0.00"));
+    }
+
+    @Test
+    void elHistorialTraeLasOperacionesDelUsuarioDeLaMasNuevaALaMasViejaConJugadorYCotizacion() {
+        History history = seedHistory();
+
+        QuotePage<TradeView> page = repository.findHistory(buyer, TradeFilter.none(), 0, 10);
+
+        assertThat(idsOf(page)).containsExactly(history.saleToSeller(), history.purchaseFromSeller(),
+                history.purchaseFromAdmin(), history.salahPurchase());
+        TradeView first = page.content().getFirst();
+        assertThat(first.player().name()).isEqualTo("Harry Kane");
+        assertThat(first.player().team().name()).isEqualTo("Arsenal FC");
+        assertThat(first.quote().id()).isEqualTo(quoteId);
+        assertThat(first.quote().value()).isEqualTo(new BigDecimal("103.00"));
+        assertThat(first.quote().strategy().name()).isNotBlank();
+    }
+
+    @Test
+    void elTipoSeMiraDesdeElLadoDelUsuario() {
+        History history = seedHistory();
+
+        QuotePage<TradeView> purchases = repository.findHistory(buyer, new TradeFilter(null, OrderSide.BUY, null, null),
+                0, 10);
+        QuotePage<TradeView> sales = repository.findHistory(buyer, new TradeFilter(null, OrderSide.SELL, null, null),
+                0, 10);
+
+        assertThat(idsOf(purchases)).containsExactly(history.purchaseFromSeller(), history.purchaseFromAdmin(),
+                history.salahPurchase());
+        assertThat(idsOf(sales)).containsExactly(history.saleToSeller());
+    }
+
+    @Test
+    void filtraPorJugador() {
+        History history = seedHistory();
+
+        QuotePage<TradeView> page = repository.findHistory(buyer, new TradeFilter(history.salah(), null, null, null),
+                0, 10);
+
+        assertThat(idsOf(page)).containsExactly(history.salahPurchase());
+    }
+
+    @Test
+    void elRangoDeFechasIncluyeLosDosDiasEnHoraDeArgentina() {
+        History history = seedHistory();
+
+        QuotePage<TradeView> page = repository.findHistory(buyer,
+                TradeFilter.of(null, null, "2026-08-25", "2026-08-26"), 0, 10);
+
+        assertThat(idsOf(page)).containsExactly(history.saleToSeller(), history.purchaseFromSeller());
+    }
+
+    @Test
+    void elHistorialSeRecorrePorHojas() {
+        History history = seedHistory();
+
+        QuotePage<TradeView> second = repository.findHistory(buyer, TradeFilter.none(), 1, 3);
+
+        assertThat(idsOf(second)).containsExactly(history.salahPurchase());
+        assertThat(second.totalElements()).isEqualTo(4);
+        assertThat(second.hasPrevious()).isTrue();
+        assertThat(second.hasNext()).isFalse();
+    }
+
+    /**
+     * El comprador del escenario compra al superusuario el 24/08, a otro usuario el 25/08 y le vende
+     * el 26/08, siempre a las 12 de Argentina; una compra de Salah del 23/08; y una operación del
+     * vendedor con el superusuario, que no es del comprador.
+     */
+    private History seedHistory() {
+        Player salah = database.player("8301", "Mohamed Salah", Position.FORWARD,
+                database.team("64", "Liverpool FC"));
+        long salahPurchase = save(trade(buyer, superuser, OwnerType.ADMIN, salah.id(), AT.minus(Duration.ofDays(1))));
+        long fromAdmin = save(trade(buyer, superuser, OwnerType.ADMIN, kane.id(), AT));
+        long fromSeller = save(trade(buyer, seller, OwnerType.USER, kane.id(), AT.plus(Duration.ofDays(1))));
+        long toSeller = save(trade(seller, buyer, OwnerType.USER, kane.id(), AT.plus(Duration.ofDays(2))));
+        save(trade(seller, superuser, OwnerType.ADMIN, kane.id(), AT));
+        return new History(salah.id(), salahPurchase, fromAdmin, fromSeller, toSeller);
+    }
+
+    private long save(Trade trade) {
+        return repository.saveAll(List.of(trade)).getFirst().id();
+    }
+
+    private Trade trade(long buyerId, long sellerId, OwnerType sellerType, long playerId, Instant executedAt) {
+        long sellOrder = sellerType == OwnerType.ADMIN ? initialOrderId : sellOrderId;
+        return new Trade(null, executedAt, playerId, buyOrderId, sellOrder, buyerId, sellerId, sellerType, 1,
+                new BigDecimal("1.0300"), new BigDecimal("1.03"), quoteId, new BigDecimal("1000.00"),
+                new BigDecimal("998.97"), new BigDecimal("1000.00"), new BigDecimal("1001.03"), 0, 1, 1, 0,
+                sellerType == OwnerType.ADMIN ? null : new BigDecimal("0.03"));
+    }
+
+    private static List<Long> idsOf(QuotePage<TradeView> page) {
+        return page.content().stream().map(view -> view.trade().id()).toList();
+    }
+
+    /** Las operaciones del historial de prueba. */
+    private record History(long salah, long salahPurchase, long purchaseFromAdmin, long purchaseFromSeller,
+                           long saleToSeller) {
     }
 
     /**

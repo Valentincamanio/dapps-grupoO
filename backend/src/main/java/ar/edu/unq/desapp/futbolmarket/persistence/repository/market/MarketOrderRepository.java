@@ -114,6 +114,24 @@ public class MarketOrderRepository {
                 rows.getSize(), rows.getTotalElements());
     }
 
+    /**
+     * El jugador de una orden, sin cargarla; vacío si la orden no existe. Corre en la transacción de
+     * quien la pide, antes de bloquear el libro de ese jugador.
+     */
+    public Optional<Long> findPlayerIdOf(long orderId) {
+        return orderDAO.findPlayerIdById(orderId);
+    }
+
+    /**
+     * Una hoja de las órdenes del dueño, de la más nueva a la más vieja, cada una con su jugador.
+     */
+    @Transactional(readOnly = true)
+    public QuotePage<OrderView> findOfOwner(long ownerId, int page, int size) {
+        Page<MarketOrderSQL> rows = orderDAO.findByOwnerId(ownerId, PageRequest.of(page, size));
+        return new QuotePage<>(rows.getContent().stream().map(this::toView).toList(), rows.getNumber(),
+                rows.getSize(), rows.getTotalElements());
+    }
+
     private OrderView toView(MarketOrderSQL row) {
         return new OrderView(mapper.toDomain(row), playerMapper.toDomain(row.getPlayer()));
     }

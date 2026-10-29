@@ -73,6 +73,27 @@ public interface MarketOrderSQLDAO extends JpaRepository<MarketOrderSQL, Long> {
                                              @Param("statuses") Collection<String> statuses);
 
     /**
+     * El jugador de una orden, sin cargarla: con él se bloquea el libro antes de leer la orden que
+     * se cancela (research D16).
+     */
+    @Query("select o.player.id from MarketOrderSQL o where o.id = :orderId")
+    Optional<Long> findPlayerIdById(@Param("orderId") Long orderId);
+
+    /**
+     * Las órdenes del dueño, con el jugador y su equipo, de la más nueva a la más vieja (research
+     * D21). El conteo va aparte porque con {@code join fetch} no se puede derivar.
+     */
+    @Query(value = """
+            select o from MarketOrderSQL o
+            join fetch o.player p
+            join fetch p.team
+            where o.owner.id = :ownerId
+            order by o.createdAt desc, o.id desc
+            """,
+            countQuery = "select count(o) from MarketOrderSQL o where o.owner.id = :ownerId")
+    Page<MarketOrderSQL> findByOwnerId(@Param("ownerId") Long ownerId, Pageable pageable);
+
+    /**
      * El listado del mercado (research D22): las órdenes con tokens pendientes, con el jugador y su
      * equipo en la misma consulta, de la más vieja a la más nueva y con el id como desempate. Un
      * filtro nulo no filtra. El tipo de usuario dueño sale de la marca de inicial ({@code initial}

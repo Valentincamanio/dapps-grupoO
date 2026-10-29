@@ -401,6 +401,52 @@ class MarketOrderRepositoryIT {
         assertThat(second.hasNext()).isFalse();
     }
 
+    @Test
+    void elJugadorDeUnaOrdenSeLeeSinCargarla() {
+        long orderId = repository.save(MarketOrder.sell(seller, salah.id(), 5, AT)).getId();
+
+        Optional<Long> playerId = repository.findPlayerIdOf(orderId);
+        Optional<Long> missing = repository.findPlayerIdOf(orderId + 1000);
+
+        assertThat(playerId).contains(salah.id());
+        assertThat(missing).isEmpty();
+    }
+
+    @Test
+    void lasOrdenesDeUnDuenoVanDeLaMasNuevaALaMasViejaConSuJugadorEnTodosLosEstados() {
+        long oldest = repository.save(MarketOrder.sell(seller, kane.id(), 5, AT)).getId();
+        MarketOrder executed = MarketOrder.sell(seller, salah.id(), 5, AT.plusSeconds(60));
+        executed.fill(5);
+        long executedId = repository.save(executed).getId();
+        MarketOrder cancelled = MarketOrder.sell(seller, son.id(), 5, AT.plusSeconds(120));
+        cancelled.cancelRemainder(CancelReason.USER_REQUEST);
+        long cancelledId = repository.save(cancelled).getId();
+        long sameInstant = repository.save(MarketOrder.sell(seller, son.id(), 3, AT.plusSeconds(120))).getId();
+        repository.save(MarketOrder.buy(buyer, kane.id(), 2, new BigDecimal("2.06"), RESERVATION_PRICE, AT));
+
+        QuotePage<OrderView> page = repository.findOfOwner(seller, 0, 10);
+
+        assertThat(idsOf(page)).containsExactly(sameInstant, cancelledId, executedId, oldest);
+        assertThat(page.content()).extracting(view -> view.order().status())
+                .containsExactly(OrderStatus.PENDING, OrderStatus.CANCELLED, OrderStatus.EXECUTED, OrderStatus.PENDING);
+        assertThat(page.content()).allSatisfy(view -> {
+            assertThat(view.order().getOwnerId()).isEqualTo(seller);
+            assertThat(view.player().team().name()).isEqualTo("Arsenal FC");
+        });
+    }
+
+    @Test
+    void lasOrdenesDeUnDuenoSeRecorrenPorHojas() {
+        repository.save(MarketOrder.sell(seller, kane.id(), 5, AT));
+        long newest = repository.save(MarketOrder.sell(seller, salah.id(), 5, AT.plusSeconds(60))).getId();
+
+        QuotePage<OrderView> first = repository.findOfOwner(seller, 0, 1);
+
+        assertThat(idsOf(first)).containsExactly(newest);
+        assertThat(first.totalElements()).isEqualTo(2);
+        assertThat(first.hasNext()).isTrue();
+    }
+
     /**
      * Órdenes en los cuatro estados, de dos ligas y de los dos tipos de usuario dueño. Las iniciales
      * de Kane y Musiala tienen el mismo instante, así que las desempata el id.

@@ -44,9 +44,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.BookOutcome;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketFixtures;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrder;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.Trade;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.InsufficientCreditsException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.InsufficientTokensException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.OrderNotFoundException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.OrderNotOwnedException;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.PlayerNotFoundException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
@@ -66,6 +69,8 @@ class MarketOrderServiceTest {
     private static final long EARLY_BUYER = 20L;
     private static final long LATE_BUYER = 50L;
     private static final long MISSING_PLAYER = 9999L;
+    private static final long MISSING_ORDER = 9999L;
+    private static final long SALE_ID = 5L;
     private static final Instant NOW = at("2026-08-24T12:00");
     private static final Instant CREATED = at("2026-08-17T09:00");
     private static final Player KANE = activePlayer(42L, "Harry Kane");
@@ -213,6 +218,82 @@ class MarketOrderServiceTest {
         assertThat(outcome.orders()).hasSize(3).allSatisfy(saved -> assertThat(saved.getId()).isNotNull());
         assertThat(outcome.trades()).hasSize(2).allSatisfy(trade ->
                 assertThat(trade.sellOrderId()).isEqualTo(outcome.order().getId()));
+    }
+
+    @Test
+    void cancelarUnaOrdenInexistenteEs404SinBloquearNada() {
+        when(orderRepository.findPlayerIdOf(MISSING_ORDER)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service().cancel(SELLER, MISSING_ORDER))
+                .isInstanceOf(OrderNotFoundException.class)
+                .hasMessage("No se encontró la orden con id 9999.");
+        verify(orderRepository, never()).lockBook(anyLong());
+        verifyNoInteractions(userRepository, holdingRepository, quoteRepository, tradeRepository, auditRepository);
+    }
+
+    @Test
+    void cancelarBloqueaElLibroYLaCuentaDeQuienPideAntesDeLeerLaOrden() {
+        givenCancelBook(SELLER);
+        givenSaving();
+
+        service().cancel(SELLER, SALE_ID);
+
+        InOrder order = inOrder(orderRepository, userRepository, playerRepository, quoteRepository,
+                holdingRepository);
+        order.verify(orderRepository).findPlayerIdOf(SALE_ID);
+        order.verify(orderRepository).lockBook(KANE.id());
+        order.verify(userRepository).lockAllInOrder(accountIdsCaptor.capture());
+        order.verify(orderRepository).findById(SALE_ID);
+        order.verify(playerRepository).findById(KANE.id());
+        order.verify(holdingRepository).findOfPlayer(anyLong(), anyCollection());
+        assertThat(accountIdsCaptor.getValue()).containsExactly(SELLER);
+    }
+
+    @Test
+    void cancelarUnaOrdenAjenaNoGuardaNada() {
+        givenCancelBook(BUYER);
+
+        assertThatThrownBy(() -> service().cancel(BUYER, SALE_ID))
+                .isInstanceOf(OrderNotOwnedException.class);
+        verify(orderRepository, never()).saveAll(anyCollection());
+        verify(userRepository, never()).save(any());
+        verify(holdingRepository, never()).saveAll(anyCollection());
+        verifyNoInteractions(tradeRepository, auditRepository);
+    }
+
+    @Test
+    void cancelarGuardaLaOrdenLaCuentaLaTenenciaYLaAuditoria() {
+        givenCancelBook(SELLER);
+        givenSaving();
+
+        BookOutcome outcome = service().cancel(SELLER, SALE_ID);
+
+        InOrder order = inOrder(orderRepository, userRepository, holdingRepository, auditRepository);
+        order.verify(orderRepository).saveAll(anyCollection());
+        order.verify(userRepository).save(any());
+        order.verify(holdingRepository).saveAll(anyCollection());
+        order.verify(auditRepository).saveAll(anyCollection());
+        assertThat(outcome.order().status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(outcome.trades()).isEmpty();
+        assertThat(outcome.auditEntries()).singleElement()
+                .satisfies(entry -> assertThat(entry.orderId()).isEqualTo(SALE_ID));
+    }
+
+    /**
+     * La venta 5 del usuario 30 sobre Kane, con 5 tokens comprometidos; la cuenta bloqueada es la de
+     * quien pide cancelarla.
+     */
+    private void givenCancelBook(long requesterId) {
+        when(orderRepository.findPlayerIdOf(SALE_ID)).thenReturn(Optional.of(KANE.id()));
+        when(orderRepository.lockBook(KANE.id())).thenReturn(Optional.of(initialOrder(1L, KANE.id(), 0, CREATED)));
+        when(userRepository.lockAllInOrder(anyCollection()))
+                .thenReturn(Map.of(requesterId, user(requesterId, "990.00")));
+        when(orderRepository.findById(SALE_ID)).thenReturn(Optional.of(sell(SALE_ID, SELLER, KANE.id(), 5, CREATED)));
+        when(playerRepository.findById(KANE.id())).thenReturn(Optional.of(KANE));
+        when(quoteRepository.findInForceAt(KANE.id(), NOW))
+                .thenReturn(Optional.of(quote(300L, KANE.id(), "103.00", "0.300000", CREATED)));
+        when(holdingRepository.findOfPlayer(anyLong(), anyCollection()))
+                .thenReturn(List.of(holding(20L, SELLER, KANE.id(), costBasis(10, "10.00"), 5)));
     }
 
     /**

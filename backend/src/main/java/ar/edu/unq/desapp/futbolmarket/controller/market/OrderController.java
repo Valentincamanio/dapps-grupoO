@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import ar.edu.unq.desapp.futbolmarket.config.OpenApiConfig;
 import ar.edu.unq.desapp.futbolmarket.controller.market.dto.MarketOrderPageResponse;
+import ar.edu.unq.desapp.futbolmarket.controller.market.dto.OrderCancellationResponse;
 import ar.edu.unq.desapp.futbolmarket.controller.market.dto.OrderExecutionResponse;
 import ar.edu.unq.desapp.futbolmarket.controller.market.dto.OrderRequest;
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
@@ -91,9 +93,21 @@ public class OrderController {
             + "\"Tokens insuficientes: tiene 4 tokens libres de este jugador.\", " + SELL_PATH + "}";
     private static final String SELL_NOT_TRADABLE_EXAMPLE = NOT_TRADABLE + SELL_PATH + "}";
 
-    private static final String INVALID_PARAMETERS_EXAMPLE = EXAMPLE_START
-            + "\"status\": 400, \"error\": \"Bad Request\", \"message\": \"Los parámetros enviados no son válidos.\", "
-            + "\"path\": \"/orders\"}";
+    private static final String INVALID_PARAMETERS = EXAMPLE_START
+            + "\"status\": 400, \"error\": \"Bad Request\", \"message\": \"Los parámetros enviados no son válidos.\", ";
+    private static final String INVALID_PARAMETERS_EXAMPLE = INVALID_PARAMETERS + "\"path\": \"/orders\"}";
+
+    private static final String CANCEL_PATH = "\"path\": \"/orders/7/cancel\"}";
+    private static final String CANCEL_INVALID_ID_EXAMPLE = INVALID_PARAMETERS + "\"path\": \"/orders/0/cancel\"}";
+    private static final String CANCEL_UNAUTHORIZED_EXAMPLE = UNAUTHORIZED + CANCEL_PATH;
+    private static final String CANCEL_ADMIN_EXAMPLE = ADMIN + CANCEL_PATH;
+    private static final String NOT_OWNED_EXAMPLE = EXAMPLE_START
+            + "\"status\": 403, \"error\": \"Forbidden\", \"message\": \"La orden no pertenece al usuario.\", "
+            + CANCEL_PATH;
+    private static final String ORDER_NOT_FOUND_EXAMPLE = EXAMPLE_START
+            + "\"status\": 404, \"error\": \"Not Found\", \"message\": \"No se encontró la orden con id 9999.\", "
+            + "\"path\": \"/orders/9999/cancel\"}";
+    private static final String NOT_CANCELLABLE_EXAMPLE = CONFLICT + "\"La orden ya está ejecutada.\", " + CANCEL_PATH;
 
     private final MarketOrderService marketOrderService;
     private final MarketQueryService marketQueryService;
@@ -208,5 +222,38 @@ public class OrderController {
                                        @Valid @RequestBody OrderRequest request) {
         int quantity = request.quantity().intValueExact();
         return OrderExecutionResponse.from(marketOrderService.sell(userId, request.playerId(), quantity));
+    }
+
+    @Tag(name = "Órdenes")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @SecurityRequirement(name = OpenApiConfig.API_KEY_AUTH)
+    @Operation(
+            summary = "Cancela el remanente pendiente de una orden propia",
+            description = "Lo ejecutado se conserva. Una compra libera sus créditos reservados; una venta, sus tokens "
+                    + "comprometidos. Se puede cancelar aunque el jugador no sea operable. La orden inicial del "
+                    + "superusuario no se cancela.")
+    @ApiResponse(responseCode = "200", description = "La orden cancelada y el saldo posterior.")
+    @ApiResponse(responseCode = "400", description = "Identificador inválido.",
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = CANCEL_INVALID_ID_EXAMPLE)))
+    @ApiResponse(responseCode = "401", description = "No hay credencial, o la credencial es inválida o está vencida.",
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = CANCEL_UNAUTHORIZED_EXAMPLE)))
+    @ApiResponse(responseCode = "403",
+            description = "El administrador (antes del controller), o una orden de otro usuario o la orden inicial "
+                    + "del superusuario.",
+            content = @Content(schema = @Schema(implementation = ApiError.class), examples = {
+                    @ExampleObject(name = "ajena", value = NOT_OWNED_EXAMPLE),
+                    @ExampleObject(name = "administrador", value = CANCEL_ADMIN_EXAMPLE)}))
+    @ApiResponse(responseCode = "404", description = "No existe la orden.",
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = ORDER_NOT_FOUND_EXAMPLE)))
+    @ApiResponse(responseCode = "409", description = "La orden ya está ejecutada o ya está cancelada; mercado ocupado.",
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = NOT_CANCELLABLE_EXAMPLE)))
+    @PostMapping("/{id}/cancel")
+    public OrderCancellationResponse cancel(@AuthenticationPrincipal @Parameter(hidden = true) Long userId,
+                                            @PathVariable @Min(1) Long id) {
+        return OrderCancellationResponse.from(marketOrderService.cancel(userId, id));
     }
 }

@@ -8,10 +8,12 @@ import { BoardPage } from '../pages/BoardPage';
 import { LockerRoomPage } from '../pages/LockerRoomPage';
 import { LoginPage } from '../pages/LoginPage';
 import { MarketPage } from '../pages/MarketPage';
+import { MyOrdersPage } from '../pages/MyOrdersPage';
 import { PlayerPage } from '../pages/PlayerPage';
 import { PortfolioPage } from '../pages/PortfolioPage';
 import { RankingPage } from '../pages/RankingPage';
 import { RegisterPage } from '../pages/RegisterPage';
+import { TransactionsPage } from '../pages/TransactionsPage';
 import { RequireRole } from './RequireRole';
 import { RequireSession } from './RequireSession';
 
@@ -43,6 +45,22 @@ export const appRoutes: RouteObject[] = [
         element: (
           <RequireRole role="USER">
             <PortfolioPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: 'operaciones',
+        element: (
+          <RequireRole role="USER">
+            <TransactionsPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: 'ordenes',
+        element: (
+          <RequireRole role="USER">
+            <MyOrdersPage />
           </RequireRole>
         ),
       },

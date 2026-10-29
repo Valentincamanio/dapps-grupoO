@@ -34,6 +34,8 @@ import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OwnerType;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.Trade;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.InsufficientCreditsException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.OrderNotCancellableException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.OrderNotOwnedException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.SaleBlockedByInitialOrderException;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
@@ -370,6 +372,121 @@ class MarketOrderServiceIT {
             assertThat(trade.total()).isEqualByComparingTo("4.12");
             assertThat(trade.quoteId()).isEqualTo(kaneQuote.id());
         });
+    }
+
+    @Test
+    void cancelarUnaCompraParcialConservaLoEjecutadoYDevuelveLaReservaAlLibreUS67() {
+        AppUser buyer = user(INITIAL_BALANCE);
+        AppUser seller = user(INITIAL_BALANCE);
+        startScenario();
+        service.buy(seller.getId(), kane.id(), 100);
+        MarketOrder purchase = service.buy(buyer.getId(), kane.id(), 10).order();
+        service.sell(seller.getId(), kane.id(), 4);
+        assertThat(database.account(buyer.getId()).getReserved()).isEqualByComparingTo("6.18");
+
+        BookOutcome outcome = service.cancel(buyer.getId(), purchase.getId());
+
+        MarketOrder cancelled = database.ordersOf(buyer).getFirst();
+        assertThat(outcome.order().getId()).isEqualTo(purchase.getId());
+        assertThat(cancelled.status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(cancelled.getExecuted()).isEqualTo(4);
+        assertThat(cancelled.getCancelled()).isEqualTo(6);
+        assertThat(cancelled.getReservedCredits()).isEqualByComparingTo("0.00");
+        assertThat(cancelled.getCancelReason()).isEqualTo(CancelReason.USER_REQUEST);
+        AppUser after = database.account(buyer.getId());
+        assertThat(after.getBalance()).isEqualByComparingTo("995.88");
+        assertThat(after.getReserved()).isEqualByComparingTo("0.00");
+        assertThat(after.availableBalance()).isEqualByComparingTo("995.88");
+        assertThat(database.holdingOf(buyer, kane)).hasValueSatisfying(holding ->
+                assertThat(holding.getQuantity()).isEqualTo(4));
+        assertThat(entriesOf(buyer)).filteredOn(entry -> entry.eventType() == AuditEventType.ORDER_CANCELLED)
+                .singleElement().satisfies(entry -> {
+                    assertThat(entry.actorType()).isEqualTo(AuditActorType.USER);
+                    assertThat(entry.orderId()).isEqualTo(purchase.getId());
+                    assertThat(entry.cancelReason()).isEqualTo(CancelReason.USER_REQUEST);
+                    assertThat(entry.quantity()).isEqualTo(6);
+                });
+    }
+
+    @Test
+    void cancelarUnaVentaConRemanenteDejaSusTokensLibresDeNuevoUS68() {
+        AppUser seller = user(INITIAL_BALANCE);
+        startScenario();
+        service.buy(seller.getId(), kane.id(), 100);
+        MarketOrder sale = service.sell(seller.getId(), kane.id(), 5).order();
+
+        service.cancel(seller.getId(), sale.getId());
+
+        MarketOrder cancelled = database.ordersOf(seller).getLast();
+        assertThat(cancelled.status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(cancelled.getCancelled()).isEqualTo(5);
+        assertThat(database.holdingOf(seller, kane)).hasValueSatisfying(holding -> {
+            assertThat(holding.getQuantity()).isEqualTo(100);
+            assertThat(holding.getCommitted()).isZero();
+        });
+        assertThat(database.account(seller.getId()).getBalance()).isEqualByComparingTo("900.00");
+    }
+
+    @Test
+    void conElJugadorInactivoTambienSeCancelaFR032() {
+        AppUser buyer = user(INITIAL_BALANCE);
+        AppUser seller = user(INITIAL_BALANCE);
+        startScenario();
+        service.buy(seller.getId(), kane.id(), 100);
+        MarketOrder purchase = service.buy(buyer.getId(), kane.id(), 10).order();
+        database.quoteDatabase().inactive(kane);
+
+        service.cancel(buyer.getId(), purchase.getId());
+
+        assertThat(database.ordersOf(buyer).getFirst().status()).isEqualTo(OrderStatus.CANCELLED);
+        AppUser after = database.account(buyer.getId());
+        assertThat(after.getBalance()).isEqualByComparingTo(INITIAL_BALANCE);
+        assertThat(after.getReserved()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void unaOrdenYaCanceladaNoSeVuelveACancelarUS69() {
+        AppUser seller = user(INITIAL_BALANCE);
+        startScenario();
+        service.buy(seller.getId(), kane.id(), 100);
+        MarketOrder sale = service.sell(seller.getId(), kane.id(), 5).order();
+        service.cancel(seller.getId(), sale.getId());
+        int entriesBefore = database.auditEntries().size();
+
+        assertThatThrownBy(() -> service.cancel(seller.getId(), sale.getId()))
+                .isInstanceOf(OrderNotCancellableException.class)
+                .hasMessage("La orden ya está cancelada.");
+        assertThat(database.auditEntries()).hasSize(entriesBefore);
+    }
+
+    @Test
+    void unaOrdenDeOtroUsuarioNoSeCancelaUS610() {
+        AppUser buyer = user(INITIAL_BALANCE);
+        AppUser seller = user(INITIAL_BALANCE);
+        startScenario();
+        service.buy(seller.getId(), kane.id(), 100);
+        MarketOrder purchase = service.buy(buyer.getId(), kane.id(), 10).order();
+
+        assertThatThrownBy(() -> service.cancel(seller.getId(), purchase.getId()))
+                .isInstanceOf(OrderNotOwnedException.class)
+                .hasMessage("La orden no pertenece al usuario.");
+        MarketOrder untouched = database.ordersOf(buyer).getFirst();
+        assertThat(untouched.status()).isEqualTo(OrderStatus.PENDING);
+        assertThat(database.account(buyer.getId()).getReserved()).isEqualByComparingTo("10.30");
+    }
+
+    @Test
+    void laOrdenInicialNoLaCancelaNingunUsuarioNiElSuperusuarioUS610() {
+        AppUser buyer = user(INITIAL_BALANCE);
+        startScenario();
+        service.buy(buyer.getId(), kane.id(), 10);
+        long initialId = database.initialOrderOf(kane).getId();
+
+        assertThatThrownBy(() -> service.cancel(buyer.getId(), initialId))
+                .isInstanceOf(OrderNotOwnedException.class);
+        assertThatThrownBy(() -> service.cancel(database.superuser().getId(), initialId))
+                .isInstanceOf(OrderNotOwnedException.class);
+        assertThat(database.initialOrderOf(kane).pending()).isEqualTo(90);
     }
 
     /**

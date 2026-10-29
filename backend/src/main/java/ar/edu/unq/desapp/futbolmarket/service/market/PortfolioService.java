@@ -8,14 +8,12 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.HoldingView;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderView;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.Portfolio;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.Quote;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
-import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.UserNotFoundException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.market.HoldingRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.market.MarketOrderRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.market.TradeRepository;
@@ -46,9 +44,7 @@ public class PortfolioService {
      */
     @Transactional(readOnly = true)
     public Portfolio current(long requesterId, long userId) {
-        AppUser requester = userRepository.findById(requesterId).orElseThrow(InvalidCredentialsException::new);
-        requester.requireCanAccessAccountOf(userId);
-        AppUser account = userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
+        AppUser account = AccountAccess.accountOf(userRepository, requesterId, userId);
         if (account.getRole() == Role.ADMIN) {
             List<OrderView> initialOrders = orderRepository.findInitialOrdersOf(userId);
             return Portfolio.currentOfSuperuser(account, initialOrders,

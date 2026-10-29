@@ -31,8 +31,14 @@ export function AppLayout() {
             <Link to="/ranking">Ranking</Link>
             {/* El listado del mercado es para todos, también sin sesión */}
             <Link to="/mercado">Mercado</Link>
-            {/* El portfolio es de quien opera: solo USER */}
-            {profile?.role === 'USER' ? <Link to="/portfolio">Portfolio</Link> : null}
+            {/* El portfolio, las operaciones y las órdenes son de quien opera: solo USER */}
+            {profile?.role === 'USER' ? (
+              <>
+                <Link to="/portfolio">Portfolio</Link>
+                <Link to="/operaciones">Operaciones</Link>
+                <Link to="/ordenes">Mis órdenes</Link>
+              </>
+            ) : null}
             {/* La entrada a la administración existe solo para ADMIN (FR-064) */}
             {profile?.role === 'ADMIN' ? <Link to="/admin">Administración</Link> : null}
           </>

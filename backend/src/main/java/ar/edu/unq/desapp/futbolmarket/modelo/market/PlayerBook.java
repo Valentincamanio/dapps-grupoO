@@ -124,6 +124,31 @@ public final class PlayerBook {
     }
 
     /**
+     * Cancela el remanente de una orden propia (FR-034 y research D16): lo ejecutado se conserva,
+     * una compra devuelve su reserva al libre y una venta libera sus tokens comprometidos. Una orden
+     * ajena o inicial es 403 y una cerrada, 409, sin cambiar nada. Se puede cancelar aunque el
+     * jugador no sea operable (FR-032).
+     */
+    public BookOutcome cancel(MarketOrder order, long requesterId, Instant at) {
+        order.requireOwnedBy(requesterId);
+        AppUser owner = accountOf(requesterId);
+        PartyState before = stateOf(owner);
+        int pending = order.pending();
+        BigDecimal released = order.cancelRemainder(CancelReason.USER_REQUEST);
+        BookOutcome.Builder outcome = new BookOutcome.Builder(player, quote, owner, order);
+        if (order.getSide() == OrderSide.BUY) {
+            owner.release(released);
+        } else {
+            Holding holding = holdingOf(requesterId);
+            holding.releaseCommitted(pending);
+            outcome.changed(holding);
+        }
+        outcome.orderCancelled(order, AuditEntry.orderCancelled(order, player, AuditActor.user(requesterId),
+                new PartyChange(before, stateOf(owner)), at));
+        return outcome.build();
+    }
+
+    /**
      * Un cruce: el comprador paga desde la reserva de su compra, el vendedor cobra y los tokens
      * pasan de la venta (o del pendiente de la inicial) a la tenencia del comprador. Si la
      * operación cuesta más que lo reservado, porque el precio subió desde que se creó la compra, el

@@ -475,6 +475,128 @@ class OrderControllerIT {
         assertThat(json(result).get("message").asString()).isEqualTo(MISSING_CREDENTIAL_MESSAGE);
     }
 
+    @Test
+    void cancelarUnaCompraParcialResponde200ConLaFormaDelContrato() throws Exception {
+        TestUser first = helper.registerUser();
+        TestUser buyer = helper.registerUser();
+        buy(bearer(first), body(kane.id(), "97"));
+        long purchase = orderId(buy(bearer(buyer), body(kane.id(), "10")));
+
+        MvcTestResult result = cancel(bearer(buyer), purchase);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        assertThat(raw(result)).contains("\"status\":\"CANCELLED\"", "\"requestedQuantity\":10",
+                "\"executedQuantity\":3", "\"cancelledQuantity\":7", "\"pendingQuantity\":0",
+                "\"reservedCredits\":0.00", "\"balance\":997.00", "\"availableBalance\":997.00",
+                "\"reservedBalance\":0.00");
+        JsonNode order = json(result).get("order");
+        assertThat(order.get("id").asLong()).isEqualTo(purchase);
+        assertThat(order.get("side").asString()).isEqualTo("BUY");
+        assertThat(order.get("ownerType").asString()).isEqualTo("USER");
+        assertThat(order.get("player").get("name").asString()).isEqualTo("Harry Kane");
+        assertThat(order.get("createdAt").asString()).isEqualTo("2026-10-28T15:00:00Z");
+        AppUser after = database.account(buyer.id());
+        assertThat(after.getReserved()).isEqualByComparingTo("0.00");
+        assertThat(database.ordersOf(after).getFirst().status()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelarUnaOrdenCerradaResponde409() throws Exception {
+        TestUser user = helper.registerUser();
+        long executed = orderId(buy(bearer(user), body(kane.id(), "10")));
+
+        MvcTestResult result = cancel(bearer(user), executed);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(json(result).get("message").asString()).isEqualTo("La orden ya está ejecutada.");
+        assertThat(database.account(user.id()).getBalance()).isEqualByComparingTo("990.00");
+    }
+
+    @Test
+    void cancelarUnaOrdenAjenaResponde403YNadaCambia() throws Exception {
+        TestUser first = helper.registerUser();
+        TestUser buyer = helper.registerUser();
+        TestUser other = helper.registerUser();
+        buy(bearer(first), body(kane.id(), "97"));
+        long purchase = orderId(buy(bearer(buyer), body(kane.id(), "10")));
+
+        MvcTestResult result = cancel(bearer(other), purchase);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(json(result).get("message").asString()).isEqualTo("La orden no pertenece al usuario.");
+        assertThat(database.ordersOf(database.account(buyer.id())).getFirst().status())
+                .isEqualTo(OrderStatus.PARTIAL);
+        assertThat(database.account(buyer.id()).getReserved()).isEqualByComparingTo("7.21");
+    }
+
+    @Test
+    void cancelarLaOrdenInicialResponde403() throws Exception {
+        TestUser user = helper.registerUser();
+
+        MvcTestResult result = cancel(bearer(user), database.initialOrderOf(kane).getId());
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(json(result).get("message").asString()).isEqualTo("La orden no pertenece al usuario.");
+        assertThat(database.initialOrderOf(kane).pending()).isEqualTo(100);
+    }
+
+    @Test
+    void elAdministradorNoCancelaYRecibe403AntesDelController() throws Exception {
+        TestUser first = helper.registerUser();
+        TestUser buyer = helper.registerUser();
+        buy(bearer(first), body(kane.id(), "97"));
+        long purchase = orderId(buy(bearer(buyer), body(kane.id(), "10")));
+        String adminToken = helper.login(new TestUser(null, ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD, null));
+
+        MvcTestResult result = cancel(BEARER_PREFIX + adminToken, purchase);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(json(result).get("message").asString()).isEqualTo(FORBIDDEN_MESSAGE);
+        assertThat(database.ordersOf(database.account(buyer.id())).getFirst().status())
+                .isEqualTo(OrderStatus.PARTIAL);
+    }
+
+    @Test
+    void cancelarUnaOrdenInexistenteResponde404() throws Exception {
+        TestUser user = helper.registerUser();
+
+        MvcTestResult result = cancel(bearer(user), 999_999L);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+        assertThat(json(result).get("message").asString()).isEqualTo("No se encontró la orden con id 999999.");
+    }
+
+    @Test
+    void cancelarConUnIdentificadorInvalidoResponde400() throws Exception {
+        TestUser user = helper.registerUser();
+
+        MvcTestResult result = cancel(bearer(user), 0L);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(json(result).get("message").asString()).isEqualTo("Los parámetros enviados no son válidos.");
+    }
+
+    @Test
+    void cancelarSinCredencialResponde401() throws Exception {
+        TestUser user = helper.registerUser();
+        long executed = orderId(buy(bearer(user), body(kane.id(), "10")));
+
+        MvcTestResult result = mvc.post().uri("/orders/%d/cancel".formatted(executed)).exchange();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+        assertThat(json(result).get("message").asString()).isEqualTo(MISSING_CREDENTIAL_MESSAGE);
+    }
+
+    private MvcTestResult cancel(String authorization, long orderId) {
+        return mvc.post().uri("/orders/%d/cancel".formatted(orderId)).header(AUTHORIZATION_HEADER, authorization)
+                .exchange();
+    }
+
+    private long orderId(MvcTestResult result) throws Exception {
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.CREATED.value());
+        return json(result).get("order").get("id").asLong();
+    }
+
     private MvcTestResult sell(String authorization, String body) {
         return mvc.post().uri(SELL_PATH).header(AUTHORIZATION_HEADER, authorization)
                 .contentType(MediaType.APPLICATION_JSON).content(body).exchange();
