@@ -285,4 +285,32 @@ class MarketOrderTest {
         assertThatThrownBy(() -> buy.cancelBeyond(keep))
                 .isInstanceOf(MarketInvariantException.class);
     }
+
+    @Test
+    void sumarALaReservaCubreUnaOperacionMasCaraQueLoReservado() {
+        MarketOrder buy = MarketOrder.buy(OWNER, PLAYER, 1, new BigDecimal("1.03"), RESERVATION_PRICE, AT);
+
+        buy.addToReservation(new BigDecimal("0.07"));
+        buy.consumeReservation(new BigDecimal("1.10"));
+
+        assertThat(buy.getReservedCredits()).isEqualTo(new BigDecimal("0.00"));
+    }
+
+    @Test
+    void sumarUnMontoNegativoALaReservaEsUnaInvariante() {
+        MarketOrder buy = MarketOrder.buy(OWNER, PLAYER, 10, RESERVATION, RESERVATION_PRICE, AT);
+
+        assertThatThrownBy(() -> buy.addToReservation(new BigDecimal("-0.01")))
+                .isInstanceOf(MarketInvariantException.class);
+        assertThat(buy.getReservedCredits()).isEqualTo(RESERVATION);
+    }
+
+    @Test
+    void unaVentaNoSumaAUnaReserva() {
+        MarketOrder sell = MarketOrder.sell(OWNER, PLAYER, 10, AT);
+
+        assertThatThrownBy(() -> sell.addToReservation(new BigDecimal("1.00")))
+                .isInstanceOf(MarketInvariantException.class)
+                .hasMessage("Solo una compra reserva créditos.");
+    }
 }

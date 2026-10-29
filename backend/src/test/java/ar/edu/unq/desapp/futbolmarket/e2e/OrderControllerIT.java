@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
 import ar.edu.unq.desapp.futbolmarket.e2e.AuthTestHelper.TestUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
@@ -37,7 +38,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * La compra de punta a punta por HTTP (US1), contra una H2 propia, con el administrador configurado
+ * La compra (US1) y la venta (US4) de punta a punta por HTTP, contra una H2 propia, con el administrador configurado
  * como superusuario y el reloj quieto el 28/10/2026. Kane cotiza 103,00 desde el lunes 26/10 y
  * tiene su orden inicial con los 100 tokens.
  */
@@ -54,6 +55,7 @@ class OrderControllerIT {
     private static final Instant QUOTE_FROM = Instant.parse("2026-10-26T03:00:00Z");
 
     private static final String BUY_PATH = "/orders/buy";
+    private static final String SELL_PATH = "/orders/sell";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String API_KEY_HEADER = "X-API-Key";
     private static final String BEARER_PREFIX = "Bearer ";
@@ -324,6 +326,158 @@ class OrderControllerIT {
         assertThat(withApiKey.getResponse().getStatus()).isEqualTo(HttpStatus.CREATED.value());
         assertThat(json(withApiKey).get("balance").decimalValue()).isEqualByComparingTo("998.00");
         assertThat(database.ordersOf(database.account(user.id()))).hasSize(2);
+    }
+
+    @Test
+    void venderContraUnaCompraPendienteResponde201ConContraparteUsuario() throws Exception {
+        String holder = bearer(helper.registerUser());
+        TestUser buyer = helper.registerUser();
+        buy(holder, body(kane.id(), "100"));
+        buy(bearer(buyer), body(kane.id(), "4"));
+
+        MvcTestResult result = sell(holder, body(kane.id(), "4"));
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.CREATED.value());
+        String raw = raw(result);
+        assertThat(raw).contains("\"tokenPrice\":1.0300", "\"total\":4.12", "\"executedTotal\":4.12",
+                "\"balance\":904.12", "\"availableBalance\":904.12", "\"reservedBalance\":0.00");
+        JsonNode execution = jsonMapper.readTree(raw);
+        JsonNode order = execution.get("order");
+        assertThat(order.get("side").asString()).isEqualTo("SELL");
+        assertThat(order.get("ownerType").asString()).isEqualTo("USER");
+        assertThat(order.get("status").asString()).isEqualTo("EXECUTED");
+        assertThat(order.get("pendingQuantity").asInt()).isZero();
+        assertThat(execution.get("trades").values()).singleElement().satisfies(trade -> {
+            assertThat(trade.get("quantity").asInt()).isEqualTo(4);
+            assertThat(trade.get("counterparty").asString()).isEqualTo("USER");
+            assertThat(trade.has("buyerId")).isFalse();
+        });
+        assertThat(database.ordersOf(database.account(buyer.id())).getFirst().status()).isEqualTo(OrderStatus.EXECUTED);
+    }
+
+    @Test
+    void venderMientrasLaInicialTieneTokensResponde409ConLosQueLeQuedanAlAdministrador() throws Exception {
+        TestUser user = helper.registerUser();
+        String bearer = bearer(user);
+        buy(bearer, body(kane.id(), "99"));
+
+        MvcTestResult result = sell(bearer, body(kane.id(), "5"));
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(json(result).get("message").asString())
+                .isEqualTo("Todavía no se puede vender: al administrador le queda 1 token de este jugador.");
+        assertThat(json(result).get("path").asString()).isEqualTo(SELL_PATH);
+        assertThat(database.ordersOf(database.account(user.id()))).hasSize(1);
+    }
+
+    @Test
+    void venderMasQueLosTokensLibresResponde409() throws Exception {
+        TestUser user = helper.registerUser();
+        String bearer = bearer(user);
+        buy(bearer, body(kane.id(), "100"));
+        sell(bearer, body(kane.id(), "60"));
+
+        MvcTestResult result = sell(bearer, body(kane.id(), "50"));
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(json(result).get("message").asString())
+                .isEqualTo("Tokens insuficientes: tiene 40 tokens libres de este jugador.");
+        assertThat(database.ordersOf(database.account(user.id()))).hasSize(2);
+    }
+
+    @Test
+    void conUnaOrdenPendienteDelOtroLadoResponde409EnLosDosSentidos() throws Exception {
+        String holder = bearer(helper.registerUser());
+        String buyer = bearer(helper.registerUser());
+        buy(holder, body(kane.id(), "100"));
+        buy(buyer, body(kane.id(), "3"));
+
+        MvcTestResult sellWithPurchase = sell(buyer, body(kane.id(), "1"));
+        sell(holder, body(kane.id(), "5"));
+        MvcTestResult buyWithSale = buy(holder, body(kane.id(), "1"));
+
+        assertThat(sellWithPurchase.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(json(sellWithPurchase).get("message").asString())
+                .isEqualTo("Ya tiene una orden de compra pendiente de este jugador.");
+        assertThat(buyWithSale.getResponse().getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(json(buyWithSale).get("message").asString())
+                .isEqualTo("Ya tiene una orden de venta pendiente de este jugador.");
+    }
+
+    @Test
+    void elAdministradorNoVendeYRecibe403() throws Exception {
+        String adminToken = helper.login(new TestUser(null, ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD, null));
+        AppUser before = database.superuser();
+
+        MvcTestResult result = sell(BEARER_PREFIX + adminToken, body(kane.id(), "10"));
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(json(result).get("message").asString()).isEqualTo(FORBIDDEN_MESSAGE);
+        assertThat(database.ordersOf(before)).singleElement()
+                .satisfies(order -> assertThat(order.isInitial()).isTrue());
+        assertThat(database.initialOrderOf(kane).pending()).isEqualTo(100);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "cantidad 0                      | {\"playerId\": %d, \"quantity\": 0}    | quantity",
+            "cantidad negativa               | {\"playerId\": %d, \"quantity\": -1}   | quantity",
+            "cantidad decimal                | {\"playerId\": %d, \"quantity\": 1.5}  | quantity",
+            "cantidad mayor que 100          | {\"playerId\": %d, \"quantity\": 101}  | quantity",
+            "sin cantidad                    | {\"playerId\": %d}                     | quantity",
+            "sin jugador                     | {\"quantity\": 10, \"other\": %d}      | playerId",
+            "jugador 0                       | {\"playerId\": 0, \"quantity\": 10, \"other\": %d} | playerId"})
+    void unaVentaConCuerpoInvalidoResponde400ConLasViolaciones(String description, String template, String field)
+            throws Exception {
+        TestUser user = helper.registerUser();
+
+        MvcTestResult result = sell(bearer(user), template.formatted(kane.id()));
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        JsonNode error = json(result);
+        assertThat(error.get("message").asString()).isEqualTo(INVALID_REQUEST);
+        assertThat(error.get("path").asString()).isEqualTo(SELL_PATH);
+        assertThat(error.get("violations").values()).isNotEmpty()
+                .allSatisfy(violation -> assertThat(violation.get("field").asString()).isEqualTo(field));
+        assertNothingBought(user);
+    }
+
+    @Test
+    void unaVentaSinCuerpoOConJsonInvalidoResponde400() throws Exception {
+        String bearer = bearer(helper.registerUser());
+
+        MvcTestResult withoutBody = mvc.post().uri(SELL_PATH).header(AUTHORIZATION_HEADER, bearer)
+                .contentType(MediaType.APPLICATION_JSON).exchange();
+        MvcTestResult invalidJson = sell(bearer, "{\"playerId\": ");
+
+        assertThat(withoutBody.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(json(withoutBody).get("message").asString()).isEqualTo(UNREADABLE_BODY);
+        assertThat(invalidJson.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(json(invalidJson).get("message").asString()).isEqualTo(UNREADABLE_BODY);
+    }
+
+    @Test
+    void unaVentaDeUnJugadorInexistenteResponde404() throws Exception {
+        TestUser user = helper.registerUser();
+
+        MvcTestResult result = sell(bearer(user), body(MISSING_PLAYER, "10"));
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+        assertNothingBought(user);
+    }
+
+    @Test
+    void unaVentaSinCredencialResponde401() throws Exception {
+        MvcTestResult result = mvc.post().uri(SELL_PATH).contentType(MediaType.APPLICATION_JSON)
+                .content(body(kane.id(), "10")).exchange();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+        assertThat(json(result).get("message").asString()).isEqualTo(MISSING_CREDENTIAL_MESSAGE);
+    }
+
+    private MvcTestResult sell(String authorization, String body) {
+        return mvc.post().uri(SELL_PATH).header(AUTHORIZATION_HEADER, authorization)
+                .contentType(MediaType.APPLICATION_JSON).content(body).exchange();
     }
 
     private void assertConflict(Player player, String message) throws Exception {

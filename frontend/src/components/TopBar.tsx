@@ -1,5 +1,5 @@
 // Encabezado del pizarrón: logo, enlaces de secciones (quien lo usa decide cuáles ve cada rol),
-// buscador opcional, saldo opcional y enlace de cuenta.
+// buscador opcional, saldo libre opcional y enlace de cuenta.
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import styles from './TopBar.module.css';
@@ -9,6 +9,7 @@ interface TopBarProps {
   // tiene una sola
   navSlot?: ReactNode;
   searchSlot?: ReactNode;
+  // El saldo libre ya formateado: lo que se puede usar, sin lo reservado para compras (FR-062)
   balance?: string;
   accountLink: ReactNode;
 }
@@ -29,7 +30,7 @@ export function TopBar({ navSlot, searchSlot, balance, accountLink }: TopBarProp
       <div className={styles.right}>
         {balance !== undefined ? (
           <div className={styles.balance}>
-            Saldo: <b>{balance}</b>
+            Saldo libre: <b>{balance}</b>
           </div>
         ) : null}
         <div className={styles.account}>{accountLink}</div>

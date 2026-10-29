@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,12 @@ class OrderMatcherTest {
     private static final Instant MONDAY = at("2026-08-24T10:00");
     private static final Instant TUESDAY = at("2026-08-25T10:00");
     private static final BigDecimal PRICE = new BigDecimal("1.0300");
+    private static final long SELLER = 20L;
+    private static final long USER_A = 21L;
+    private static final long USER_C = 22L;
+    private static final BigDecimal RISEN_PRICE = new BigDecimal("1.1000");
+    private static final Map<Long, BigDecimal> PLENTY = Map.of(USER_A, new BigDecimal("1000.00"),
+            USER_C, new BigDecimal("1000.00"), SELLER, new BigDecimal("1000.00"));
 
     @Test
     void unaCompraDeDiezContraLaInicialConCienEsUnSoloCruceAUnPesoPorDiez() {
@@ -134,5 +141,135 @@ class OrderMatcherTest {
 
         assertThat(initial.pending()).isEqualTo(3);
         assertThat(sale.pending()).isEqualTo(5);
+    }
+
+    @Test
+    void unaVentaDeOchoContraUnaCompraDeCincoVendeCincoYQuedanTresDeRemanente() {
+        MarketOrder purchase = MarketFixtures.buy(2L, USER_A, PLAYER, 5, "1.0300", MONDAY);
+
+        MatchPlan plan = OrderMatcher.matchSell(SELLER, 8, List.of(purchase), PLENTY, PRICE);
+
+        assertThat(plan.fills()).singleElement().satisfies(fill -> {
+            assertThat(fill.counterpart()).isSameAs(purchase);
+            assertThat(fill.quantity()).isEqualTo(5);
+            assertThat(fill.tokenPrice()).isEqualByComparingTo(PRICE);
+            assertThat(fill.total()).isEqualTo(new BigDecimal("5.15"));
+        });
+        assertThat(plan.remainder()).isEqualTo(3);
+        assertThat(plan.shortfalls()).isEmpty();
+    }
+
+    @Test
+    void conDosComprasCompletaLaMasViejaYSigueConLaOtra() {
+        MarketOrder fromA = MarketFixtures.buy(2L, USER_A, PLAYER, 5, "1.0300", MONDAY);
+        MarketOrder fromC = MarketFixtures.buy(3L, USER_C, PLAYER, 5, "1.0300", TUESDAY);
+
+        MatchPlan plan = OrderMatcher.matchSell(SELLER, 7, List.of(fromC, fromA), PLENTY, PRICE);
+
+        assertThat(plan.fills()).extracting(Fill::counterpart).containsExactly(fromA, fromC);
+        assertThat(plan.fills()).extracting(Fill::quantity).containsExactly(5, 2);
+        assertThat(plan.remainder()).isZero();
+    }
+
+    @Test
+    void unaCompraConDiezTreintaDisponiblesAUnoDiezPagaNueveYElRestoEsFaltante() {
+        MarketOrder purchase = MarketFixtures.buy(2L, USER_A, PLAYER, 10, "1.0300", MONDAY);
+
+        MatchPlan plan = OrderMatcher.matchSell(SELLER, 10, List.of(purchase), Map.of(USER_A, zero()), RISEN_PRICE);
+
+        assertThat(plan.fills()).singleElement().satisfies(fill -> {
+            assertThat(fill.quantity()).isEqualTo(9);
+            assertThat(fill.total()).isEqualTo(new BigDecimal("9.90"));
+        });
+        assertThat(plan.shortfalls()).singleElement().satisfies(shortfall -> {
+            assertThat(shortfall.order()).isSameAs(purchase);
+            assertThat(shortfall.quantity()).isEqualTo(1);
+        });
+        assertThat(plan.remainder()).isEqualTo(1);
+    }
+
+    @Test
+    void siAlcanzaParaLoQueSeVendeNoHayFaltanteAunqueNoAlcanceParaTodoElPendiente() {
+        MarketOrder purchase = MarketFixtures.buy(2L, USER_A, PLAYER, 10, "1.0300", MONDAY);
+
+        MatchPlan plan = OrderMatcher.matchSell(SELLER, 4, List.of(purchase), Map.of(USER_A, zero()), RISEN_PRICE);
+
+        assertThat(plan.fills()).singleElement().satisfies(fill -> {
+            assertThat(fill.quantity()).isEqualTo(4);
+            assertThat(fill.total()).isEqualTo(new BigDecimal("4.40"));
+        });
+        assertThat(plan.shortfalls()).isEmpty();
+        assertThat(plan.remainder()).isZero();
+    }
+
+    @Test
+    void unaCompraQueNoPagaNiUnTokenEsFaltanteEnteraYLaVentaSigueConLaProxima() {
+        MarketOrder poor = buyWithReservation(2L, USER_A, 5, "0.50", MONDAY);
+        MarketOrder fromC = MarketFixtures.buy(3L, USER_C, PLAYER, 5, "1.1000", TUESDAY);
+        Map<Long, BigDecimal> free = Map.of(USER_A, new BigDecimal("0.50"), USER_C, zero());
+
+        MatchPlan plan = OrderMatcher.matchSell(SELLER, 5, List.of(poor, fromC), free, RISEN_PRICE);
+
+        assertThat(plan.shortfalls()).singleElement().satisfies(shortfall -> {
+            assertThat(shortfall.order()).isSameAs(poor);
+            assertThat(shortfall.quantity()).isEqualTo(5);
+        });
+        assertThat(plan.fills()).singleElement().satisfies(fill -> {
+            assertThat(fill.counterpart()).isSameAs(fromC);
+            assertThat(fill.quantity()).isEqualTo(5);
+        });
+        assertThat(plan.remainder()).isZero();
+    }
+
+    @Test
+    void lasComprasDelMismoDuenoSeSalteanYLasVentasNoCuentan() {
+        MarketOrder own = MarketFixtures.buy(2L, SELLER, PLAYER, 5, "1.0300", MONDAY);
+        MarketOrder sale = sell(3L, USER_A, PLAYER, 5, MONDAY);
+        MarketOrder fromC = MarketFixtures.buy(4L, USER_C, PLAYER, 3, "1.0300", TUESDAY);
+
+        MatchPlan plan = OrderMatcher.matchSell(SELLER, 5, List.of(own, sale, fromC), PLENTY, PRICE);
+
+        assertThat(plan.fills()).extracting(Fill::counterpart).containsExactly(fromC);
+        assertThat(plan.remainder()).isEqualTo(2);
+    }
+
+    @Test
+    void elResultadoDeUnaVentaNoDependeDelOrdenDeEntrada() {
+        MarketOrder fromA = MarketFixtures.buy(2L, USER_A, PLAYER, 4, "1.0300", MONDAY);
+        MarketOrder fromC = MarketFixtures.buy(3L, USER_C, PLAYER, 4, "1.0300", MONDAY);
+        MarketOrder late = MarketFixtures.buy(4L, USER_B, PLAYER, 4, "1.0300", TUESDAY);
+        Map<Long, BigDecimal> free = Map.of(USER_A, zero(), USER_C, zero(), USER_B, zero());
+
+        MatchPlan forward = OrderMatcher.matchSell(SELLER, 10, List.of(fromA, fromC, late), free, PRICE);
+        MatchPlan backward = OrderMatcher.matchSell(SELLER, 10, List.of(late, fromC, fromA), free, PRICE);
+
+        assertThat(backward).isEqualTo(forward);
+        assertThat(forward.fills()).extracting(Fill::counterpart).containsExactly(fromA, fromC, late);
+        assertThat(forward.fills()).extracting(Fill::quantity).containsExactly(4, 4, 2);
+    }
+
+    @Test
+    void loQueUnaCompraTomaDelLibreYaNoEstaParaLaSiguienteDelMismoDueno() {
+        MarketOrder first = MarketFixtures.buy(2L, USER_A, PLAYER, 5, "1.0000", MONDAY);
+        MarketOrder second = MarketFixtures.buy(3L, USER_A, PLAYER, 5, "1.0000", TUESDAY);
+        Map<Long, BigDecimal> free = Map.of(USER_A, new BigDecimal("0.50"));
+
+        MatchPlan plan = OrderMatcher.matchSell(SELLER, 10, List.of(first, second), free, RISEN_PRICE);
+
+        assertThat(plan.fills()).extracting(Fill::quantity).containsExactly(5, 4);
+        assertThat(plan.shortfalls()).singleElement().satisfies(shortfall -> {
+            assertThat(shortfall.order()).isSameAs(second);
+            assertThat(shortfall.quantity()).isEqualTo(1);
+        });
+    }
+
+    private static MarketOrder buyWithReservation(long id, long ownerId, int quantity, String reserved,
+                                                  Instant createdAt) {
+        return MarketOrder.reconstitute(new MarketOrder.State(id, OrderSide.BUY, ownerId, PLAYER, quantity, 0, 0,
+                new BigDecimal(reserved), new BigDecimal("1.0300"), createdAt, false, null));
+    }
+
+    private static BigDecimal zero() {
+        return MarketMath.ZERO_CREDITS;
     }
 }

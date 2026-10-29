@@ -71,3 +71,19 @@
   outline: 3px solid var(--ink);
   outline-offset: 3px;
 }
+
+/* Las órdenes y el panel de operar van sobre el pizarrón, debajo de la hoja */
+.market {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.marketHeading {
+  margin: 0;
+  font-family: var(--font-script);
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--yellow);
+}

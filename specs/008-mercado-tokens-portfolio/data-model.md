@@ -233,6 +233,13 @@ tokenPrice)`, con el pedido como dueño y cantidad (la orden todavía no existe:
 con `executedQuantity()` y `executedTotal()`; T078 suma el lado de venta y los `shortfalls`. `Fill.of(counterpart,
 quantity, tokenPrice)` calcula el total con `MarketMath.total`.
 
+Implementación (T078): el lado de venta es `OrderMatcher.matchSell(ownerId, quantity, opposite, freeBalances,
+tokenPrice)`. En vez de recibir cada compra con su disponible ya calculado, recibe el libre de cada dueño
+(`freeBalances`) y calcula el disponible de cada compra como su reserva más el libre de su dueño que no tomaron sus
+compras anteriores en el mismo cruce: así un dueño con dos compras pendientes no cuenta dos veces el mismo libre.
+`MatchPlan` suma `shortfalls` (`Shortfall(order, quantity)`; vacío en las compras, con un constructor de dos
+argumentos para ese lado).
+
 Casos que fija `OrderMatcherTest` (los del spec): compra de 10 contra la inicial con 100 → un `Fill` de 10 a 1,0000;
 inicial con 3 y compra de 10 → `Fill` de 3 a 1,0000 y remanente 7; compra de 10 contra una venta de 5 → `Fill` de 5 y
 remanente 5; dos ventas, la de B antes que la de D → primero B; venta de 8 contra una compra de 5 → `Fill` de 5 y
@@ -290,6 +297,20 @@ Implementación (T044 a T046):
   la cuenta, JPQL `min(id)` por rol) y lo bloquea con `lockById`; así su cuenta no se lee antes del bloqueo (D13).
   Los jugadores salen de `PlayerRepository.findAllByIds` (nuevo, con el equipo). Las cuatro entradas son
   `@Transactional`: `onStartup` y `afterSync` llaman a las otras dos dentro del mismo bean.
+
+Implementación de la venta (T079):
+
+- `placeBuy` y `placeSell` comparten la ejecución de un cruce. Antes de pagar, si la operación cuesta más que la
+  reserva de la compra (el precio subió), el comprador reserva la diferencia desde su libre y se suma a la reserva
+  de la orden con `MarketOrder.addToReservation` (nuevo); el plan ya verificó que le alcanza.
+- `placeSell` aplica en este orden: crea la venta y compromete sus tokens (`ORDER_CREATED`); ejecuta cada `Fill`
+  (`TRADE_EXECUTED`, autor el vendedor); cancela cada faltante con `cancelRemainder(INSUFFICIENT_CREDITS)` después
+  de ejecutar lo que sí se paga, que libera la reserva que le queda (`ORDER_CANCELLED`, autor `SYSTEM`); y recién al
+  final ajusta con `adjustReservation` la reserva de cada compra cruzada. Ajustar al final, y no después de cada
+  cruce, evita que el ajuste de una compra tome del libre lo que el plan contaba para otra del mismo dueño. Con
+  `cancelRemainder` después de ejecutar no hace falta `cancelBeyond`, que queda en el modelo sin uso en el cruce.
+- Un faltante cuya compra no tenía cambios todavía entra a las órdenes del resultado con su registro
+  (`BookOutcome.Builder.orderCancelled`).
 
 ### 2.11 `Portfolio`, `PortfolioPosition` y `PortfolioTotals`
 
@@ -794,3 +815,5 @@ acá. Donde dice "a decidir", el punto queda abierto para el equipo.
 | `TeamSelect` | Props `teams`, `value`, `status`, `onOpen`, `onSelect` y `onRetry`: la lista de equipos la carga quien lo usa | `MarketFilters` recibe los equipos y su estado desde la página, que los carga con `useCatalog` como la pizarra |
 | `VariationBadge` | Props `variation?` y `tone?` (`'chalk'` o `'ink'`); triángulo, monto y porcentaje con signo y el texto "sube" o "baja" | `ProfitBadge` sigue esa forma con "gana", "pierde" y "sin cambios" |
 | `RequoteChoice` como patrón de `ConfirmDialog` (D27, T039) | **No es un diálogo**: es un grupo de opciones en línea con los botones "Confirmar" y "Cancelar" opcionales. No tiene `role="dialog"`, foco inicial, Enter ni Escape | De `RequoteChoice` se toma solo que nada se envía hasta confirmar y el par de botones; `role="dialog"`, `aria-labelledby`, el foco inicial y el manejo de Enter y Escape de `ConfirmDialog` son nuevos |
+| `PlayerPage` y la tabla de cotizaciones (T076) | `PlayerQuotes.test.tsx` de la 007 busca **la única** `table` de la ficha (`getByRole('table')`) | Las órdenes pendientes de la ficha van con `OrderList` en la variante `market` y `layout="list"` (nuevo): tarjetas en una lista con los mismos datos, sin tabla. Van sobre el pizarrón, debajo de la hoja, junto con `TradePanel`, porque sus estilos son de tiza |
+| `Player.active` | La API lo envía en `GET /players/{id}`, pero el tipo `Player` del frontend no lo tenía y los jugadores de prueba de la 002 a la 007 no lo traen | `active?: boolean` opcional en `types/api.ts`; sin el campo el jugador se toma como activo. La ficha lo usa para el aviso de no operable (T073) |

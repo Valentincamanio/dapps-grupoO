@@ -13,6 +13,7 @@ import java.util.TreeSet;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.MarketInvariantException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.OppositeOrderPendingException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.PlayerNotTradableException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.SaleBlockedByInitialOrderException;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.Quote;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
@@ -90,40 +91,131 @@ public final class PlayerBook {
         BookOutcome.Builder outcome = new BookOutcome.Builder(player, quote, buyer, order);
         outcome.orderCreated(AuditEntry.orderCreated(order, player, AuditActor.user(ownerId),
                 new PartyChange(before, stateOf(buyer)), at));
-        plan.fills().forEach(fill -> executeBuy(outcome, order, buyer, fill, at));
+        plan.fills().forEach(fill -> executeTrade(outcome, order, fill.counterpart(), fill, ownerId, at));
         return outcome.build();
     }
 
     /**
-     * Un cruce de la compra: el comprador paga desde la reserva de su orden, el vendedor cobra y los
-     * tokens pasan de la venta (o del pendiente de la inicial) a la tenencia del comprador.
+     * Una venta (FR-011, FR-016, FR-023, FR-027 y research D10 y D11): se crea y compromete sus
+     * tokens, se cruza en el acto con las compras pendientes de la más vieja a la más nueva al
+     * precio vigente, y lo que falta queda pendiente con sus tokens comprometidos. Lo que una compra
+     * no puede pagar se cancela por saldo insuficiente, y la reserva de cada compra cruzada se
+     * vuelve a calcular para su remanente.
      */
-    private void executeBuy(BookOutcome.Builder outcome, MarketOrder order, AppUser buyer, Fill fill, Instant at) {
-        MarketOrder sell = fill.counterpart();
-        AppUser seller = accountOf(sell.getOwnerId());
+    public BookOutcome placeSell(long ownerId, int quantity, Instant at) {
+        AppUser seller = accountOf(ownerId);
+        seller.requireCanTrade();
+        requireTradable();
+        requireInitialOrderSoldOut();
+        requireNoOpenOrderOf(ownerId, OrderSide.BUY);
+        Holding sellerHolding = holdingOf(ownerId);
+        MarketOrder order = MarketOrder.sell(ownerId, playerId(), quantity, at);
+        PartyState before = stateOf(seller);
+        sellerHolding.commit(quantity);
+        BookOutcome.Builder outcome = new BookOutcome.Builder(player, quote, seller, order);
+        outcome.changed(sellerHolding);
+        outcome.orderCreated(AuditEntry.orderCreated(order, player, AuditActor.user(ownerId),
+                new PartyChange(before, stateOf(seller)), at));
+        MatchPlan plan = OrderMatcher.matchSell(ownerId, quantity, openOrders, freeBalances(), quote.tokenPrice());
+        plan.fills().forEach(fill -> executeTrade(outcome, fill.counterpart(), order, fill, ownerId, at));
+        plan.shortfalls().forEach(shortfall -> cancelForShortfall(outcome, shortfall.order(), at));
+        plan.fills().forEach(fill -> adjustReservation(fill.counterpart()));
+        return outcome.build();
+    }
+
+    /**
+     * Un cruce: el comprador paga desde la reserva de su compra, el vendedor cobra y los tokens
+     * pasan de la venta (o del pendiente de la inicial) a la tenencia del comprador. Si la
+     * operación cuesta más que lo reservado, porque el precio subió desde que se creó la compra, el
+     * comprador reserva antes la diferencia desde su libre (research D11).
+     *
+     * @param actorId quien hizo el pedido: el comprador o el vendedor
+     */
+    private void executeTrade(BookOutcome.Builder outcome, MarketOrder buyOrder, MarketOrder sellOrder, Fill fill,
+                              long actorId, Instant at) {
+        AppUser buyer = accountOf(buyOrder.getOwnerId());
+        AppUser seller = accountOf(sellOrder.getOwnerId());
         Holding buyerHolding = holdingOf(buyer.getId());
         PartyState buyerBefore = stateOf(buyer);
         PartyState sellerBefore = stateOf(seller);
         BigDecimal buyerBalanceBefore = buyer.getBalance();
         BigDecimal sellerBalanceBefore = seller.getBalance();
 
-        order.fill(fill.quantity());
-        order.consumeReservation(fill.total());
+        reserveShortage(buyOrder, buyer, fill.total());
+        buyOrder.fill(fill.quantity());
+        buyOrder.consumeReservation(fill.total());
         buyer.payFromReserve(fill.total());
         buyerHolding.buy(fill.quantity(), fill.total());
         outcome.changed(buyerHolding);
-        sell.fill(fill.quantity());
+        sellOrder.fill(fill.quantity());
         seller.receive(fill.total());
-        BigDecimal realized = sell.isInitial() ? null : sellFromHolding(outcome, seller, fill);
+        BigDecimal realized = sellOrder.isInitial() ? null : sellFromHolding(outcome, seller, fill);
 
-        Trade trade = new Trade(null, at, playerId(), order.getId(), sell.getId(), buyer.getId(), seller.getId(),
-                sell.ownerType(), fill.quantity(), fill.tokenPrice(), fill.total(), quote.id(),
+        Trade trade = new Trade(null, at, playerId(), buyOrder.getId(), sellOrder.getId(), buyer.getId(),
+                seller.getId(), sellOrder.ownerType(), fill.quantity(), fill.tokenPrice(), fill.total(), quote.id(),
                 buyerBalanceBefore, buyer.getBalance(), sellerBalanceBefore, seller.getBalance(),
                 buyerBefore.tokens(), tokensOf(buyer), sellerBefore.tokens(), tokensOf(seller), realized);
-        AuditEntry entry = AuditEntry.tradeExecuted(trade, player, AuditActor.user(buyer.getId()),
+        AuditEntry entry = AuditEntry.tradeExecuted(trade, player, AuditActor.user(actorId),
                 new PartyChange(buyerBefore, stateOf(buyer)), new PartyChange(sellerBefore, stateOf(seller)));
+        outcome.changed(buyer);
         outcome.changed(seller);
-        outcome.tradeExecuted(trade, order, sell, entry);
+        outcome.tradeExecuted(trade, buyOrder, sellOrder, entry);
+    }
+
+    /**
+     * Si la operación cuesta más que la reserva de la compra, el comprador reserva la diferencia
+     * desde su libre. El plan ya verificó que le alcanza.
+     */
+    private static void reserveShortage(MarketOrder buyOrder, AppUser buyer, BigDecimal total) {
+        BigDecimal shortage = total.subtract(buyOrder.getReservedCredits());
+        if (shortage.signum() > 0) {
+            buyer.reserve(shortage);
+            buyOrder.addToReservation(shortage);
+        }
+    }
+
+    /**
+     * Cancela por saldo insuficiente lo que la compra no pudo pagar (FR-027) y le devuelve su
+     * reserva al libre. El autor es el sistema.
+     */
+    private void cancelForShortfall(BookOutcome.Builder outcome, MarketOrder purchase, Instant at) {
+        AppUser buyer = accountOf(purchase.getOwnerId());
+        PartyState before = stateOf(buyer);
+        buyer.release(purchase.cancelRemainder(CancelReason.INSUFFICIENT_CREDITS));
+        outcome.changed(buyer);
+        outcome.orderCancelled(purchase, AuditEntry.orderCancelled(purchase, player, AuditActor.system(),
+                new PartyChange(before, stateOf(buyer)), at));
+    }
+
+    /**
+     * Deja la reserva de una compra cruzada en la de su remanente al precio de reserva, o en lo que
+     * su dueño pueda reservar si no alcanza (research D11). Si el precio bajó, lo que sobra vuelve al
+     * libre. Una compra cancelada o ejecutada queda sin reserva.
+     */
+    private void adjustReservation(MarketOrder purchase) {
+        AppUser buyer = accountOf(purchase.getOwnerId());
+        BigDecimal change = purchase.adjustReservation(purchase.getReservedCredits().add(buyer.availableBalance()));
+        if (change.signum() > 0) {
+            buyer.reserve(change);
+        } else if (change.signum() < 0) {
+            buyer.release(change.negate());
+        }
+    }
+
+    /**
+     * Las ventas de usuarios esperan a que el superusuario venda todos sus tokens del jugador
+     * (FR-011): no se crea nada.
+     */
+    private void requireInitialOrderSoldOut() {
+        if (initialOrder.pending() > 0) {
+            throw new SaleBlockedByInitialOrderException(initialOrder.pending());
+        }
+    }
+
+    private Map<Long, BigDecimal> freeBalances() {
+        Map<Long, BigDecimal> free = new HashMap<>();
+        accounts.forEach((id, account) -> free.put(id, account.availableBalance()));
+        return free;
     }
 
     /**

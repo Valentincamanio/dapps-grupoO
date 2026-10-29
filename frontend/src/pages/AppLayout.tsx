@@ -45,7 +45,7 @@ export function AppLayout() {
             onSelect={(player) => navigate(`/jugadores/${player.id}`)}
           />
         }
-        balance={profile ? formatBalance(profile.balance) : undefined}
+        balance={profile ? formatBalance(profile.availableBalance) : undefined}
         accountLink={accountLink}
       />
       <main className={styles.content}>

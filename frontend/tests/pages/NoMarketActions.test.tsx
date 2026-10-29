@@ -1,6 +1,6 @@
-// Feature 007, FR-071 y SC-020: las pantallas con cotizaciones y las de administración no ofrecen
-// operar en el mercado ni muestran datos de inversión del usuario. El precio por token del jugador
-// sí puede aparecer, como texto.
+// Feature 007, FR-071 y SC-020, con el mercado de la 008: las pantallas con cotizaciones y las de
+// administración no ofrecen sumar jugadores al plantel ni muestran una cartera de acciones. Las órdenes
+// pendientes, con sus tokens, y el precio por token del jugador sí pueden aparecer.
 import { screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { formatCredits } from '../../src/utils/quotes';
@@ -10,8 +10,8 @@ import { currentQuoteOf, STRATEGY_A, STRATEGY_B } from '../mocks/quotes';
 import { renderWithRouter } from '../mocks/renderWithRouter';
 import { server } from '../mocks/server';
 
-const MARKET_ACTION = /compra|comprar|vend|sumar|plantel|orden/i;
-const INVESTMENT_DATA = /presupuesto|portfolio|cartera|\btokens\b|mis acciones/i;
+const MARKET_ACTION = /sumar|plantel/i;
+const INVESTMENT_DATA = /cartera|mis acciones/i;
 
 function expectNoMarketActions() {
   const actionable = [...screen.queryAllByRole('button'), ...screen.queryAllByRole('link')];
@@ -27,7 +27,7 @@ function renderAsAdmin(path: string) {
   return renderWithRouter({ initialEntries: [path], session: 'valid' });
 }
 
-describe('pantallas de la 007 sin acciones de mercado', () => {
+describe('pantallas de la 007 sin acciones de plantel', () => {
   beforeEach(() => {
     resetAdminMocks();
     server.use(adminProfileHandler);

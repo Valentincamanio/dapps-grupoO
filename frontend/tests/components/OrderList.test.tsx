@@ -109,4 +109,16 @@ describe('OrderList', () => {
     expect(screen.getByText('no hay órdenes pendientes.')).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
   });
+
+  it('en tarjetas muestra los mismos datos sin tabla, para ponerla junto a otra', () => {
+    const initial = toMarketOrder(orderById(INITIAL_ORDER_ID));
+
+    render(<OrderList variant="market" layout="list" orders={[initial]} caption="Órdenes de Kylian Mbappé" />);
+
+    expect(screen.queryByRole('table')).toBeNull();
+    const card = within(screen.getByRole('list', { name: 'Órdenes de Kylian Mbappé' })).getByRole('listitem');
+    const values = within(card).getAllByRole('definition').map((value) => value.textContent);
+    expect(card).toHaveTextContent('Kylian Mbappé');
+    expect(values).toEqual(['venta', 'administrador', '100', '13', '87', 'parcial', '28/10/2026, 09:00']);
+  });
 });

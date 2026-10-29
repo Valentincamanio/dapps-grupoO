@@ -42,9 +42,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.market.BookOutcome;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketFixtures;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrder;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.Trade;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.InsufficientCreditsException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.InsufficientTokensException;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.exception.PlayerNotFoundException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
@@ -61,6 +63,8 @@ class MarketOrderServiceTest {
 
     private static final long BUYER = 10L;
     private static final long SELLER = 30L;
+    private static final long EARLY_BUYER = 20L;
+    private static final long LATE_BUYER = 50L;
     private static final long MISSING_PLAYER = 9999L;
     private static final Instant NOW = at("2026-08-24T12:00");
     private static final Instant CREATED = at("2026-08-17T09:00");
@@ -151,6 +155,86 @@ class MarketOrderServiceTest {
         });
         assertThat(outcome.auditEntries()).allSatisfy(entry ->
                 assertThat(entry.orderId()).isEqualTo(outcome.order().getId()));
+    }
+
+    @Test
+    void unaVentaDeUnJugadorInexistenteEs404SinBloquearNada() {
+        when(playerRepository.existsById(MISSING_PLAYER)).thenReturn(false);
+
+        assertThatThrownBy(() -> service().sell(SELLER, MISSING_PLAYER, 5))
+                .isInstanceOf(PlayerNotFoundException.class);
+        verifyNoInteractions(orderRepository, userRepository, holdingRepository, quoteRepository, tradeRepository,
+                auditRepository);
+    }
+
+    @Test
+    void unaVentaBloqueaElLibroYDespuesAlVendedorYALosDuenosDeLasComprasDeMenorAMayorId() {
+        givenSellBook(10);
+        givenSaving();
+
+        service().sell(SELLER, KANE.id(), 5);
+
+        InOrder order = inOrder(orderRepository, userRepository, playerRepository, quoteRepository,
+                holdingRepository);
+        order.verify(orderRepository).lockBook(KANE.id());
+        order.verify(orderRepository).findOpenOfPlayer(KANE.id());
+        order.verify(userRepository).lockAllInOrder(accountIdsCaptor.capture());
+        order.verify(playerRepository).findById(KANE.id());
+        order.verify(quoteRepository).findInForceAt(KANE.id(), NOW);
+        order.verify(holdingRepository).findOfPlayer(anyLong(), anyCollection());
+        assertThat(accountIdsCaptor.getValue()).containsExactly(EARLY_BUYER, SELLER, LATE_BUYER);
+    }
+
+    @Test
+    void unaVentaRechazadaNoGuardaNada() {
+        givenSellBook(2);
+
+        assertThatThrownBy(() -> service().sell(SELLER, KANE.id(), 5))
+                .isInstanceOf(InsufficientTokensException.class);
+        verify(orderRepository, never()).saveAll(anyCollection());
+        verify(userRepository, never()).save(any());
+        verify(holdingRepository, never()).saveAll(anyCollection());
+        verifyNoInteractions(tradeRepository, auditRepository);
+    }
+
+    @Test
+    void unaVentaGuardaLaVentaYLasComprasQueCruzoConSusOperacionesYAuditoria() {
+        givenSellBook(10);
+        givenSaving();
+
+        BookOutcome outcome = service().sell(SELLER, KANE.id(), 5);
+
+        InOrder order = inOrder(orderRepository, userRepository, holdingRepository, tradeRepository, auditRepository);
+        order.verify(orderRepository).saveAll(anyCollection());
+        order.verify(userRepository, times(3)).save(any());
+        order.verify(holdingRepository).saveAll(anyCollection());
+        order.verify(tradeRepository).saveAll(anyCollection());
+        order.verify(auditRepository).saveAll(anyCollection());
+        assertThat(outcome.orders()).hasSize(3).allSatisfy(saved -> assertThat(saved.getId()).isNotNull());
+        assertThat(outcome.trades()).hasSize(2).allSatisfy(trade ->
+                assertThat(trade.sellOrderId()).isEqualTo(outcome.order().getId()));
+    }
+
+    /**
+     * El libro de Kane con la inicial agotada: el usuario 50 compra 3 y el 20 (más viejo) compra 3.
+     * El vendedor tiene {@code tokens} tokens libres.
+     */
+    private void givenSellBook(int tokens) {
+        when(playerRepository.existsById(KANE.id())).thenReturn(true);
+        when(orderRepository.lockBook(KANE.id())).thenReturn(Optional.of(initialOrder(1L, KANE.id(), 0, CREATED)));
+        when(orderRepository.findOpenOfPlayer(KANE.id())).thenReturn(List.of(
+                MarketFixtures.buy(6L, LATE_BUYER, KANE.id(), 3, "1.0300", NOW),
+                MarketFixtures.buy(5L, EARLY_BUYER, KANE.id(), 3, "1.0300", CREATED)));
+        Map<Long, AppUser> accounts = new LinkedHashMap<>();
+        accounts.put(EARLY_BUYER, user(EARLY_BUYER, "1000.00", "3.09"));
+        accounts.put(SELLER, user(SELLER, "990.00"));
+        accounts.put(LATE_BUYER, user(LATE_BUYER, "1000.00", "3.09"));
+        when(userRepository.lockAllInOrder(anyCollection())).thenReturn(accounts);
+        when(playerRepository.findById(KANE.id())).thenReturn(Optional.of(KANE));
+        when(quoteRepository.findInForceAt(KANE.id(), NOW))
+                .thenReturn(Optional.of(quote(300L, KANE.id(), "103.00", "0.300000", CREATED)));
+        when(holdingRepository.findOfPlayer(anyLong(), anyCollection()))
+                .thenReturn(List.of(holding(20L, SELLER, KANE.id(), costBasis(tokens, "10.00"), 0)));
     }
 
     /**

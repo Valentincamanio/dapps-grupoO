@@ -21,6 +21,9 @@ export interface Player {
   position: Position;
   team: string;
   league: League;
+  // La ficha lo recibe siempre; opcional porque los jugadores de prueba de la 002 a la 007 no lo
+  // traen. Sin el campo, el jugador se toma como activo (un inactivo no se opera, FR-064)
+  active?: boolean;
 }
 
 export interface PlayerPage {

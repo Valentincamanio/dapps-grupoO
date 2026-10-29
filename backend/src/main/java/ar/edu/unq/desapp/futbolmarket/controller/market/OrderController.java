@@ -40,27 +40,43 @@ import lombok.RequiredArgsConstructor;
 public class OrderController {
 
     // Los ejemplos del contrato. Son concatenaciones y no format() porque una anotación pide constantes.
+    // Cada ejemplo es el comienzo común, su cuerpo y la ruta del pedido.
     private static final String EXAMPLE_START = "{\"timestamp\": \"2026-10-28T15:00:00Z\", ";
-    private static final String EXAMPLE_PATH = "\"path\": \"/orders/buy\"";
-    private static final String INVALID_BODY_EXAMPLE = EXAMPLE_START
-            + "\"status\": 400, \"error\": \"Bad Request\", \"message\": \"El request tiene datos inválidos.\", "
-            + EXAMPLE_PATH + ", \"violations\": [{\"field\": \"quantity\", \"message\": \""
+    private static final String BUY_PATH = "\"path\": \"/orders/buy\"";
+    private static final String SELL_PATH = "\"path\": \"/orders/sell\"";
+    private static final String INVALID_BODY = EXAMPLE_START
+            + "\"status\": 400, \"error\": \"Bad Request\", \"message\": \"El request tiene datos inválidos.\", ";
+    private static final String VIOLATIONS = ", \"violations\": [{\"field\": \"quantity\", \"message\": \""
             + OrderRequest.QUANTITY_MESSAGE + "\"}]}";
-    private static final String UNAUTHORIZED_EXAMPLE = EXAMPLE_START
+    private static final String UNAUTHORIZED = EXAMPLE_START
             + "\"status\": 401, \"error\": \"Unauthorized\", \"message\": \"Se requiere una credencial: un token de "
-            + "sesión (Authorization: Bearer) o una clave de API (X-API-Key).\", " + EXAMPLE_PATH + "}";
-    private static final String ADMIN_EXAMPLE = EXAMPLE_START
+            + "sesión (Authorization: Bearer) o una clave de API (X-API-Key).\", ";
+    private static final String ADMIN = EXAMPLE_START
             + "\"status\": 403, \"error\": \"Forbidden\", \"message\": \"No tiene permisos para acceder a este "
-            + "recurso.\", " + EXAMPLE_PATH + "}";
-    private static final String PLAYER_NOT_FOUND_EXAMPLE = EXAMPLE_START
-            + "\"status\": 404, \"error\": \"Not Found\", \"message\": \"No se encontró el jugador con id 9999.\", "
-            + EXAMPLE_PATH + "}";
-    private static final String INSUFFICIENT_CREDITS_EXAMPLE = EXAMPLE_START
-            + "\"status\": 409, \"error\": \"Conflict\", \"message\": \"Saldo insuficiente: se necesitan 10,00 "
-            + "créditos y el saldo libre es 5,00.\", " + EXAMPLE_PATH + "}";
-    private static final String NOT_TRADABLE_EXAMPLE = EXAMPLE_START
-            + "\"status\": 409, \"error\": \"Conflict\", \"message\": \"El jugador no se puede operar: está "
-            + "inactivo.\", " + EXAMPLE_PATH + "}";
+            + "recurso.\", ";
+    private static final String PLAYER_NOT_FOUND = EXAMPLE_START
+            + "\"status\": 404, \"error\": \"Not Found\", \"message\": \"No se encontró el jugador con id 9999.\", ";
+    private static final String CONFLICT = EXAMPLE_START + "\"status\": 409, \"error\": \"Conflict\", \"message\": ";
+    private static final String NOT_TRADABLE = CONFLICT
+            + "\"El jugador no se puede operar: está inactivo.\", ";
+
+    private static final String INVALID_BODY_EXAMPLE = INVALID_BODY + BUY_PATH + VIOLATIONS;
+    private static final String UNAUTHORIZED_EXAMPLE = UNAUTHORIZED + BUY_PATH + "}";
+    private static final String ADMIN_EXAMPLE = ADMIN + BUY_PATH + "}";
+    private static final String PLAYER_NOT_FOUND_EXAMPLE = PLAYER_NOT_FOUND + BUY_PATH + "}";
+    private static final String INSUFFICIENT_CREDITS_EXAMPLE = CONFLICT
+            + "\"Saldo insuficiente: se necesitan 10,00 créditos y el saldo libre es 5,00.\", " + BUY_PATH + "}";
+    private static final String NOT_TRADABLE_EXAMPLE = NOT_TRADABLE + BUY_PATH + "}";
+
+    private static final String SELL_INVALID_BODY_EXAMPLE = INVALID_BODY + SELL_PATH + VIOLATIONS;
+    private static final String SELL_UNAUTHORIZED_EXAMPLE = UNAUTHORIZED + SELL_PATH + "}";
+    private static final String SELL_ADMIN_EXAMPLE = ADMIN + SELL_PATH + "}";
+    private static final String SELL_PLAYER_NOT_FOUND_EXAMPLE = PLAYER_NOT_FOUND + SELL_PATH + "}";
+    private static final String SALE_BLOCKED_EXAMPLE = CONFLICT
+            + "\"Todavía no se puede vender: al administrador le queda 1 token de este jugador.\", " + SELL_PATH + "}";
+    private static final String INSUFFICIENT_TOKENS_EXAMPLE = CONFLICT
+            + "\"Tokens insuficientes: tiene 4 tokens libres de este jugador.\", " + SELL_PATH + "}";
+    private static final String SELL_NOT_TRADABLE_EXAMPLE = NOT_TRADABLE + SELL_PATH + "}";
 
     private final MarketOrderService marketOrderService;
 
@@ -100,5 +116,44 @@ public class OrderController {
                                       @Valid @RequestBody OrderRequest request) {
         int quantity = request.quantity().intValueExact();
         return OrderExecutionResponse.from(marketOrderService.buy(userId, request.playerId(), quantity));
+    }
+
+    @Operation(
+            summary = "Vende tokens de un jugador",
+            description = "Se rechaza al crearla, sin crear nada, mientras la orden inicial del jugador tenga tokens "
+                    + "pendientes. Si no, compromete los tokens y se cruza con las compras pendientes de otros "
+                    + "usuarios, de la más vieja a la más nueva, al precio vigente; lo que no se vende queda como "
+                    + "venta pendiente. Una compra pendiente cuyo saldo (su reserva más el saldo libre de su dueño) "
+                    + "no alcanza se ejecuta por lo que alcanza y el resto se cancela.")
+    @ApiResponse(responseCode = "201",
+            description = "La orden creada, con las operaciones que se ejecutaron en el acto.")
+    @ApiResponse(responseCode = "400",
+            description = "Cuerpo inválido: falta el jugador o la cantidad, o la cantidad no es un entero entre 1 y "
+                    + "100 (0, negativa, decimal o mayor que 100). No se crea nada.",
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = SELL_INVALID_BODY_EXAMPLE)))
+    @ApiResponse(responseCode = "401", description = "No hay credencial, o la credencial es inválida o está vencida.",
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = SELL_UNAUTHORIZED_EXAMPLE)))
+    @ApiResponse(responseCode = "403",
+            description = "El administrador no compra ni vende (FR-010). Se rechaza antes del controller.",
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = SELL_ADMIN_EXAMPLE)))
+    @ApiResponse(responseCode = "404", description = "No existe el jugador. No se crea nada.",
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = SELL_PLAYER_NOT_FOUND_EXAMPLE)))
+    @ApiResponse(responseCode = "409",
+            description = "Venta bloqueada porque la orden inicial todavía tiene tokens; tokens libres "
+                    + "insuficientes; compras propias pendientes de ese jugador; jugador no operable; mercado ocupado.",
+            content = @Content(schema = @Schema(implementation = ApiError.class), examples = {
+                    @ExampleObject(name = "bloqueada", value = SALE_BLOCKED_EXAMPLE),
+                    @ExampleObject(name = "tokens", value = INSUFFICIENT_TOKENS_EXAMPLE),
+                    @ExampleObject(name = "noOperable", value = SELL_NOT_TRADABLE_EXAMPLE)}))
+    @PostMapping("/sell")
+    @ResponseStatus(HttpStatus.CREATED)
+    public OrderExecutionResponse sell(@AuthenticationPrincipal @Parameter(hidden = true) Long userId,
+                                       @Valid @RequestBody OrderRequest request) {
+        int quantity = request.quantity().intValueExact();
+        return OrderExecutionResponse.from(marketOrderService.sell(userId, request.playerId(), quantity));
     }
 }

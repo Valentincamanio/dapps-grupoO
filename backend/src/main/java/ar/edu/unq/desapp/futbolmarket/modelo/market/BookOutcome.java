@@ -206,6 +206,14 @@ public final class BookOutcome {
             auditEntries.add(new LinkedEntry(entry, 0, trades.size() - 1));
         }
 
+        /**
+         * El registro de una orden cancelada, que apunta a esa orden; si todavía no había cambiado,
+         * pasa a estar entre las que cambiaron.
+         */
+        void orderCancelled(MarketOrder order, AuditEntry entry) {
+            auditEntries.add(new LinkedEntry(entry, indexOf(order), NO_TRADE));
+        }
+
         BookOutcome build() {
             return new BookOutcome(player, quote, account, orders, List.copyOf(accounts.values()),
                     List.copyOf(holdings.values()), trades, auditEntries);

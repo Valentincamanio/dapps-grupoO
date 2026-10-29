@@ -7,10 +7,12 @@ import {
   formatScore,
   formatSigned,
   formatSignedPercent,
+  formatTokens,
   ownerTypeLabel,
   profitText,
   sideLabel,
   statusLabel,
+  tradeBlockOf,
   tradeTotal,
 } from '../../src/utils/market';
 import { formatCredits } from '../../src/utils/quotes';
@@ -129,5 +131,29 @@ describe('market', () => {
 
     expect(text).toBe('10,21 cr.');
     expect(text).not.toMatch(CURRENCY_SYMBOLS);
+  });
+
+  it('un jugador inactivo o sin cotización no se opera, y eso pesa más que la venta bloqueada', () => {
+    const blocks = [tradeBlockOf(false, true, 0), tradeBlockOf(true, false, 0), tradeBlockOf(false, false, 87)];
+
+    expect(blocks).toEqual([
+      { kind: 'not-tradable', reason: 'el jugador está inactivo' },
+      { kind: 'not-tradable', reason: 'el jugador todavía no tiene cotización' },
+      { kind: 'not-tradable', reason: 'el jugador está inactivo' },
+    ]);
+  });
+
+  it('mientras el administrador tenga tokens solo se compra, y con la inicial agotada se opera libre', () => {
+    const blocked = tradeBlockOf(true, true, 1);
+    const free = tradeBlockOf(true, true, 0);
+
+    expect(blocked).toEqual({ kind: 'sale-blocked', remainingTokens: 1 });
+    expect(free).toBeNull();
+  });
+
+  it('los tokens se cuentan en singular y en plural', () => {
+    const texts = [formatTokens(1), formatTokens(0), formatTokens(10)];
+
+    expect(texts).toEqual(['1 token', '0 tokens', '10 tokens']);
   });
 });

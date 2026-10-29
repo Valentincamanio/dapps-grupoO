@@ -5,12 +5,18 @@ import java.util.List;
 
 /**
  * Lo que decide {@link OrderMatcher} para un pedido (research D10): los cruces, en el orden en que
- * se ejecutan, y lo que queda pendiente de la orden entrante.
+ * se ejecutan, lo que queda pendiente de la orden entrante y, en una venta, lo que las compras
+ * pendientes no pueden pagar (research D11). Una compra nunca tiene faltantes.
  */
-public record MatchPlan(List<Fill> fills, int remainder) {
+public record MatchPlan(List<Fill> fills, int remainder, List<Shortfall> shortfalls) {
 
     public MatchPlan {
         fills = List.copyOf(fills);
+        shortfalls = List.copyOf(shortfalls);
+    }
+
+    public MatchPlan(List<Fill> fills, int remainder) {
+        this(fills, remainder, List.of());
     }
 
     public int executedQuantity() {

@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,8 +27,10 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.InsufficientCreditsException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.InsufficientTokensException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.OppositeOrderPendingException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.PlayerNotTradableException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.SaleBlockedByInitialOrderException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.TradingNotAllowedException;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.Quote;
@@ -43,6 +46,10 @@ class PlayerBookTest {
     private static final Instant CREATED = at("2026-08-17T09:00");
     private static final Instant NOW = at("2026-08-24T12:00");
     private static final Player KANE = activePlayer(PLAYER, "Harry Kane");
+    private static final long USER_A = 12L;
+    private static final long USER_C = 13L;
+    private static final long USER_D = 14L;
+    private static final Instant LATER = at("2026-08-18T09:00");
     private static final Quote QUOTE = quote(QUOTE_ID, PLAYER, "103.00", "0.300000", at("2026-08-24T00:00"));
 
     @Test
@@ -297,6 +304,380 @@ class PlayerBookTest {
         assertThat(PlayerBook.accountsToLock(BUYER, OrderSide.BUY,
                 Optional.of(initialOrder(INITIAL_ID, PLAYER, 0, CREATED)), open))
                 .containsExactly(BUYER, 30L);
+    }
+
+    @Test
+    void mientrasLaInicialTieneUnTokenNoSeVendeNiSeCreaNadaUS41() {
+        AppUser seller = user(SELLER, "990.00");
+        Holding sellerHolding = holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0);
+        MarketOrder initial = initialOrder(INITIAL_ID, PLAYER, 1, CREATED);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(initial), List.of(), List.of(sellerHolding),
+                seller);
+
+        assertThatThrownBy(() -> book.placeSell(SELLER, 5, NOW))
+                .isInstanceOf(SaleBlockedByInitialOrderException.class)
+                .hasMessage("Todavía no se puede vender: al administrador le queda 1 token de este jugador.");
+        assertThat(sellerHolding.getCommitted()).isZero();
+        assertThat(seller.getBalance()).isEqualTo(new BigDecimal("990.00"));
+        assertThat(initial.pending()).isEqualTo(1);
+    }
+
+    @Test
+    void conLaInicialAgotadaLaVentaSeCreaPendienteYComprometeSusTokensUS42() {
+        AppUser seller = user(SELLER, "990.00");
+        Holding sellerHolding = holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(), List.of(sellerHolding),
+                seller);
+
+        BookOutcome outcome = book.placeSell(SELLER, 5, NOW);
+
+        MarketOrder order = outcome.order();
+        assertThat(order.getSide()).isEqualTo(OrderSide.SELL);
+        assertThat(order.status()).isEqualTo(OrderStatus.PENDING);
+        assertThat(order.pending()).isEqualTo(5);
+        assertThat(order.getReservedCredits()).isEqualByComparingTo("0.00");
+        assertThat(sellerHolding.getCommitted()).isEqualTo(5);
+        assertThat(sellerHolding.freeTokens()).isEqualTo(5);
+        assertThat(outcome.trades()).isEmpty();
+        assertThat(outcome.holdings()).containsExactly(sellerHolding);
+        assertThat(outcome.auditEntries()).singleElement().satisfies(entry -> {
+            assertThat(entry.eventType()).isEqualTo(AuditEventType.ORDER_CREATED);
+            assertThat(entry.actorId()).isEqualTo(SELLER);
+            assertThat(entry.side()).isEqualTo(OrderSide.SELL);
+            assertThat(entry.detail()).isEqualTo("Orden de venta de 5 tokens de Harry Kane");
+        });
+    }
+
+    @Test
+    void sinVentasUnaCompraQuedaPendienteYReservaAlPrecioVigenteUS43() {
+        AppUser buyer = user(USER_A, "1000.00");
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(), List.of(), buyer);
+
+        BookOutcome outcome = book.placeBuy(USER_A, 10, NOW);
+
+        assertThat(outcome.order().status()).isEqualTo(OrderStatus.PENDING);
+        assertThat(outcome.order().pending()).isEqualTo(10);
+        assertThat(outcome.order().getReservedCredits()).isEqualTo(new BigDecimal("10.30"));
+        assertThat(buyer.getReserved()).isEqualByComparingTo("10.30");
+        assertThat(buyer.availableBalance()).isEqualByComparingTo("989.70");
+    }
+
+    @Test
+    void unaVentaDeCuatroACientoCincoPagaCuatroVeinteYAjustaLaReservaDelRemanenteUS44() {
+        AppUser buyer = user(USER_A, "1000.00", "10.30");
+        AppUser seller = user(SELLER, "1000.00");
+        MarketOrder purchase = MarketFixtures.buy(5L, USER_A, PLAYER, 10, "1.0300", CREATED);
+        Holding sellerHolding = holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0);
+        PlayerBook book = book(KANE, Optional.of(quoteOf("105.00")), Optional.of(soldOut()), List.of(purchase),
+                List.of(sellerHolding), buyer, seller);
+
+        BookOutcome outcome = book.placeSell(SELLER, 4, NOW);
+
+        assertThat(outcome.trades()).singleElement().satisfies(trade -> {
+            assertThat(trade.quantity()).isEqualTo(4);
+            assertThat(trade.tokenPrice()).isEqualByComparingTo("1.0500");
+            assertThat(trade.total()).isEqualTo(new BigDecimal("4.20"));
+            assertThat(trade.sellerType()).isEqualTo(OwnerType.USER);
+            assertThat(trade.buyerId()).isEqualTo(USER_A);
+            assertThat(trade.sellerId()).isEqualTo(SELLER);
+            assertThat(trade.realizedProfit()).isEqualByComparingTo("0.20");
+        });
+        assertThat(purchase.status()).isEqualTo(OrderStatus.PARTIAL);
+        assertThat(purchase.pending()).isEqualTo(6);
+        assertThat(purchase.getReservedCredits()).isEqualTo(new BigDecimal("6.18"));
+        assertThat(buyer.getBalance()).isEqualTo(new BigDecimal("995.80"));
+        assertThat(buyer.getReserved()).isEqualByComparingTo("6.18");
+        assertThat(buyer.availableBalance()).isEqualByComparingTo("989.62");
+        assertThat(seller.getBalance()).isEqualTo(new BigDecimal("1004.20"));
+        assertThat(outcome.order().status()).isEqualTo(OrderStatus.EXECUTED);
+        assertThat(sellerHolding.getQuantity()).isEqualTo(6);
+        assertThat(sellerHolding.getCommitted()).isZero();
+        assertThat(outcome.orders()).containsExactly(outcome.order(), purchase);
+        assertThat(outcome.accounts()).containsExactly(seller, buyer);
+    }
+
+    @Test
+    void unaVentaDeOchoContraUnaCompraDeCincoDejaTresPendientesComprometidosUS45() {
+        AppUser buyer = user(USER_A, "1000.00", "5.15");
+        AppUser seller = user(SELLER, "1000.00");
+        MarketOrder purchase = MarketFixtures.buy(5L, USER_A, PLAYER, 5, "1.0300", CREATED);
+        Holding sellerHolding = holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(purchase),
+                List.of(sellerHolding), buyer, seller);
+
+        BookOutcome outcome = book.placeSell(SELLER, 8, NOW);
+
+        assertThat(outcome.executedQuantity()).isEqualTo(5);
+        assertThat(outcome.order().status()).isEqualTo(OrderStatus.PARTIAL);
+        assertThat(outcome.order().pending()).isEqualTo(3);
+        assertThat(purchase.status()).isEqualTo(OrderStatus.EXECUTED);
+        assertThat(sellerHolding.getQuantity()).isEqualTo(5);
+        assertThat(sellerHolding.getCommitted()).isEqualTo(3);
+        assertThat(buyer.getReserved()).isEqualByComparingTo("0.00");
+        assertOneSideOpen(List.of(purchase), outcome);
+    }
+
+    @Test
+    void conDosComprasSeCompletaLaMasViejaYElRestoVaALaOtraUS46() {
+        AppUser fromA = user(USER_A, "1000.00", "5.15");
+        AppUser fromC = user(USER_C, "1000.00", "5.15");
+        AppUser seller = user(SELLER, "1000.00");
+        MarketOrder purchaseA = MarketFixtures.buy(5L, USER_A, PLAYER, 5, "1.0300", CREATED);
+        MarketOrder purchaseC = MarketFixtures.buy(6L, USER_C, PLAYER, 5, "1.0300", LATER);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(purchaseC, purchaseA),
+                List.of(holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0)), fromA, fromC, seller);
+
+        BookOutcome outcome = book.placeSell(SELLER, 7, NOW);
+
+        assertThat(outcome.trades()).extracting(Trade::buyerId).containsExactly(USER_A, USER_C);
+        assertThat(outcome.trades()).extracting(Trade::quantity).containsExactly(5, 2);
+        assertThat(purchaseA.status()).isEqualTo(OrderStatus.EXECUTED);
+        assertThat(purchaseC.status()).isEqualTo(OrderStatus.PARTIAL);
+        assertThat(purchaseC.pending()).isEqualTo(3);
+        assertThat(purchaseC.getReservedCredits()).isEqualTo(new BigDecimal("3.09"));
+        assertThat(fromC.getReserved()).isEqualByComparingTo("3.09");
+    }
+
+    @Test
+    void conDosVentasUnaCompraSeEjecutaPrimeroContraLaMasViejaUS47() {
+        AppUser buyer = user(USER_A, "1000.00");
+        MarketOrder fromB = sell(5L, SELLER, PLAYER, 3, CREATED);
+        MarketOrder fromD = sell(6L, USER_D, PLAYER, 3, LATER);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(fromD, fromB),
+                List.of(holding(20L, SELLER, PLAYER, costBasis(3, "3.00"), 3),
+                        holding(21L, USER_D, PLAYER, costBasis(3, "3.00"), 3)),
+                buyer, user(SELLER, "1000.00"), user(USER_D, "1000.00"));
+
+        BookOutcome outcome = book.placeBuy(USER_A, 4, NOW);
+
+        assertThat(outcome.trades()).extracting(Trade::sellerId).containsExactly(SELLER, USER_D);
+        assertThat(outcome.trades()).extracting(Trade::quantity).containsExactly(3, 1);
+        assertThat(fromB.status()).isEqualTo(OrderStatus.EXECUTED);
+        assertThat(fromD.pending()).isEqualTo(2);
+    }
+
+    @Test
+    void diezTokensAUnoCeroTrescientosCuarentaYCincoSonDiezTreintaYCincoParaLasDosPartesUS48() {
+        AppUser buyer = user(USER_A, "1000.00");
+        AppUser seller = user(SELLER, "1000.00");
+        MarketOrder sale = sell(5L, SELLER, PLAYER, 10, CREATED);
+        PlayerBook book = book(KANE, Optional.of(quoteOf("103.45")), Optional.of(soldOut()), List.of(sale),
+                List.of(holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 10)), buyer, seller);
+
+        BookOutcome outcome = book.placeBuy(USER_A, 10, NOW);
+
+        assertThat(outcome.executedTotal()).isEqualTo(new BigDecimal("10.35"));
+        assertThat(buyer.getBalance()).isEqualTo(new BigDecimal("989.65"));
+        assertThat(seller.getBalance()).isEqualTo(new BigDecimal("1010.35"));
+        assertThat(buyer.getReserved()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void conElPrecioAUnoDiezYSinLibreSeEjecutanNueveYSeCancelaUnoPorSaldoUS49() {
+        AppUser buyer = user(USER_A, "10.30", "10.30");
+        AppUser seller = user(SELLER, "1000.00");
+        MarketOrder purchase = MarketFixtures.buy(5L, USER_A, PLAYER, 10, "1.0300", CREATED);
+        Holding sellerHolding = holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0);
+        PlayerBook book = book(KANE, Optional.of(quoteOf("110.00")), Optional.of(soldOut()), List.of(purchase),
+                List.of(sellerHolding), buyer, seller);
+
+        BookOutcome outcome = book.placeSell(SELLER, 10, NOW);
+
+        assertThat(outcome.trades()).singleElement().satisfies(trade -> {
+            assertThat(trade.quantity()).isEqualTo(9);
+            assertThat(trade.total()).isEqualTo(new BigDecimal("9.90"));
+        });
+        assertThat(purchase.status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(purchase.getExecuted()).isEqualTo(9);
+        assertThat(purchase.getCancelled()).isEqualTo(1);
+        assertThat(purchase.getCancelReason()).isEqualTo(CancelReason.INSUFFICIENT_CREDITS);
+        assertThat(purchase.getReservedCredits()).isEqualByComparingTo("0.00");
+        assertThat(buyer.getBalance()).isEqualTo(new BigDecimal("0.40"));
+        assertThat(buyer.getReserved()).isEqualByComparingTo("0.00");
+        assertThat(buyer.availableBalance()).isEqualByComparingTo("0.40");
+        assertThat(outcome.order().pending()).isEqualTo(1);
+        assertThat(sellerHolding.getCommitted()).isEqualTo(1);
+        List<AuditEntry> entries = outcome.auditEntries();
+        assertThat(entries).extracting(AuditEntry::eventType).containsExactly(AuditEventType.ORDER_CREATED,
+                AuditEventType.TRADE_EXECUTED, AuditEventType.ORDER_CANCELLED);
+        AuditEntry cancelled = entries.get(2);
+        assertThat(cancelled.actorType()).isEqualTo(AuditActorType.SYSTEM);
+        assertThat(cancelled.actorId()).isNull();
+        assertThat(cancelled.cancelReason()).isEqualTo(CancelReason.INSUFFICIENT_CREDITS);
+        assertThat(cancelled.quantity()).isEqualTo(1);
+        assertThat(cancelled.primary().before())
+                .isEqualTo(new PartyState(USER_A, new BigDecimal("0.00"), new BigDecimal("0.40"), 9));
+        assertThat(cancelled.primary().after())
+                .isEqualTo(new PartyState(USER_A, new BigDecimal("0.40"), new BigDecimal("0.00"), 9));
+        assertThat(cancelled.detail())
+                .isEqualTo("Cancelación de 1 token de la orden de compra de Harry Kane por saldo insuficiente");
+    }
+
+    @Test
+    void conSeisComprometidosEnUnaVentaSoloLeQuedanCuatroLibresUS410() {
+        AppUser seller = user(SELLER, "1000.00");
+        Holding sellerHolding = holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 6);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()),
+                List.of(sell(5L, SELLER, PLAYER, 6, CREATED)), List.of(sellerHolding), seller);
+
+        assertThatThrownBy(() -> book.placeSell(SELLER, 5, NOW))
+                .isInstanceOf(InsufficientTokensException.class)
+                .hasMessage("Tokens insuficientes: tiene 4 tokens libres de este jugador.");
+        assertThat(sellerHolding.getCommitted()).isEqualTo(6);
+    }
+
+    @Test
+    void sinTenenciaNoSeVende() {
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(), List.of(),
+                user(SELLER, "1000.00"));
+
+        assertThatThrownBy(() -> book.placeSell(SELLER, 1, NOW))
+                .isInstanceOf(InsufficientTokensException.class)
+                .hasMessage("Tokens insuficientes: tiene 0 tokens libres de este jugador.");
+    }
+
+    @Test
+    void unUsuarioNoCompraYVendeElMismoJugadorALaVezUS411() {
+        AppUser trader = user(USER_A, "1000.00", "5.15");
+        Holding holding = holding(20L, USER_A, PLAYER, costBasis(10, "10.00"), 0);
+        PlayerBook withPurchase = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()),
+                List.of(MarketFixtures.buy(5L, USER_A, PLAYER, 5, "1.0300", CREATED)), List.of(holding), trader);
+        PlayerBook withSale = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()),
+                List.of(sell(6L, USER_A, PLAYER, 5, CREATED)),
+                List.of(holding(21L, USER_A, PLAYER, costBasis(10, "10.00"), 5)), user(USER_A, "1000.00"));
+
+        assertThatThrownBy(() -> withPurchase.placeSell(USER_A, 5, NOW))
+                .isInstanceOf(OppositeOrderPendingException.class)
+                .hasMessage("Ya tiene una orden de compra pendiente de este jugador.");
+        assertThatThrownBy(() -> withSale.placeBuy(USER_A, 5, NOW))
+                .isInstanceOf(OppositeOrderPendingException.class)
+                .hasMessage("Ya tiene una orden de venta pendiente de este jugador.");
+        assertThat(holding.getCommitted()).isZero();
+    }
+
+    @Test
+    void elAdministradorNoVende() {
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(), List.of(),
+                superuser("100.00"));
+
+        assertThatThrownBy(() -> book.placeSell(SUPERUSER_ID, 1, NOW))
+                .isInstanceOf(TradingNotAllowedException.class);
+    }
+
+    @Test
+    void unJugadorInactivoNoSeVende() {
+        PlayerBook book = book(inactivePlayer(PLAYER, "Harry Kane"), Optional.of(QUOTE), Optional.of(soldOut()),
+                List.of(), List.of(holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0)), user(SELLER, "1000.00"));
+
+        assertThatThrownBy(() -> book.placeSell(SELLER, 1, NOW))
+                .isInstanceOf(PlayerNotTradableException.class)
+                .hasMessage("El jugador no se puede operar: está inactivo.");
+    }
+
+    @Test
+    void siPuedePagarLoQueSeEjecutaElRemanenteQuedaConLoQueAlcanzaSinCancelarElHuecoDeD11() {
+        AppUser buyer = user(USER_A, "10.30", "10.30");
+        AppUser seller = user(SELLER, "1000.00");
+        MarketOrder purchase = MarketFixtures.buy(5L, USER_A, PLAYER, 10, "1.0300", CREATED);
+        PlayerBook book = book(KANE, Optional.of(quoteOf("110.00")), Optional.of(soldOut()), List.of(purchase),
+                List.of(holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0)), buyer, seller);
+
+        BookOutcome outcome = book.placeSell(SELLER, 4, NOW);
+
+        assertThat(outcome.executedTotal()).isEqualTo(new BigDecimal("4.40"));
+        assertThat(purchase.pending()).isEqualTo(6);
+        assertThat(purchase.getCancelled()).isZero();
+        assertThat(purchase.getReservedCredits()).isEqualTo(new BigDecimal("5.90"));
+        assertThat(buyer.getBalance()).isEqualTo(new BigDecimal("5.90"));
+        assertThat(buyer.getReserved()).isEqualByComparingTo("5.90");
+        assertThat(buyer.availableBalance()).isEqualByComparingTo("0.00");
+        assertThat(outcome.auditEntries()).extracting(AuditEntry::eventType)
+                .doesNotContain(AuditEventType.ORDER_CANCELLED);
+    }
+
+    @Test
+    void unaCompraQueSeEjecutaMasBarataQueSuReservaDevuelveLaDiferenciaAlLibre() {
+        AppUser buyer = user(USER_A, "1000.00", "10.30");
+        AppUser seller = user(SELLER, "1000.00");
+        MarketOrder purchase = MarketFixtures.buy(5L, USER_A, PLAYER, 10, "1.0300", CREATED);
+        PlayerBook book = book(KANE, Optional.of(quoteOf("100.00")), Optional.of(soldOut()), List.of(purchase),
+                List.of(holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0)), buyer, seller);
+
+        book.placeSell(SELLER, 10, NOW);
+
+        assertThat(purchase.status()).isEqualTo(OrderStatus.EXECUTED);
+        assertThat(purchase.getReservedCredits()).isEqualByComparingTo("0.00");
+        assertThat(buyer.getBalance()).isEqualTo(new BigDecimal("990.00"));
+        assertThat(buyer.getReserved()).isEqualByComparingTo("0.00");
+        assertThat(buyer.availableBalance()).isEqualByComparingTo("990.00");
+    }
+
+    @Test
+    void unaCompraQueSeEjecutaMasCaraQueSuReservaTomaLaDiferenciaDelLibre() {
+        AppUser buyer = user(USER_A, "1000.00", "10.30");
+        AppUser seller = user(SELLER, "1000.00");
+        MarketOrder purchase = MarketFixtures.buy(5L, USER_A, PLAYER, 10, "1.0300", CREATED);
+        PlayerBook book = book(KANE, Optional.of(quoteOf("110.00")), Optional.of(soldOut()), List.of(purchase),
+                List.of(holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0)), buyer, seller);
+
+        book.placeSell(SELLER, 10, NOW);
+
+        assertThat(purchase.status()).isEqualTo(OrderStatus.EXECUTED);
+        assertThat(buyer.getBalance()).isEqualTo(new BigDecimal("989.00"));
+        assertThat(buyer.getReserved()).isEqualByComparingTo("0.00");
+        assertThat(seller.getBalance()).isEqualTo(new BigDecimal("1011.00"));
+    }
+
+    @Test
+    void venderTodoDejaLaTenenciaEnCeroYLaRecompraArrancaUnPromedioNuevo() {
+        AppUser buyer = user(USER_A, "1000.00", "10.30");
+        AppUser seller = user(SELLER, "1000.00");
+        Holding sellerHolding = holding(20L, SELLER, PLAYER, costBasis(10, "10.00"), 0);
+        PlayerBook first = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()),
+                List.of(MarketFixtures.buy(5L, USER_A, PLAYER, 10, "1.0300", CREATED)), List.of(sellerHolding),
+                buyer, seller);
+        first.placeSell(SELLER, 10, NOW);
+        PlayerBook second = book(KANE, Optional.of(quoteOf("110.00")), Optional.of(soldOut()),
+                List.of(sell(6L, USER_D, PLAYER, 5, CREATED)),
+                List.of(sellerHolding, holding(21L, USER_D, PLAYER, costBasis(5, "5.00"), 5)),
+                seller, user(USER_D, "1000.00"));
+
+        second.placeBuy(SELLER, 5, NOW);
+
+        assertThat(sellerHolding.getQuantity()).isEqualTo(5);
+        assertThat(sellerHolding.getBasis().averagePrice()).isEqualByComparingTo("1.1000");
+        assertThat(sellerHolding.getBasis().invested()).isEqualByComparingTo("5.50");
+    }
+
+    @Test
+    void elLibroNuncaQuedaConPendientesDeLosDosLados() {
+        AppUser buyer = user(USER_A, "1000.00");
+        MarketOrder sale = sell(5L, SELLER, PLAYER, 3, CREATED);
+        PlayerBook book = book(KANE, Optional.of(QUOTE), Optional.of(soldOut()), List.of(sale),
+                List.of(holding(20L, SELLER, PLAYER, costBasis(3, "3.00"), 3)), buyer, user(SELLER, "1000.00"));
+
+        BookOutcome outcome = book.placeBuy(USER_A, 10, NOW);
+
+        assertThat(outcome.order().pending()).isEqualTo(7);
+        assertOneSideOpen(List.of(sale), outcome);
+    }
+
+    /**
+     * Juntando las órdenes que había y las del resultado, las abiertas son todas de un mismo lado.
+     */
+    private static void assertOneSideOpen(List<MarketOrder> before, BookOutcome outcome) {
+        List<MarketOrder> all = new ArrayList<>(before);
+        all.addAll(outcome.orders());
+        assertThat(all.stream().filter(MarketOrder::isOpen).filter(order -> !order.isInitial())
+                .map(MarketOrder::getSide).distinct()).hasSizeLessThanOrEqualTo(1);
+    }
+
+    private static MarketOrder soldOut() {
+        return initialOrder(INITIAL_ID, PLAYER, 0, CREATED);
+    }
+
+    private static Quote quoteOf(String value) {
+        return quote(QUOTE_ID, PLAYER, value, "0.300000", at("2026-08-24T00:00"));
     }
 
     private static PlayerBook book(Player player, Optional<Quote> quote, Optional<MarketOrder> initial,

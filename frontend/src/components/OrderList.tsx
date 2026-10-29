@@ -12,6 +12,9 @@ interface MarketVariantProps {
   orders: MarketOrder[];
   caption?: string;
   emptyMessage?: string;
+  // 'list' la muestra como una lista de tarjetas, para ponerla junto a otra tabla (la ficha ya tiene
+  // la de cotizaciones). Por defecto, una tabla que pasa a tarjetas a 360 px
+  layout?: 'table' | 'list';
 }
 
 interface OwnVariantProps {
@@ -47,6 +50,9 @@ export function OrderList(props: OrderListProps) {
 
   if (orders.length === 0) {
     return <p className={styles.empty}>{props.emptyMessage ?? DEFAULT_EMPTY_MESSAGES[variant]}</p>;
+  }
+  if (props.variant === 'market' && props.layout === 'list') {
+    return <OrderCards orders={props.orders} caption={props.caption ?? DEFAULT_CAPTIONS.market} />;
   }
 
   return (
@@ -104,6 +110,52 @@ export function OrderList(props: OrderListProps) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+// Las mismas órdenes del mercado como tarjetas con etiquetas, sin tabla
+function OrderCards({ orders, caption }: { orders: MarketOrder[]; caption: string }) {
+  return (
+    <div>
+      <p className={styles.caption}>{caption}</p>
+      <ul className={styles.cards} aria-label={caption}>
+        {orders.map((order) => (
+          <li key={order.id} className={styles.card}>
+            <span className={styles.player}>{order.player.name}</span>
+            <dl className={styles.fields}>
+              <div>
+                <dt>Tipo</dt>
+                <dd>{sideLabel(order.side)}</dd>
+              </div>
+              <div>
+                <dt>Dueño</dt>
+                <dd>{ownerTypeLabel(order.ownerType)}</dd>
+              </div>
+              <div>
+                <dt>Pedida</dt>
+                <dd className={styles.number}>{order.requestedQuantity}</dd>
+              </div>
+              <div>
+                <dt>Ejecutada</dt>
+                <dd className={styles.number}>{order.executedQuantity}</dd>
+              </div>
+              <div>
+                <dt>Pendiente</dt>
+                <dd className={styles.number}>{order.pendingQuantity}</dd>
+              </div>
+              <div>
+                <dt>Estado</dt>
+                <dd className={styles.status}>{statusLabel(order.status)}</dd>
+              </div>
+              <div>
+                <dt>Fecha</dt>
+                <dd>{formatInstant(order.createdAt)}</dd>
+              </div>
+            </dl>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

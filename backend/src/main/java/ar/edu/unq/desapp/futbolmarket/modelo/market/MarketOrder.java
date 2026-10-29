@@ -125,6 +125,18 @@ public class MarketOrder {
     }
 
     /**
+     * Suma a la reserva de esta compra lo que su dueño reservó desde su libre, cuando una operación
+     * a un precio mayor que el de reserva cuesta más de lo reservado (research D11).
+     */
+    public void addToReservation(BigDecimal amount) {
+        requireBuy();
+        if (amount.signum() < 0) {
+            throw new MarketInvariantException("No se puede sumar un monto negativo a una reserva: " + amount + ".");
+        }
+        reservedCredits = reservedCredits.add(amount);
+    }
+
+    /**
      * Vuelve a calcular la reserva del remanente después de un cruce (research D11): la del
      * pendiente al precio de reserva, salvo que no alcance lo que la orden puede tener reservado.
      * Así el libre del dueño nunca queda negativo y no se cancela nada que todavía se pueda pagar.

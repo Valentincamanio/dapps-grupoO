@@ -48,6 +48,18 @@ public class MarketOrderService {
         return save(book.placeBuy(requesterId, quantity, at));
     }
 
+    /**
+     * Una venta (US4), por el mismo camino que la compra. El cargador bloquea también a los dueños de
+     * todas las compras abiertas del jugador, porque cuáles se usan depende del cruce (research D13).
+     */
+    @Transactional
+    public BookOutcome sell(long requesterId, long playerId, int quantity) {
+        Instant at = clock.instant();
+        requirePlayer(playerId);
+        PlayerBook book = bookLoader.load(playerId, requesterId, OrderSide.SELL, at);
+        return save(book.placeSell(requesterId, quantity, at));
+    }
+
     private void requirePlayer(long playerId) {
         if (!playerRepository.existsById(playerId)) {
             throw new PlayerNotFoundException(playerId);

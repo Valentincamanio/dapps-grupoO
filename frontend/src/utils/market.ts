@@ -1,6 +1,6 @@
 // Etiquetas, estimados y formatos del mercado (research D27). Sin símbolos de moneda: los importes
 // son créditos, con formatCredits y formatTokenPrice de utils/quotes.ts.
-import type { OrderSide, OrderStatus, OwnerType, TradeEstimate } from '../types/market';
+import type { OrderSide, OrderStatus, OwnerType, TradeBlock, TradeEstimate } from '../types/market';
 import { amountDirection, type VariationDirection } from './quotes';
 
 const SIDE_LABELS: Record<OrderSide, string> = {
@@ -96,6 +96,20 @@ export function estimateBuy(quantity: number, initialPending: number, tokenPrice
 export function estimateSell(quantity: number, tokenPrice: number): TradeEstimate {
   const atQuotePrice = Math.max(0, quantity);
   return { atInitialPrice: 0, atQuotePrice, total: tradeTotal(atQuotePrice, tokenPrice) };
+}
+
+// Por qué no se puede operar desde la ficha (FR-064): un jugador inactivo o sin cotización no se
+// opera, y mientras el superusuario tenga tokens solo se compra. null si se puede comprar y vender.
+export function tradeBlockOf(active: boolean, hasQuote: boolean, initialPending: number): TradeBlock {
+  if (!active) return { kind: 'not-tradable', reason: 'el jugador está inactivo' };
+  if (!hasQuote) return { kind: 'not-tradable', reason: 'el jugador todavía no tiene cotización' };
+  if (initialPending > 0) return { kind: 'sale-blocked', remainingTokens: initialPending };
+  return null;
+}
+
+// Una cantidad de tokens en palabras: 1 token, 10 tokens
+export function formatTokens(quantity: number): string {
+  return quantity === 1 ? '1 token' : `${quantity} tokens`;
 }
 
 // Ganancia, pérdida o diferencia con signo salvo el cero, p. ej. +0,30

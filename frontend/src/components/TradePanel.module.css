@@ -1,0 +1,100 @@
+/* El panel de operar va sobre el pizarrón, debajo de la hoja del jugador */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  font-family: var(--font-hand);
+  font-size: 18px;
+  color: var(--chalk);
+  overflow-wrap: anywhere;
+}
+
+.notice {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 4px solid var(--yellow);
+  color: var(--yellow);
+}
+
+/* Cantidad y botones en una fila que, a 360 px, pasa a dos */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+}
+
+.controls input {
+  width: 8ch;
+}
+
+.controls input:focus-visible {
+  outline: 3px dashed var(--chalk);
+  outline-offset: 3px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.actions button:focus-visible {
+  outline: 3px dashed var(--chalk);
+  outline-offset: 3px;
+}
+
+.error {
+  margin: 0;
+  color: var(--pink);
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 2px dashed var(--chalk-dim);
+  border-radius: 6px;
+}
+
+.result p {
+  margin: 0;
+}
+
+.trades {
+  margin: 0;
+  padding-left: 20px;
+}
+
+/* El detalle de la confirmación, dentro del diálogo */
+.summary {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.summary div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
+
+.summary dt {
+  color: var(--chalk-dim);
+}
+
+.summary dt::after {
+  content: ':';
+}
+
+.summary dd {
+  margin: 0;
+}
+
+.hint {
+  margin: 6px 0 0;
+  color: var(--chalk-dim);
+  font-size: 16px;
+}
