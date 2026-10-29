@@ -40,6 +40,18 @@ public record Trade(Long id, Instant executedAt, long playerId, Long buyOrderId,
     }
 
     /**
+     * Una copia con los ids de las dos órdenes, que se conocen recién al guardarlas: el cruce arma
+     * la operación antes, con la orden del pedido todavía sin id (data-model 2.10). La operación
+     * original no cambia.
+     */
+    public Trade withOrderIds(Long buyOrder, Long sellOrder) {
+        return new Trade(id, executedAt, playerId, buyOrder, sellOrder, buyerId, sellerId, sellerType, quantity,
+                tokenPrice, total, quoteId, buyerBalanceBefore, buyerBalanceAfter, sellerBalanceBefore,
+                sellerBalanceAfter, buyerTokensBefore, buyerTokensAfter, sellerTokensBefore, sellerTokensAfter,
+                realizedProfit);
+    }
+
+    /**
      * El lado del usuario en la operación: compra o venta.
      */
     public OrderSide sideFor(long userId) {

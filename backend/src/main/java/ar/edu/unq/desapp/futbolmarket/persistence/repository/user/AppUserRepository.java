@@ -105,6 +105,15 @@ public class AppUserRepository {
     }
 
     /**
+     * El id del superusuario sin cargar su cuenta, para bloquearla con {@link #lockById} antes de
+     * leerla: una cuenta que ya está en el contexto de persistencia no se refresca al bloquearla
+     * (research D13 de la 008).
+     */
+    public Optional<Long> findSuperuserId() {
+        return Optional.ofNullable(appUserSQLDAO.findFirstIdByRole(Role.ADMIN.name()));
+    }
+
+    /**
      * Reconoce el índice por su nombre en la causa más específica, sin distinguir mayúsculas
      * porque H2 informa los nombres en mayúsculas. Cualquier otro caso se relanza sin tocarlo.
      */

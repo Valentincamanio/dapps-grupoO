@@ -41,6 +41,13 @@ public interface PlayerSQLDAO extends JpaRepository<PlayerSQL, Long> {
     List<PlayerSQL> findAllByActiveTrue();
 
     /**
+     * Esos jugadores con su equipo en la misma consulta: los que reciben su orden inicial (research
+     * D8 de la 008).
+     */
+    @EntityGraph(attributePaths = "team")
+    List<PlayerSQL> findAllByIdIn(Collection<Long> ids);
+
+    /**
      * Todos los jugadores, activos o inactivos, con su equipo en la misma consulta.
      */
     @Override

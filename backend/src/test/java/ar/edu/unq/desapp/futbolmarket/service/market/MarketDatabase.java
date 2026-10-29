@@ -3,14 +3,36 @@ package ar.edu.unq.desapp.futbolmarket.service.market;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.context.ApplicationContext;
 
+import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.AuditEntry;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.Holding;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketMath;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrder;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderSide;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.Trade;
+import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.Quote;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteType;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteWeek;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
+import ar.edu.unq.desapp.futbolmarket.persistence.mapper.market.AuditEntryMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.mapper.market.HoldingMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.mapper.market.MarketOrderMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.mapper.market.TradeMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.quote.QuoteRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.strategy.StrategyRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.market.HoldingSQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.market.MarketOrderSQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.user.AppUserSQL;
@@ -42,11 +64,18 @@ import ar.edu.unq.desapp.futbolmarket.service.quote.QuoteDatabase;
  *   <li>Después de cada escenario, {@link #assertInvariants()} y {@link #assertCreditsConserved}.</li>
  * </ul>
  *
- * <p>No borra las cuentas: el superusuario lo crea el alta de arranque y tiene que seguir
- * existiendo entre un test y otro.</p>
+ * <p>Borra las cuentas de usuario, que guardan su reserva, pero no la del administrador: el
+ * superusuario lo crea el alta de arranque y tiene que seguir existiendo entre un test y otro. Su
+ * saldo crece de un escenario a otro, así que la conservación de los créditos se verifica sobre el
+ * total de las cuentas de cada escenario al empezar.</p>
+ *
+ * <p>También arma los datos de un escenario (cuentas con saldo y cotizaciones con la estrategia
+ * activa de la base) y lee como modelo lo que quedó en las tablas del mercado.</p>
  */
 public final class MarketDatabase {
     private static final List<String> OPEN_STATUSES = List.of(OrderStatus.PENDING.name(), OrderStatus.PARTIAL.name());
+    private static final String PASSWORD = "campeon2022";
+    private static final int SUFFIX_LENGTH = 8;
 
     private final AuditEntrySQLDAO auditDAO;
     private final TradeSQLDAO tradeDAO;
@@ -54,6 +83,14 @@ public final class MarketDatabase {
     private final MarketOrderSQLDAO orderDAO;
     private final AppUserSQLDAO appUserDAO;
     private final QuoteDatabase quoteDatabase;
+    private final AppUserRepository userRepository;
+    private final QuoteRepository quoteRepository;
+    private final StrategyRepository strategyRepository;
+    private final PasswordHasher hasher;
+    private final MarketOrderMapper orderMapper;
+    private final HoldingMapper holdingMapper;
+    private final TradeMapper tradeMapper;
+    private final AuditEntryMapper auditMapper;
 
     public MarketDatabase(ApplicationContext context) {
         auditDAO = context.getBean(AuditEntrySQLDAO.class);
@@ -62,6 +99,14 @@ public final class MarketDatabase {
         orderDAO = context.getBean(MarketOrderSQLDAO.class);
         appUserDAO = context.getBean(AppUserSQLDAO.class);
         quoteDatabase = new QuoteDatabase(context);
+        userRepository = context.getBean(AppUserRepository.class);
+        quoteRepository = context.getBean(QuoteRepository.class);
+        strategyRepository = context.getBean(StrategyRepository.class);
+        hasher = context.getBean(PasswordHasher.class);
+        orderMapper = context.getBean(MarketOrderMapper.class);
+        holdingMapper = context.getBean(HoldingMapper.class);
+        tradeMapper = context.getBean(TradeMapper.class);
+        auditMapper = context.getBean(AuditEntryMapper.class);
     }
 
     /**
@@ -73,14 +118,102 @@ public final class MarketDatabase {
 
     /**
      * Borra la auditoría, las operaciones, las tenencias y las órdenes, en el orden de las claves
-     * foráneas, y después lo que carga {@link QuoteDatabase}.
+     * foráneas, después las cuentas de usuario y por último lo que carga {@link QuoteDatabase}.
      */
     public void clean() {
         auditDAO.deleteAll();
         tradeDAO.deleteAll();
         holdingDAO.deleteAll();
         orderDAO.deleteAll();
+        appUserDAO.deleteAll(appUserDAO.findAll().stream()
+                .filter(account -> Role.USER.name().equals(account.getRole()))
+                .toList());
         quoteDatabase.clean();
+    }
+
+    /**
+     * Una cuenta de usuario nueva con ese saldo y datos únicos.
+     */
+    public AppUser user(String balance) {
+        String username = "u" + UUID.randomUUID().toString().replace("-", "").substring(0, SUFFIX_LENGTH);
+        return userRepository.save(AppUser.register(username, username + "@correo.com", PASSWORD,
+                new BigDecimal(balance), hasher).user());
+    }
+
+    public AppUser account(long userId) {
+        return userRepository.findById(userId).orElseThrow();
+    }
+
+    public AppUser superuser() {
+        return account(userRepository.findSuperuserId().orElseThrow());
+    }
+
+    /**
+     * Una cotización recotizada del jugador que rige desde {@code validFrom}, con la estrategia
+     * activa de la base, como guardan las suyas los IT de la 007.
+     *
+     * @param value el valor del 100 %, como {@code "103.00"}
+     */
+    public Quote quote(Player player, String value, String score, Instant validFrom) {
+        Quote quote = new Quote(null, player.id(), QuoteWeek.containing(validFrom), validFrom, new BigDecimal(value),
+                Quote.INITIAL_VALUE, new BigDecimal(score), QuoteType.REQUOTED,
+                strategyRepository.findCatalog().activeVersion().ref());
+        return quoteRepository.saveAll(List.of(quote)).getFirst();
+    }
+
+    /**
+     * Las órdenes del mercado, por id.
+     */
+    public List<MarketOrder> orders() {
+        return orderDAO.findAll().stream().map(orderMapper::toDomain)
+                .sorted(Comparator.comparing(MarketOrder::getId))
+                .toList();
+    }
+
+    public List<MarketOrder> initialOrdersOf(Player player) {
+        return orders().stream()
+                .filter(order -> order.isInitial() && order.getPlayerId() == player.id())
+                .toList();
+    }
+
+    public MarketOrder initialOrderOf(Player player) {
+        List<MarketOrder> initialOrders = initialOrdersOf(player);
+        assertThat(initialOrders).as("órdenes iniciales del jugador %d", player.id()).hasSize(1);
+        return initialOrders.getFirst();
+    }
+
+    public List<MarketOrder> ordersOf(AppUser owner) {
+        return orders().stream().filter(order -> order.getOwnerId() == owner.getId()).toList();
+    }
+
+    public Optional<Holding> holdingOf(AppUser owner, Player player) {
+        return holdingDAO.findAll().stream().map(holdingMapper::toDomain)
+                .filter(holding -> holding.getOwnerId() == owner.getId() && holding.getPlayerId() == player.id())
+                .findFirst();
+    }
+
+    public List<Trade> trades() {
+        return tradeDAO.findAll().stream().map(tradeMapper::toDomain)
+                .sorted(Comparator.comparing(Trade::id))
+                .toList();
+    }
+
+    /**
+     * Los registros de auditoría en el orden en que se guardaron.
+     */
+    public List<AuditEntry> auditEntries() {
+        return auditDAO.findAll().stream().map(auditMapper::toDomain)
+                .sorted(Comparator.comparing(AuditEntry::id))
+                .toList();
+    }
+
+    /**
+     * El saldo total de esas cuentas, para {@link #assertCreditsConserved}.
+     */
+    public BigDecimal totalBalance(Collection<Long> accountIds) {
+        return appUserDAO.findAllById(accountIds).stream()
+                .map(AppUserSQL::getBalance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /**
@@ -102,9 +235,7 @@ public final class MarketDatabase {
      * que al empezar. Reservar y liberar no mueven el total; pagar y cobrar mueven lo mismo.
      */
     public void assertCreditsConserved(Collection<Long> accountIds, BigDecimal initialTotal) {
-        BigDecimal total = appUserDAO.findAllById(accountIds).stream()
-                .map(AppUserSQL::getBalance)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = totalBalance(accountIds);
         assertThat(total).as("saldo total de las cuentas %s", accountIds).isEqualByComparingTo(initialTotal);
     }
 

@@ -105,6 +105,27 @@ public class PlayerRepository {
         return playerDAO.findById(playerId).map(playerMapper::toDomain);
     }
 
+    /**
+     * Si el jugador existe, sin cargarlo: el mercado responde 404 antes de bloquear nada (research
+     * D15 de la 008).
+     */
+    @Transactional(readOnly = true)
+    public boolean existsById(long playerId) {
+        return playerDAO.existsById(playerId);
+    }
+
+    /**
+     * Esos jugadores con su equipo, en una sola consulta. Los que no existen no figuran y sin ids no
+     * se consulta la base.
+     */
+    @Transactional(readOnly = true)
+    public List<Player> findAllByIds(Collection<Long> playerIds) {
+        if (playerIds.isEmpty()) {
+            return List.of();
+        }
+        return toPlayers(playerDAO.findAllByIdIn(playerIds));
+    }
+
     private List<Player> toPlayers(List<PlayerSQL> players) {
         return players.stream().map(playerMapper::toDomain).toList();
     }

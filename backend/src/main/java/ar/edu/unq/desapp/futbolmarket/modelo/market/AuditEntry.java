@@ -72,6 +72,15 @@ public record AuditEntry(Long id, Instant occurredAt, AuditEventType eventType, 
                 change, null, cancelledDetail(order, player));
     }
 
+    /**
+     * Una copia con los ids de la orden y de la operación, que se conocen recién al guardarlas: el
+     * libro arma el registro antes (data-model 2.10). El registro original no cambia.
+     */
+    public AuditEntry withReferences(Long order, Long trade) {
+        return new AuditEntry(id, occurredAt, eventType, actorType, actorId, playerId, order, trade, side, quantity,
+                tokenPrice, total, quoteId, cancelReason, primary, secondary, detail);
+    }
+
     private static void requireOrderOf(MarketOrder order, Player player, PartyChange change) {
         if (player.id() == null || player.id() != order.getPlayerId() || change.userId() != order.getOwnerId()) {
             throw new MarketInvariantException("El registro de una orden no coincide con su jugador o su dueño.");

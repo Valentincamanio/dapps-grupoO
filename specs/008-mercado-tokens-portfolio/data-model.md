@@ -223,6 +223,12 @@ Devuelve `MatchPlan(fills, remainder, shortfalls)`:
 - `remainder`: lo que queda pendiente de la orden entrante.
 - `shortfalls`: compras pendientes a cancelar (entera o en parte) por saldo insuficiente, con la cantidad.
 
+Implementación (T043): el lado de compra es `OrderMatcher.matchBuy(ownerId, quantity, initialOrder, opposite,
+tokenPrice)`, con el pedido como dueño y cantidad (la orden todavía no existe: su reserva sale del plan). De las
+órdenes abiertas toma solo las ventas de usuarios que no son del dueño. `MatchPlan` es por ahora `(fills, remainder)`
+con `executedQuantity()` y `executedTotal()`; T078 suma el lado de venta y los `shortfalls`. `Fill.of(counterpart,
+quantity, tokenPrice)` calcula el total con `MarketMath.total`.
+
 Casos que fija `OrderMatcherTest` (los del spec): compra de 10 contra la inicial con 100 → un `Fill` de 10 a 1,0000;
 inicial con 3 y compra de 10 → `Fill` de 3 a 1,0000 y remanente 7; compra de 10 contra una venta de 5 → `Fill` de 5 y
 remanente 5; dos ventas, la de B antes que la de D → primero B; venta de 8 contra una compra de 5 → `Fill` de 5 y
@@ -256,6 +262,30 @@ Métodos:
 `auditEntries` es el de los hechos: `ORDER_CREATED`, cada `TRADE_EXECUTED` y cada `ORDER_CANCELLED`.
 
 `isTradable()` es `player.active() && quote.isPresent() && initialOrder.isPresent()` (D15).
+
+Implementación (T044 a T046):
+
+- **Ids de lo guardado.** La orden del pedido no tiene id hasta guardarse, y las operaciones y la auditoría lo
+  necesitan. `BookOutcome` guarda, junto a cada `Trade`, la posición de su compra y de su venta en `orders()`, y
+  junto a cada `AuditEntry`, la posición de su orden y de su operación. El servicio guarda las órdenes y llama a
+  `withSavedOrders(guardadas)`, que devuelve un resultado nuevo con los ids de las órdenes en las operaciones y la
+  auditoría; después guarda las operaciones y llama a `withSavedTrades(guardadas)`, que pone el id de cada
+  operación en su registro. `Trade` y `AuditEntry` siguen inmutables: se copian con `Trade.withOrderIds` y
+  `AuditEntry.withReferences`. `orders()` lleva la orden del pedido primero; `order()` la devuelve.
+- `BookOutcome` también expone `account()` (la cuenta del pedido, con sus saldos después), `executedQuantity()` y
+  `executedTotal()`, para `OrderExecutionResponse`. Cada cuenta, tenencia y orden que cambia figura una sola vez.
+- El constructor es `PlayerBook(player, quote, initialOrder, openOrders, accounts, holdings)`; el superusuario se
+  reconoce como el dueño de la orden inicial (no hace falta `superuserId`). Qué cuentas bloquear lo decide
+  `PlayerBook.accountsToLock(requesterId, side, initialOrder, openOrders)`, así el cargador no tiene `if` de negocio.
+- `PartyState.of(account, tokens)` arma la foto de una cuenta.
+- **Orden de lectura del cargador.** `PlayerBookLoader` lee las órdenes abiertas apenas toma el candado del libro
+  (las serializa ese candado) porque sus dueños son parte de las cuentas a bloquear; después bloquea las cuentas y
+  recién entonces lee el jugador, la cotización y las tenencias.
+- El 404 del servicio usa `PlayerRepository.existsById` (nuevo), que no carga el jugador.
+- `InitialOrderService` busca el superusuario con `AppUserRepository.findSuperuserId()` (nuevo: el id sin cargar
+  la cuenta, JPQL `min(id)` por rol) y lo bloquea con `lockById`; así su cuenta no se lee antes del bloqueo (D13).
+  Los jugadores salen de `PlayerRepository.findAllByIds` (nuevo, con el equipo). Las cuatro entradas son
+  `@Transactional`: `onStartup` y `afterSync` llaman a las otras dos dentro del mismo bean.
 
 ### 2.11 `Portfolio`, `PortfolioPosition` y `PortfolioTotals`
 
@@ -729,7 +759,8 @@ acá. Donde dice "a decidir", el punto queda abierto para el equipo.
 | Administrador y base propia de los IT "en `@TestPropertySource`" (T033 y T056) | Hay dos patrones (corregido en T019 a T033: la primera versión de esta fila decía que no se usaba `@TestPropertySource`). Sin administrador, `@TestPropertySource` con una base fija, `spring.datasource.url=jdbc:h2:mem:<nombre>;DB_CLOSE_DELAY=-1` (24 IT, como `QuoteRepositoryIT`). Con administrador, `@DynamicPropertySource` con `futbolmarket.auth.admin.username`, `.email` y `.password` (con un sufijo al azar de 8 caracteres) y la base `jdbc:h2:mem:<nombre>-<sufijo>;DB_CLOSE_DELAY=-1` (11 IT) | Los IT del mercado siguen el mismo criterio, con `;LOCK_TIMEOUT=10000` al final de la URL. `InitialOrderIT`, que configura el administrador, pone `futbolmarket.market.initial-orders.automatic=true` por el mismo registro |
 | `AdminAccountInitializer` suma el `Clock` "con `@RequiredArgsConstructor`; ningún test lo construye a mano" (research D6, T030) | `AdminAccountInitializerTest` sí lo construye a mano, con tres argumentos (línea 157) | Como `AuthService`: un constructor de tres argumentos que delega con `Clock.systemUTC()`, para que ese test no cambie, y el de cuatro con `@Autowired` para Spring (relevado en T030) |
 | El superusuario al arrancar (T047 y T056) | `AdminAccountInitializer` es un `ApplicationRunner`: corre **antes** de que se publique `ApplicationReadyEvent` | Cuando arranca `InitialOrderStartup`, la cuenta del administrador ya existe si está configurada |
-| Esperar al `@Async` del arranque "con el mecanismo de los IT existentes" (T056) | Ningún IT espera un proceso de arranque: el perfil test apaga los dos (`sync.on-startup` y `quotes.recalculation.on-startup` en `false`), y `StartupSync` y `QuoteStartupRecalculation` solo tienen tests unitarios. Awaitility 4.3.0 ya está en el classpath de test (llega con `spring-boot-starter-test` 4.1.1), pero ningún test lo usa | A decidir en T056: Awaitility (no es una dependencia nueva) o un sondeo con tope de tiempo |
+| Esperar al `@Async` del arranque "con el mecanismo de los IT existentes" (T056) | Ningún IT espera un proceso de arranque: el perfil test apaga los dos (`sync.on-startup` y `quotes.recalculation.on-startup` en `false`), y `StartupSync` y `QuoteStartupRecalculation` solo tienen tests unitarios. Awaitility 4.3.0 ya está en el classpath de test (llega con `spring-boot-starter-test` 4.1.1), pero ningún test lo usa | Decidido en T056: Awaitility (no es una dependencia nueva). Como el catálogo está vacío al levantar el contexto, `InitialOrderIT` carga los jugadores y vuelve a publicar `ApplicationReadyEvent`; espera el `@Async` con `await().untilAsserted`. El caso sin administrador es una clase `@Nested` con `@NestedTestConfiguration(OVERRIDE)` y su propio contexto |
+| `MarketDatabase` (T033) | — | Suma, para los IT de la US1 (T056 a T059): `clean()` borra también las cuentas `USER` (su reserva rompería las invariantes del escenario siguiente; el administrador queda), `user(saldo)`, `quote(jugador, valor, score, vigencia)` con la estrategia activa de la base, `superuser()`, `account(id)`, lecturas como modelo (`orders()`, `initialOrderOf`, `ordersOf`, `holdingOf`, `trades()`, `auditEntries()`) y `totalBalance(ids)` |
 
 ### 12.4 Frontend
 
