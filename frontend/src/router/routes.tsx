@@ -8,6 +8,7 @@ import { BoardPage } from '../pages/BoardPage';
 import { LockerRoomPage } from '../pages/LockerRoomPage';
 import { LoginPage } from '../pages/LoginPage';
 import { PlayerPage } from '../pages/PlayerPage';
+import { PortfolioPage } from '../pages/PortfolioPage';
 import { RankingPage } from '../pages/RankingPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { RequireRole } from './RequireRole';
@@ -31,6 +32,15 @@ export const appRoutes: RouteObject[] = [
           <RequireSession>
             <LockerRoomPage />
           </RequireSession>
+        ),
+      },
+      // Mercado, solo USER: un visitante va a /login y el administrador ve el aviso
+      {
+        path: 'portfolio',
+        element: (
+          <RequireRole role="USER">
+            <PortfolioPage />
+          </RequireRole>
         ),
       },
       // Administración, solo ADMIN: un visitante va a /login y un usuario común ve el aviso

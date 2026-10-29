@@ -1,10 +1,10 @@
-// Research R-4, CE-009: ninguna pantalla ofrece compra, venta ni plantel.
+// Research R-4, CE-009: ninguna pantalla ofrece sumar al plantel.
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { PLAYERS } from '../mocks/players';
 import { renderWithRouter } from '../mocks/renderWithRouter';
 
-const FORBIDDEN = /comprar|vender|sumar|plantel|presupuesto|puntaje|portfolio|orden/i;
+const FORBIDDEN = /sumar|plantel/i;
 const PRICE_TEXT = /[$€]\s*\d|\d\s*[$€]|\bUSD\b|\bEUR\b/;
 
 function expectNoPurchaseActions() {
@@ -20,7 +20,7 @@ function expectNoPurchaseActions() {
   expect(screen.queryByRole('img', { name: /estrella/i })).toBeNull();
 }
 
-describe('pantallas sin acciones de compra', () => {
+describe('ninguna pantalla ofrece sumar al plantel', () => {
   it('/pizarra, con un filtro y el desplegable de equipos abierto', async () => {
     const { user } = renderWithRouter({ initialEntries: ['/pizarra'] });
 

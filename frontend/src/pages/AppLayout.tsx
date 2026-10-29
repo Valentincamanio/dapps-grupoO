@@ -29,6 +29,8 @@ export function AppLayout() {
         navSlot={
           <>
             <Link to="/ranking">Ranking</Link>
+            {/* El portfolio es de quien opera: solo USER */}
+            {profile?.role === 'USER' ? <Link to="/portfolio">Portfolio</Link> : null}
             {/* La entrada a la administración existe solo para ADMIN (FR-064) */}
             {profile?.role === 'ADMIN' ? <Link to="/admin">Administración</Link> : null}
           </>

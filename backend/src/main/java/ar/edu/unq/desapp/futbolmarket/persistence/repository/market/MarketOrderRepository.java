@@ -9,7 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrder;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderView;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.market.MarketOrderMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.mapper.player.PlayerMapper;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.market.MarketOrderSQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.market.MarketOrderSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.player.PlayerSQLDAO;
@@ -32,6 +34,7 @@ public class MarketOrderRepository {
     private final AppUserSQLDAO appUserDAO;
     private final PlayerSQLDAO playerDAO;
     private final MarketOrderMapper mapper;
+    private final PlayerMapper playerMapper;
 
     /**
      * Inserta o actualiza la orden. El dueño y el jugador se referencian sin cargarlos.
@@ -81,6 +84,17 @@ public class MarketOrderRepository {
 
     public Optional<MarketOrder> findById(long orderId) {
         return orderDAO.findById(orderId).map(mapper::toDomain);
+    }
+
+    /**
+     * Las órdenes iniciales del dueño que todavía tienen tokens, cada una con su jugador: las
+     * posiciones del portfolio del superusuario, en una sola consulta.
+     */
+    @Transactional(readOnly = true)
+    public List<OrderView> findInitialOrdersOf(long ownerId) {
+        return orderDAO.findInitialOrdersOf(ownerId, OPEN_STATUSES).stream()
+                .map(row -> new OrderView(mapper.toDomain(row), playerMapper.toDomain(row.getPlayer())))
+                .toList();
     }
 
     private MarketOrderSQL toSQL(MarketOrder order) {

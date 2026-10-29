@@ -20,6 +20,7 @@ import org.springframework.test.context.TestPropertySource;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.market.CostBasis;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.Holding;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.HoldingView;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
@@ -147,6 +148,50 @@ class HoldingRepositoryIT {
         List<Holding> read = repository.findOfPlayer(kane.id(), List.of());
 
         assertThat(read).isEmpty();
+    }
+
+    @Test
+    void lasPosicionesDeUnTitularSonSusTenenciasConTokensConElJugadorYSuEquipo() {
+        Holding kaneHolding = Holding.empty(ana, kane.id());
+        kaneHolding.buy(10, new BigDecimal("10.00"));
+        kaneHolding.commit(3);
+        Holding salahHolding = Holding.empty(ana, salah.id());
+        salahHolding.buy(5, new BigDecimal("5.15"));
+        Holding betoHolding = Holding.empty(beto, kane.id());
+        betoHolding.buy(1, new BigDecimal("1.00"));
+        repository.saveAll(List.of(kaneHolding, salahHolding, betoHolding));
+
+        List<HoldingView> positions = repository.findPositionsOf(ana);
+
+        assertThat(positions).extracting(view -> view.player().name())
+                .containsExactlyInAnyOrder("Harry Kane", "Mohamed Salah");
+        assertThat(positions).filteredOn(view -> view.player().id().equals(kane.id())).singleElement()
+                .satisfies(view -> {
+                    assertThat(view.holding().getOwnerId()).isEqualTo(ana);
+                    assertThat(view.holding().getQuantity()).isEqualTo(10);
+                    assertThat(view.holding().getCommitted()).isEqualTo(3);
+                    assertThat(view.player().team().name()).isEqualTo("Arsenal FC");
+                });
+    }
+
+    @Test
+    void unaTenenciaQueQuedoEnCeroNoEsUnaPosicion() {
+        Holding sold = Holding.empty(ana, kane.id());
+        sold.buy(10, new BigDecimal("10.00"));
+        sold.commit(10);
+        sold.sell(10, new BigDecimal("10.30"));
+        repository.saveAll(List.of(sold));
+
+        List<HoldingView> positions = repository.findPositionsOf(ana);
+
+        assertThat(positions).isEmpty();
+    }
+
+    @Test
+    void sinTenenciasNoHayPosiciones() {
+        List<HoldingView> positions = repository.findPositionsOf(carla);
+
+        assertThat(positions).isEmpty();
     }
 
     private long user(String username) {

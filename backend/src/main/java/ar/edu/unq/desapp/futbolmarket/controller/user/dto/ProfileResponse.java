@@ -7,9 +7,11 @@ import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 
 /**
  * Perfil del usuario autenticado. No lleva la contraseña, ninguno de los dos hashes ni la clave
- * de API (FR-025).
+ * de API (FR-025). {@code balance} es el saldo total; la 008 suma el libre y el reservado
+ * (FR-057).
  */
-public record ProfileResponse(Long id, String username, String email, Role role, BigDecimal balance) {
+public record ProfileResponse(Long id, String username, String email, Role role, BigDecimal balance,
+                              BigDecimal availableBalance, BigDecimal reservedBalance) {
 
     public static ProfileResponse from(AppUser user) {
         return new ProfileResponse(
@@ -17,6 +19,8 @@ public record ProfileResponse(Long id, String username, String email, Role role,
                 user.getUsername(),
                 user.getEmail(),
                 user.getRole(),
-                user.getBalance());
+                user.getBalance(),
+                user.availableBalance(),
+                user.getReserved());
     }
 }

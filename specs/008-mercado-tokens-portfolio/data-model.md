@@ -102,6 +102,10 @@ Una lectura de órdenes (`OrderView(order, player)`) suma el jugador para mostra
 superusuario (US2), el listado del mercado (US5) y las órdenes propias (US6). Es un modelo de lectura, como
 `TradeView`, y no se guarda. El plan no la nombraba (T012).
 
+Una lectura de tenencias (`HoldingView(holding, player)`) es lo mismo para el portfolio actual (US2): la tenencia con
+su jugador, que `HoldingRepository.findPositionsOf` arma en una sola consulta con `join fetch`. Tampoco se guarda
+(T060).
+
 Implementación (T013):
 
 - `cancelRemainder(reason)` devuelve la reserva que libera (0 en una venta), para devolver lo mismo a la cuenta, y
@@ -318,6 +322,20 @@ del jugador (`modelo/position/Position`), que estas mismas clases usan (D3).
 
 Fábricas: `Portfolio.current(account, holdings, quotesByPlayer, realized)`, `Portfolio.currentOfSuperuser(account,
 initialOrders, quotesByPlayer)` y `Portfolio.at(day, balance, replay, quotesByPlayer)`.
+
+Implementación (T061 y T064):
+
+- `PortfolioPosition.held(player, basis, committed, quote)` (la de un usuario) y `PortfolioPosition.unsold(player,
+  tokens, quote)` (la del superusuario: sus comprometidos son todos sus tokens, que están a la venta en la orden
+  inicial). `sharePercent()` devuelve `tokens`.
+- Los totales del superusuario suman 0,00 de invertido y de ganancia (sus posiciones no tienen costo) y la realizada
+  es nula.
+- Una orden inicial de un jugador **sin cotización** no figura en el portfolio del superusuario: no se puede valuar y
+  el contrato exige `quote` y `value` en cada posición. Una **tenencia** de usuario sin cotización es un error de los
+  datos (`MarketInvariantException`): para comprar hace falta una cotización y no se borran.
+- `PortfolioService` decide el portfolio del superusuario por el rol `ADMIN` de la cuenta pedida (un administrador no
+  tiene tenencias). El que pide sin cuenta (credencial de una cuenta borrada) recibe `InvalidCredentialsException`
+  (401), como en `AccountService`.
 
 Ejemplos que fija `PortfolioTest`: 10 tokens a 1,0000 con cotización 103,00 → 10 %, invertido 10,00, precio 1,0300,
 valor 10,30, ganancia +0,30, rentabilidad +3,00 %; libre 990,00, reservado 6,18 y posiciones por 20,60 →

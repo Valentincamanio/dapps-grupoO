@@ -23,6 +23,12 @@ export default tseslint.config(
   {
     files: ['src/**/*.tsx', 'tests/**/*.tsx'],
     ...jsxA11y.flatConfigs.recommended,
+    rules: {
+      ...jsxA11y.flatConfigs.recommended.rules,
+      // La prop role de RequireRole es el rol de la cuenta (USER o ADMIN), no un rol ARIA: la regla
+      // sigue mirando los elementos del DOM.
+      'jsx-a11y/aria-role': ['error', { ignoreNonDOM: true }],
+    },
   },
   {
     files: ['*.config.{js,ts}'],

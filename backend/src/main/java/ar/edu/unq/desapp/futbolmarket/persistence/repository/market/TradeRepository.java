@@ -1,5 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.repository.market;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -7,6 +8,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketMath;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.Trade;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.market.TradeMapper;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.market.TradeReferences;
@@ -44,6 +46,15 @@ public class TradeRepository {
 
     public Optional<Trade> findById(long tradeId) {
         return tradeDAO.findById(tradeId).map(mapper::toDomain);
+    }
+
+    /**
+     * La ganancia realizada acumulada en las ventas del usuario: 0 si nunca vendió.
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal realizedProfitOf(long userId) {
+        BigDecimal realized = tradeDAO.sumRealizedProfitOfSeller(userId);
+        return realized == null ? MarketMath.ZERO_CREDITS : realized.setScale(MarketMath.CREDIT_SCALE);
     }
 
     private TradeReferences referencesOf(Trade trade) {

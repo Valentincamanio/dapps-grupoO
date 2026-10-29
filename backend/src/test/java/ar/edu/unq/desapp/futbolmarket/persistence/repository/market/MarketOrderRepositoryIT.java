@@ -26,6 +26,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.market.CancelReason;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrder;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderSide;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderView;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OwnerType;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
@@ -265,6 +266,40 @@ class MarketOrderRepositoryIT {
         Optional<MarketOrder> book = transactionTemplate.execute(status -> repository.lockBook(kane.id()));
 
         assertThat(book).isEmpty();
+    }
+
+    @Test
+    void lasInicialesDelSuperusuarioSonLasQueTienenTokensConElJugadorYSuEquipo() {
+        MarketOrder kaneInitial = MarketOrder.initialFor(superuser, kane.id(), AT);
+        kaneInitial.fill(10);
+        repository.save(kaneInitial);
+        MarketOrder salahInitial = MarketOrder.initialFor(superuser, salah.id(), AT);
+        salahInitial.fill(100);
+        repository.save(salahInitial);
+        repository.save(MarketOrder.initialFor(superuser, son.id(), AT));
+        repository.save(MarketOrder.sell(seller, kane.id(), 5, AT));
+
+        List<OrderView> initialOrders = repository.findInitialOrdersOf(superuser);
+
+        assertThat(initialOrders).extracting(view -> view.player().name())
+                .containsExactlyInAnyOrder("Harry Kane", "Son Heung-min");
+        assertThat(initialOrders).allSatisfy(view -> {
+            assertThat(view.order().isInitial()).isTrue();
+            assertThat(view.order().getPlayerId()).isEqualTo(view.player().id());
+            assertThat(view.player().team().name()).isEqualTo("Arsenal FC");
+        });
+        assertThat(initialOrders).filteredOn(view -> view.player().id().equals(kane.id())).singleElement()
+                .satisfies(view -> assertThat(view.order().pending()).isEqualTo(90));
+    }
+
+    @Test
+    void unUsuarioNoTieneOrdenesIniciales() {
+        repository.save(MarketOrder.initialFor(superuser, kane.id(), AT));
+        repository.save(MarketOrder.sell(seller, kane.id(), 5, AT));
+
+        List<OrderView> initialOrders = repository.findInitialOrdersOf(seller);
+
+        assertThat(initialOrders).isEmpty();
     }
 
     private long user(String username, Role role, String balance) {

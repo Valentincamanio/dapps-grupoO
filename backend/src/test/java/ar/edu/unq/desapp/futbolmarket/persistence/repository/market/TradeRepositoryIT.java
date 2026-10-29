@@ -156,6 +156,48 @@ class TradeRepositoryIT {
         assertThat(TradeSQL.class.isAnnotationPresent(Immutable.class)).isTrue();
     }
 
+    @Test
+    void laGananciaRealizadaEsLaSumaDeLasVentasDelUsuario() {
+        repository.saveAll(List.of(
+                sale(seller, OwnerType.USER, new BigDecimal("0.20")),
+                sale(seller, OwnerType.USER, new BigDecimal("-0.05")),
+                sale(buyer, OwnerType.USER, new BigDecimal("1.00"))));
+
+        BigDecimal realized = repository.realizedProfitOf(seller);
+
+        assertThat(realized).isEqualTo(new BigDecimal("0.15"));
+    }
+
+    @Test
+    void sinVentasLaGananciaRealizadaEsCero() {
+        repository.saveAll(List.of(sale(seller, OwnerType.USER, new BigDecimal("0.20"))));
+
+        BigDecimal realized = repository.realizedProfitOf(buyer);
+
+        assertThat(realized).isEqualTo(new BigDecimal("0.00"));
+    }
+
+    @Test
+    void lasVentasDelSuperusuarioNoTienenGananciaRealizada() {
+        repository.saveAll(List.of(sale(superuser, OwnerType.ADMIN, null)));
+
+        BigDecimal realized = repository.realizedProfitOf(superuser);
+
+        assertThat(realized).isEqualTo(new BigDecimal("0.00"));
+    }
+
+    /**
+     * Una venta de un token del vendedor al comprador. Las órdenes son las del escenario: la
+     * consulta solo mira quién vende.
+     */
+    private Trade sale(long sellerId, OwnerType sellerType, BigDecimal realizedProfit) {
+        long buyerId = sellerId == buyer ? seller : buyer;
+        return new Trade(null, AT, kane.id(), buyOrderId, sellOrderId, buyerId, sellerId, sellerType, 1,
+                new BigDecimal("1.0300"), new BigDecimal("1.03"), quoteId, new BigDecimal("1000.00"),
+                new BigDecimal("998.97"), new BigDecimal("1000.00"), new BigDecimal("1001.03"), 0, 1, 1, 0,
+                realizedProfit);
+    }
+
     private static List<String> publicMethodNames(Class<?> type) {
         return Arrays.stream(type.getDeclaredMethods())
                 .filter(method -> Modifier.isPublic(method.getModifiers()))

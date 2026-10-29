@@ -53,4 +53,19 @@ public interface MarketOrderSQLDAO extends JpaRepository<MarketOrderSQL, Long> {
             order by p.id
             """)
     List<Long> findPlayerIdsWithoutInitialOrderIn(@Param("playerIds") Collection<Long> playerIds);
+
+    /**
+     * Las órdenes iniciales del dueño con tokens pendientes, con el jugador y su equipo en la misma
+     * consulta: el portfolio del superusuario (research D7).
+     */
+    @Query("""
+            select o from MarketOrderSQL o
+            join fetch o.player p
+            join fetch p.team
+            where o.owner.id = :ownerId
+              and o.initialPlayerId is not null
+              and o.status in :statuses
+            """)
+    List<MarketOrderSQL> findInitialOrdersOf(@Param("ownerId") Long ownerId,
+                                             @Param("statuses") Collection<String> statuses);
 }

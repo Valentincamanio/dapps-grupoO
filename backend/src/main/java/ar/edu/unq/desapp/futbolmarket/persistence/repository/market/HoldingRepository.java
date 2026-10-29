@@ -7,7 +7,9 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.market.Holding;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.HoldingView;
 import ar.edu.unq.desapp.futbolmarket.persistence.mapper.market.HoldingMapper;
+import ar.edu.unq.desapp.futbolmarket.persistence.mapper.player.PlayerMapper;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.entity.market.HoldingSQL;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.market.HoldingSQLDAO;
 import ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.player.PlayerSQLDAO;
@@ -25,6 +27,18 @@ public class HoldingRepository {
     private final AppUserSQLDAO appUserDAO;
     private final PlayerSQLDAO playerDAO;
     private final HoldingMapper mapper;
+    private final PlayerMapper playerMapper;
+
+    /**
+     * Las tenencias con tokens del titular, cada una con su jugador: las posiciones de su portfolio
+     * actual, en una sola consulta.
+     */
+    @Transactional(readOnly = true)
+    public List<HoldingView> findPositionsOf(long ownerId) {
+        return holdingDAO.findPositions(ownerId).stream()
+                .map(row -> new HoldingView(mapper.toDomain(row), playerMapper.toDomain(row.getPlayer())))
+                .toList();
+    }
 
     /**
      * Las tenencias del jugador de esos titulares: las del libro de un pedido. Sin titulares no se

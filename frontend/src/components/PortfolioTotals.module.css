@@ -1,0 +1,57 @@
+.totals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--chalk);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-script);
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--chalk-dim);
+}
+
+/* En celular un total por renglón; desde pantallas medianas, en columnas que se acomodan solas */
+.list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px 24px;
+  margin: 0;
+}
+
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--chalk-faint);
+}
+
+.label {
+  font-family: var(--font-script);
+  font-size: 20px;
+  color: var(--chalk-dim);
+}
+
+.value {
+  margin: 0;
+  font-family: var(--font-marker);
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.highlighted .label,
+.highlighted .value {
+  color: var(--yellow);
+  font-size: 22px;
+}
+
+@media (min-width: 760px) {
+  .list {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}
