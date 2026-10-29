@@ -406,15 +406,15 @@ el plan sugiere hacerla primero.
 
 ### Implementación de la Historia 8
 
-- [ ] T122 [P] [US8] Verificar que `specs/007-cotizacion-estrategias/contracts/quotes-api.yaml` está en la versión 1.1.0 con `score` obligatorio en `Quote`, sus descripciones y ejemplos (el plan ya lo dejó así; si falta algo, completarlo)
-- [ ] T123 [US8] Sumar `score` (`BigDecimal` de 6 decimales, después de `tokenPrice`) a `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/quote/dto/QuoteResponse.java` (y actualizar su comentario, que dice que a propósito no lo lleva) y a `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/quote/dto/PlayerQuoteResponse.java`; y, **en esta misma tarea** (G2), en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/QuoteControllerIT.java` cambiar `ningunaRespuestaTraeElScoreNiEstadisticas` a `ningunaRespuestaTraeEstadisticasYTodasTraenElScore`, sacar `"score"` del `doesNotContain` y sumar `contains("\"score\"")`, sin tocar nada más
-- [ ] T124 [US8] Escribir `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/QuoteScoreIT.java`: la cotización actual, a una fecha, la evolución, el lote y el ranking traen `score` (0,30 en una calculada, 0 en la inicial) y ninguna trae `baseValue`, goles, minutos, rating ni métricas normalizadas (SC-014) (depende de T123)
-- [ ] T125 [P] [US8] Sumar el par "Score" al final de `frontend/src/components/QuotePanel.tsx`, solo cuando la cotización lo trae, con `formatScore` de `frontend/src/utils/market.ts`
-- [ ] T126 [P] [US8] Sumar la columna de score, al final, en `frontend/src/components/RankingList.tsx`
-- [ ] T127 [P] [US8] Sumar el score al final del detalle de cada punto de `frontend/src/components/QuoteChart.tsx` y de su alternativa en texto
-- [ ] T128 [P] [US8] Sumar la columna de score, al final, en `frontend/src/components/QuoteTable.tsx`
-- [ ] T129 [P] [US8] Sumar el score al final de `frontend/src/components/QuoteTag.tsx` (pizarra, FR-071), sin botones ni listas nuevas (sigue habiendo un único elemento con rol `list` en `/pizarra`)
-- [ ] T130 [US8] Escribir `frontend/tests/pages/QuoteScore.test.tsx`: la ficha (panel, gráfico y tabla), el ranking, la pizarra y el portfolio muestran el score; ningún texto de estadísticas crudas ni métricas normalizadas. Verificar que los tests de componentes y utilidades de la 007 pasan sin cambios (depende de T125 a T129 y T071)
+- [X] T122 [P] [US8] Verificar que `specs/007-cotizacion-estrategias/contracts/quotes-api.yaml` está en la versión 1.1.0 con `score` obligatorio en `Quote`, sus descripciones y ejemplos (el plan ya lo dejó así; si falta algo, completarlo)
+- [X] T123 [US8] Sumar `score` (`BigDecimal` de 6 decimales, después de `tokenPrice`) a `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/quote/dto/QuoteResponse.java` (y actualizar su comentario, que dice que a propósito no lo lleva) y a `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/controller/quote/dto/PlayerQuoteResponse.java`; y, **en esta misma tarea** (G2), en `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/QuoteControllerIT.java` cambiar `ningunaRespuestaTraeElScoreNiEstadisticas` a `ningunaRespuestaTraeEstadisticasYTodasTraenElScore`, sacar `"score"` del `doesNotContain` y sumar `contains("\"score\"")`, sin tocar nada más
+- [X] T124 [US8] Escribir `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/QuoteScoreIT.java`: la cotización actual, a una fecha, la evolución, el lote y el ranking traen `score` (0,30 en una calculada, 0 en la inicial) y ninguna trae `baseValue`, goles, minutos, rating ni métricas normalizadas (SC-014) (depende de T123)
+- [X] T125 [P] [US8] Sumar el par "Score" al final de `frontend/src/components/QuotePanel.tsx`, solo cuando la cotización lo trae, con `formatScore` de `frontend/src/utils/market.ts`
+- [X] T126 [P] [US8] Sumar la columna de score, al final, en `frontend/src/components/RankingList.tsx`
+- [X] T127 [P] [US8] Sumar el score al final del detalle de cada punto de `frontend/src/components/QuoteChart.tsx` y de su alternativa en texto
+- [X] T128 [P] [US8] Sumar la columna de score, al final, en `frontend/src/components/QuoteTable.tsx`
+- [X] T129 [P] [US8] Sumar el score al final de `frontend/src/components/QuoteTag.tsx` (pizarra, FR-071), sin botones ni listas nuevas (sigue habiendo un único elemento con rol `list` en `/pizarra`)
+- [X] T130 [US8] Escribir `frontend/tests/pages/QuoteScore.test.tsx`: la ficha (panel, gráfico y tabla), el ranking, la pizarra y el portfolio muestran el score; ningún texto de estadísticas crudas ni métricas normalizadas. Verificar que los tests de componentes y utilidades de la 007 pasan sin cambios (depende de T125 a T129 y T071)
 
 **Checkpoint**: score visible en la API y en todas las pantallas con cotizaciones.
 

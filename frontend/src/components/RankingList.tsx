@@ -1,7 +1,9 @@
-// Ranking por cotización: una fila por jugador con su puesto, datos, cotización, variación y la
-// estrategia y versión usadas. Por debajo de un ancho, cada fila pasa a ser una tarjeta (CSS).
+// Ranking por cotización: una fila por jugador con su puesto, datos, cotización, variación, la
+// estrategia y versión usadas y, al final, el score (FR-058 de la 008). Por debajo de un ancho,
+// cada fila pasa a ser una tarjeta (CSS).
 import type { ElementType, ReactNode } from 'react';
 import type { RankingRow } from '../types/quotes';
+import { formatScore } from '../utils/market';
 import { leagueLabel } from '../utils/positions';
 import { formatCredits } from '../utils/quotes';
 import { VariationBadge } from './VariationBadge';
@@ -49,6 +51,7 @@ export function RankingList({
           <th scope="col">Cotización</th>
           <th scope="col">Variación</th>
           <th scope="col">Estrategia</th>
+          <th scope="col">Score</th>
         </tr>
       </thead>
       <tbody>
@@ -76,6 +79,9 @@ export function RankingList({
             </td>
             <td data-label="Estrategia">
               {row.quote.strategy.name}, versión {row.quote.strategy.version}
+            </td>
+            <td data-label="Score" className={styles.value}>
+              {row.quote.score === undefined ? '—' : formatScore(row.quote.score)}
             </td>
           </tr>
         ))}

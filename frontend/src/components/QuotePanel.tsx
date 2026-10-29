@@ -1,6 +1,8 @@
-// Cotización actual de la ficha: valor del jugador, precio por token, variación, semana y
-// estrategia. No repite equipo, posición ni liga (ya están en la hoja de scout).
+// Cotización actual de la ficha: valor del jugador, precio por token, variación, semana,
+// estrategia y, al final, el score cuando la cotización lo trae (FR-058 de la 008). No repite
+// equipo, posición ni liga (ya están en la hoja de scout).
 import type { Quote } from '../types/quotes';
+import { formatScore } from '../utils/market';
 import { formatCredits, formatTokenPrice, quoteTypeLabel, weekLabel } from '../utils/quotes';
 import { VariationBadge } from './VariationBadge';
 import styles from './QuotePanel.module.css';
@@ -42,6 +44,12 @@ export function QuotePanel({ quote }: QuotePanelProps) {
           {quote.strategy.name}, versión {quote.strategy.version}
         </dd>
       </div>
+      {quote.score === undefined ? null : (
+        <div>
+          <dt>Score</dt>
+          <dd>{formatScore(quote.score)}</dd>
+        </div>
+      )}
     </dl>
   );
 }
