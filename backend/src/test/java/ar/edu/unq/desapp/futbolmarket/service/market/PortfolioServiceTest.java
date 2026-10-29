@@ -11,7 +11,9 @@ import static ar.edu.unq.desapp.futbolmarket.modelo.market.MarketFixtures.superu
 import static ar.edu.unq.desapp.futbolmarket.modelo.market.MarketFixtures.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -19,9 +21,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,15 +37,22 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.HoldingView;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketFixtures;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderView;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.Portfolio;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.Trade;
 import ar.edu.unq.desapp.futbolmarket.modelo.player.Player;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.exception.FutureQuoteDateException;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.exception.InvalidQuoteDateException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.Role;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.AccountAccessDeniedException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DateBeforeRegistrationException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.UserNotFoundException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.market.HoldingRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.market.MarketOrderRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.market.TradeRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.quote.QuoteRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.user.AppUserRepository;
 
@@ -51,6 +64,9 @@ class PortfolioServiceTest {
     private static final Instant QUOTED_AT = at("2026-10-26T00:00");
     private static final Player KANE = activePlayer(12L, "Harry Kane");
     private static final Player SALAH = activePlayer(13L, "Mohamed Salah");
+    private static final String AUGUST_17 = "2026-08-17T10:00";
+    private static final Instant SEPTEMBER_1_END = at("2026-09-02T00:00");
+    private static final String PASSWORD_HASH = "$2a$10$abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0";
 
     @Mock
     private AppUserRepository userRepository;
@@ -66,6 +82,12 @@ class PortfolioServiceTest {
 
     @Mock
     private QuoteRepository quoteRepository;
+
+    @Mock
+    private PlayerRepository playerRepository;
+
+    @Mock
+    private Clock clock;
 
     @InjectMocks
     private PortfolioService service;
@@ -164,6 +186,131 @@ class PortfolioServiceTest {
         assertThatThrownBy(() -> service.current(OWNER, OWNER)).isInstanceOf(InvalidCredentialsException.class);
 
         verifyNoInteractions(holdingRepository, quoteRepository);
+    }
+
+    @Test
+    void aUnaFechaReproduceLasOperacionesYValuaConUnaSolaConsultaDeCotizacionesUS72() {
+        AppUser owner = registeredUser(OWNER, AUGUST_17);
+        Trade purchase = MarketFixtures.purchase(1L, OWNER, KANE.id(), 10, "1.0000", at("2026-08-20T12:00"));
+        Trade fromOther = MarketFixtures.sale(2L, OTHER, OWNER, KANE.id(), 5, "1.0300", at("2026-08-26T12:00"));
+        givenNow();
+        when(userRepository.findById(OWNER)).thenReturn(Optional.of(owner));
+        when(tradeRepository.findOfUserBefore(OWNER, SEPTEMBER_1_END)).thenReturn(List.of(purchase, fromOther));
+        when(tradeRepository.findLastOfUserBefore(OWNER, SEPTEMBER_1_END)).thenReturn(Optional.of(fromOther));
+        when(playerRepository.findIndexedByIds(Set.of(KANE.id()))).thenReturn(Map.of(KANE.id(), KANE));
+        when(quoteRepository.findAtOf(Set.of(KANE.id()), SEPTEMBER_1_END)).thenReturn(
+                Map.of(KANE.id(), quote(3L, KANE.id(), "101.00", "0.100000", at("2026-08-31T00:00"))));
+
+        Portfolio portfolio = service.at(OWNER, OWNER, "2026-09-01");
+
+        assertThat(portfolio.date()).isEqualTo(LocalDate.parse("2026-09-01"));
+        assertThat(portfolio.positions()).singleElement().satisfies(position -> {
+            assertThat(position.tokens()).isEqualTo(15);
+            assertThat(position.committed()).isNull();
+            assertThat(position.value()).isEqualByComparingTo("15.15");
+        });
+        assertThat(portfolio.totals().balance()).isEqualByComparingTo("994.85");
+        assertThat(portfolio.totals().availableBalance()).isNull();
+        assertThat(portfolio.totals().reservedBalance()).isNull();
+        verify(quoteRepository, times(1)).findAtOf(anyCollection(), any());
+        verify(quoteRepository, never()).findCurrentOf(anyCollection());
+        verify(tradeRepository, never()).findFirstOfUserAtOrAfter(anyLong(), any());
+        verify(orderRepository, never()).findInitialOrdersCreatedBefore(anyLong(), any());
+        verifyNoInteractions(holdingRepository);
+    }
+
+    @Test
+    void sinOperacionesAnterioresElSaldoEsElPrevioDeLaPrimeraPosterior() {
+        givenNow();
+        when(userRepository.findById(OWNER)).thenReturn(Optional.of(registeredUser(OWNER, AUGUST_17)));
+        when(tradeRepository.findLastOfUserBefore(OWNER, SEPTEMBER_1_END)).thenReturn(Optional.empty());
+        when(tradeRepository.findFirstOfUserAtOrAfter(OWNER, SEPTEMBER_1_END)).thenReturn(Optional.of(
+                MarketFixtures.purchase(1L, OWNER, KANE.id(), 10, "1.0000", at("2026-09-02T09:00"))));
+
+        Portfolio portfolio = service.at(OWNER, OWNER, "2026-09-01");
+
+        assertThat(portfolio.positions()).isEmpty();
+        assertThat(portfolio.totals().balance()).isEqualByComparingTo("1000.00");
+        assertThat(portfolio.totals().equity()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void elPermisoSeVerificaAntesQueLaFecha() {
+        when(userRepository.findById(OTHER)).thenReturn(Optional.of(user(OTHER, "1000.00")));
+
+        assertThatThrownBy(() -> service.at(OTHER, OWNER, "2026-13-01"))
+                .isInstanceOf(AccountAccessDeniedException.class);
+
+        verifyNoInteractions(clock, tradeRepository, quoteRepository, playerRepository);
+    }
+
+    @Test
+    void unaFechaConFormatoInvalidoEs400ConElValor() {
+        when(userRepository.findById(OWNER)).thenReturn(Optional.of(registeredUser(OWNER, AUGUST_17)));
+
+        assertThatThrownBy(() -> service.at(OWNER, OWNER, "2026-13-01"))
+                .isInstanceOf(InvalidQuoteDateException.class)
+                .hasMessage("La fecha '2026-13-01' no es válida: use el formato AAAA-MM-DD.");
+
+        verifyNoInteractions(tradeRepository, quoteRepository, playerRepository);
+    }
+
+    @Test
+    void unaFechaFuturaSeRechazaAntesQueUnaAnteriorAlRegistro() {
+        givenNow();
+        when(userRepository.findById(OWNER)).thenReturn(Optional.of(registeredUser(OWNER, "2026-09-10T12:00")));
+
+        assertThatThrownBy(() -> service.at(OWNER, OWNER, "2026-09-05"))
+                .isInstanceOf(FutureQuoteDateException.class)
+                .hasMessage("La fecha 2026-09-05 es futura.");
+
+        verifyNoInteractions(tradeRepository, quoteRepository, playerRepository);
+    }
+
+    @Test
+    void unaFechaAnteriorAlRegistroEs400() {
+        givenNow();
+        when(userRepository.findById(OWNER)).thenReturn(Optional.of(registeredUser(OWNER, AUGUST_17)));
+
+        assertThatThrownBy(() -> service.at(OWNER, OWNER, "2026-08-16"))
+                .isInstanceOf(DateBeforeRegistrationException.class)
+                .hasMessage("La fecha 2026-08-16 es anterior al registro del usuario (2026-08-17).");
+
+        verifyNoInteractions(tradeRepository, quoteRepository, playerRepository);
+    }
+
+    @Test
+    void elDelSuperusuarioAUnaFechaSaleDeSusInicialesCreadasAntesMenosLoVendido() {
+        Trade sold = MarketFixtures.purchase(1L, OWNER, KANE.id(), 10, "1.0000", at("2026-08-20T12:00"));
+        givenNow();
+        when(userRepository.findById(SUPERUSER_ID)).thenReturn(Optional.of(superuser("10.00")));
+        when(tradeRepository.findOfUserBefore(SUPERUSER_ID, SEPTEMBER_1_END)).thenReturn(List.of(sold));
+        when(orderRepository.findInitialOrdersCreatedBefore(SUPERUSER_ID, SEPTEMBER_1_END))
+                .thenReturn(List.of(initialOrder(1L, KANE.id(), 90, at("2026-08-17T00:00"))));
+        when(tradeRepository.findLastOfUserBefore(SUPERUSER_ID, SEPTEMBER_1_END)).thenReturn(Optional.of(sold));
+        when(playerRepository.findIndexedByIds(Set.of(KANE.id()))).thenReturn(Map.of(KANE.id(), KANE));
+        when(quoteRepository.findAtOf(Set.of(KANE.id()), SEPTEMBER_1_END)).thenReturn(
+                Map.of(KANE.id(), quote(3L, KANE.id(), "101.00", "0.100000", at("2026-08-31T00:00"))));
+
+        Portfolio portfolio = service.at(SUPERUSER_ID, SUPERUSER_ID, "2026-09-01");
+
+        assertThat(portfolio.positions()).singleElement().satisfies(position -> {
+            assertThat(position.tokens()).isEqualTo(90);
+            assertThat(position.averagePrice()).isNull();
+            assertThat(position.committed()).isNull();
+        });
+        assertThat(portfolio.totals().balance()).isEqualByComparingTo("10.00");
+        assertThat(portfolio.totals().realizedProfit()).isNull();
+        verifyNoInteractions(holdingRepository);
+    }
+
+    private void givenNow() {
+        when(clock.instant()).thenReturn(at("2026-09-02T12:00"));
+    }
+
+    private static AppUser registeredUser(long id, String registeredAt) {
+        return AppUser.reconstitute(id, "usuario" + id, "usuario" + id + "@correo.com", PASSWORD_HASH, null, Role.USER,
+                new BigDecimal("1000.00"), BigDecimal.ZERO.setScale(2), at(registeredAt));
     }
 
     private static HoldingView view(Player player) {

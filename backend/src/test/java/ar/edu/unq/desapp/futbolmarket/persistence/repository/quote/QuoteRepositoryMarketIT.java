@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +26,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteType;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteWeek;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyVersionRef;
 import ar.edu.unq.desapp.futbolmarket.modelo.team.Team;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.strategy.StrategyRepository;
 import ar.edu.unq.desapp.futbolmarket.service.quote.QuoteDatabase;
 
@@ -48,6 +50,9 @@ class QuoteRepositoryMarketIT {
 
     @Autowired
     private StrategyRepository strategyRepository;
+
+    @Autowired
+    private PlayerRepository playerRepository;
 
     private QuoteDatabase database;
     private StrategyVersionRef strategy;
@@ -122,6 +127,42 @@ class QuoteRepositoryMarketIT {
         Optional<Quote> inForce = quoteRepository.findInForceAt(kane.id(), WEEK.start().minusSeconds(1));
 
         assertThat(inForce).isEmpty();
+    }
+
+    @Test
+    void porLoteDevuelveLaQueRegiaJustoAntesDelInstantePorJugador() {
+        Map<Long, Quote> atEnd = quoteRepository.findAtOf(List.of(kane.id(), coleman.id(), son.id()),
+                WEEK.end().plus(Duration.ofHours(1)));
+
+        assertThat(atEnd).containsOnlyKeys(kane.id(), coleman.id());
+        assertThat(atEnd.get(kane.id()).value()).isEqualTo(new BigDecimal("103.00"));
+        assertThat(atEnd.get(kane.id()).strategy()).isEqualTo(strategy);
+        assertThat(atEnd.get(coleman.id()).type()).isEqualTo(QuoteType.INITIAL);
+    }
+
+    @Test
+    void porLoteElInstanteQuedaExcluido() {
+        Map<Long, Quote> atWeekEnd = quoteRepository.findAtOf(List.of(kane.id()), WEEK.end());
+        Map<Long, Quote> afterRequote = quoteRepository.findAtOf(List.of(kane.id()), REQUOTED_AT.plusSeconds(1));
+
+        assertThat(atWeekEnd.get(kane.id()).type()).isEqualTo(QuoteType.INITIAL);
+        assertThat(afterRequote.get(kane.id()).value()).isEqualTo(new BigDecimal("105.00"));
+    }
+
+    @Test
+    void porLoteSinJugadoresNoHayNingunaYAntesDeLaPrimeraTampoco() {
+        assertThat(quoteRepository.findAtOf(List.of(), WEEK.end())).isEmpty();
+        assertThat(quoteRepository.findAtOf(List.of(kane.id()), WEEK.start())).isEmpty();
+    }
+
+    @Test
+    void losJugadoresPorLoteVienenPorIdConSuEquipo() {
+        Map<Long, Player> players = playerRepository.findIndexedByIds(List.of(kane.id(), coleman.id(), 999_999L));
+
+        assertThat(players).containsOnlyKeys(kane.id(), coleman.id());
+        assertThat(players.get(kane.id()).team().name()).isEqualTo("Arsenal FC");
+        assertThat(players.get(coleman.id()).active()).isFalse();
+        assertThat(playerRepository.findIndexedByIds(List.of())).isEmpty();
     }
 
     private Quote initial(Player player) {

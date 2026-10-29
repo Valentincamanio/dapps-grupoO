@@ -7,7 +7,7 @@ import { SessionProvider } from '../../src/context/SessionContext';
 import { usePortfolio } from '../../src/hooks/usePortfolio';
 import { writeSession } from '../../src/services/sessionStorage';
 import { SEED_TOKEN } from '../mocks/handlers';
-import { CURRENT_PORTFOLIO, MARKET_USER_ID } from '../mocks/market';
+import { CURRENT_PORTFOLIO, MARKET_USER_ID, PORTFOLIO_AT_DATE, PORTFOLIO_DATE } from '../mocks/market';
 import { server } from '../mocks/server';
 
 const PORTFOLIO_PATH = '*/api/users/:id/portfolio';
@@ -75,6 +75,49 @@ describe('usePortfolio', () => {
     await waitFor(() => expect(result.current.status).toBe('idle'));
     expect(result.current.portfolio).toBeUndefined();
     expect(requested).toEqual([]);
+  });
+
+  it('con una fecha trae el portfolio de ese día', async () => {
+    withSession();
+    const requested = trackPortfolioRequests();
+
+    const { result } = renderHook(() => usePortfolio(PORTFOLIO_DATE), { wrapper });
+
+    await waitFor(() => expect(result.current.status).toBe('success'));
+    expect(result.current.portfolio).toEqual(PORTFOLIO_AT_DATE);
+    expect(result.current.portfolio?.totals.availableBalance).toBeUndefined();
+    expect(requested).toEqual([`/api/users/${MARKET_USER_ID}/portfolio?date=${PORTFOLIO_DATE}`]);
+  });
+
+  it('al cambiar la fecha vuelve a pedir, y sin ella trae el actual', async () => {
+    withSession();
+    const requested = trackPortfolioRequests();
+    const { result, rerender } = renderHook((date?: string) => usePortfolio(date), {
+      wrapper,
+      initialProps: PORTFOLIO_DATE,
+    });
+    await waitFor(() => expect(result.current.portfolio?.date).toBe(PORTFOLIO_DATE));
+
+    rerender(undefined);
+
+    await waitFor(() => expect(result.current.portfolio).toEqual(CURRENT_PORTFOLIO));
+    expect(requested).toEqual([
+      `/api/users/${MARKET_USER_ID}/portfolio?date=${PORTFOLIO_DATE}`,
+      `/api/users/${MARKET_USER_ID}/portfolio`,
+    ]);
+  });
+
+  it('una fecha rechazada queda como error con el mensaje del servidor', async () => {
+    withSession();
+
+    const { result } = renderHook(() => usePortfolio('2026-08-10'), { wrapper });
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.error?.status).toBe(400);
+    expect(result.current.error?.message).toBe(
+      'La fecha 2026-08-10 es anterior al registro del usuario (2026-08-17).',
+    );
+    expect(result.current.portfolio).toBeUndefined();
   });
 
   it('si el servidor falla queda el error, y reintentar lo recupera', async () => {

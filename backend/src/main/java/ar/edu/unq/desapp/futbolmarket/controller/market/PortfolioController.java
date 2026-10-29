@@ -57,6 +57,9 @@ public class PortfolioController {
     private static final String NOT_FOUND_EXAMPLE = EXAMPLE_START
             + "\"status\": 404, \"error\": \"Not Found\", \"message\": \"No se encontró el usuario con id 999.\", "
             + "\"path\": \"/users/999/portfolio\"}";
+    private static final String INVALID_DATE_EXAMPLE = EXAMPLE_START
+            + "\"status\": 400, \"error\": \"Bad Request\", \"message\": \"La fecha '2026-13-01' no es válida: use "
+            + "el formato AAAA-MM-DD.\", \"path\": \"/users/7/portfolio\"}";
     private static final String INVALID_RANGE_EXAMPLE = EXAMPLE_START
             + "\"status\": 400, \"error\": \"Bad Request\", \"message\": \"El inicio del rango (2026-09-10) es "
             + "posterior al final (2026-09-01).\", \"path\": \"/users/7/transactions\"}";
@@ -71,14 +74,19 @@ public class PortfolioController {
     private final MarketQueryService marketQueryService;
 
     @Operation(
-            summary = "Portfolio actual",
-            description = "Las tenencias con la cotización vigente de cada jugador (un jugador inactivo, con su "
-                    + "última cotización), el saldo libre y reservado y los tokens comprometidos. Para el "
-                    + "superusuario, las posiciones son los tokens sin vender de cada jugador y no informan precio "
-                    + "promedio, invertido, ganancia ni rentabilidad.")
+            summary = "Portfolio actual o a una fecha",
+            description = "Sin fecha, las tenencias con la cotización vigente de cada jugador (un jugador inactivo, "
+                    + "con su última cotización), el saldo libre y reservado y los tokens comprometidos. Con fecha "
+                    + "(AAAA-MM-DD en hora de Argentina), las posiciones reconstruidas con las operaciones hasta el "
+                    + "final de ese día, valuadas con la cotización que regía entonces; informa solo el saldo total, "
+                    + "sin libre, reservado ni comprometidos. Para el superusuario, las posiciones son los tokens sin "
+                    + "vender de cada jugador y no informan precio promedio, invertido, ganancia ni rentabilidad.")
     @ApiResponse(responseCode = "200", description = "El portfolio.")
-    @ApiResponse(responseCode = "400", description = "Identificador inválido.",
-            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "400",
+            description = "Identificador inválido, o una fecha con formato inválido, futura o anterior al registro "
+                    + "del usuario. El mensaje repite el valor no admitido.",
+            content = @Content(schema = @Schema(implementation = ApiError.class),
+                    examples = @ExampleObject(value = INVALID_DATE_EXAMPLE)))
     @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION,
             content = @Content(schema = @Schema(implementation = ApiError.class),
                     examples = @ExampleObject(value = UNAUTHORIZED_EXAMPLE)))
@@ -89,9 +97,17 @@ public class PortfolioController {
             content = @Content(schema = @Schema(implementation = ApiError.class),
                     examples = @ExampleObject(value = NOT_FOUND_EXAMPLE)))
     @GetMapping("/{id}/portfolio")
-    public PortfolioResponse getPortfolio(@AuthenticationPrincipal @Parameter(hidden = true) Long requesterId,
-                                          @PathVariable @Min(1) Long id) {
-        return PortfolioResponse.from(portfolioService.current(requesterId, id));
+    public PortfolioResponse getPortfolio(
+            @AuthenticationPrincipal @Parameter(hidden = true) Long requesterId,
+            @PathVariable @Min(1) Long id,
+            @Parameter(description = "Fecha AAAA-MM-DD en hora de Argentina; sin ella, el portfolio actual.",
+                    example = "2026-08-25")
+            @RequestParam(required = false) String date
+    ) {
+        if (date == null) {
+            return PortfolioResponse.from(portfolioService.current(requesterId, id));
+        }
+        return PortfolioResponse.from(portfolioService.at(requesterId, id, date));
     }
 
     @Operation(

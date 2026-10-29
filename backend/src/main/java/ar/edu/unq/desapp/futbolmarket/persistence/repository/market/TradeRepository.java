@@ -1,6 +1,7 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.repository.market;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +35,9 @@ import lombok.RequiredArgsConstructor;
 @Repository
 @RequiredArgsConstructor
 public class TradeRepository {
+    // Una hoja de una sola operación: la última anterior o la primera posterior a un instante
+    private static final PageRequest ONE = PageRequest.of(0, 1);
+
     private final TradeSQLDAO tradeDAO;
     private final PlayerSQLDAO playerDAO;
     private final MarketOrderSQLDAO orderDAO;
@@ -80,6 +84,35 @@ public class TradeRepository {
     public BigDecimal realizedProfitOf(long userId) {
         BigDecimal realized = tradeDAO.sumRealizedProfitOfSeller(userId);
         return realized == null ? MarketMath.ZERO_CREDITS : realized.setScale(MarketMath.CREDIT_SCALE);
+    }
+
+    /**
+     * Las operaciones del usuario anteriores al instante, de la más vieja a la más nueva
+     * ({@code executedAt}, después {@code id}): las que reproduce el portfolio a una fecha.
+     */
+    @Transactional(readOnly = true)
+    public List<Trade> findOfUserBefore(long userId, Instant end) {
+        return tradeDAO.findOfUserBefore(userId, end).stream().map(mapper::toDomain).toList();
+    }
+
+    /**
+     * La última operación del usuario anterior al instante, que queda excluido.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Trade> findLastOfUserBefore(long userId, Instant end) {
+        return first(tradeDAO.findLastOfUserBefore(userId, end, ONE));
+    }
+
+    /**
+     * La primera operación del usuario desde el instante, incluido.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Trade> findFirstOfUserAtOrAfter(long userId, Instant end) {
+        return first(tradeDAO.findFirstOfUserAtOrAfter(userId, end, ONE));
+    }
+
+    private Optional<Trade> first(List<TradeSQL> rows) {
+        return rows.stream().findFirst().map(mapper::toDomain);
     }
 
     private TradeReferences referencesOf(Trade trade) {

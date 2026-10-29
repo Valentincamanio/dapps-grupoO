@@ -1,5 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.sql.interfaces.market;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -71,6 +72,18 @@ public interface MarketOrderSQLDAO extends JpaRepository<MarketOrderSQL, Long> {
             """)
     List<MarketOrderSQL> findInitialOrdersOf(@Param("ownerId") Long ownerId,
                                              @Param("statuses") Collection<String> statuses);
+
+    /**
+     * Las órdenes iniciales del dueño creadas antes del instante, que queda excluido, en cualquier
+     * estado: las posiciones del superusuario a una fecha (research D20).
+     */
+    @Query("""
+            select o from MarketOrderSQL o
+            where o.owner.id = :ownerId
+              and o.initialPlayerId is not null
+              and o.createdAt < :end
+            """)
+    List<MarketOrderSQL> findInitialOrdersCreatedBefore(@Param("ownerId") Long ownerId, @Param("end") Instant end);
 
     /**
      * El jugador de una orden, sin cargarla: con él se bloquea el libro antes de leer la orden que

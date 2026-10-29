@@ -92,6 +92,34 @@ public final class MarketFixtures {
     }
 
     /**
+     * Una compra a la orden inicial del superusuario, a ese precio por token. El comprador tenía
+     * {@link #INITIAL_BALANCE} antes; las órdenes no importan y van sin id.
+     */
+    public static Trade purchase(long id, long buyerId, long playerId, int quantity, String tokenPrice,
+                                 Instant executedAt) {
+        BigDecimal price = new BigDecimal(tokenPrice);
+        BigDecimal total = MarketMath.total(quantity, price);
+        BigDecimal before = new BigDecimal(INITIAL_BALANCE);
+        return new Trade(id, executedAt, playerId, null, null, buyerId, SUPERUSER_ID, OwnerType.ADMIN, quantity,
+                price, total, 1L, before, before.subtract(total), MarketMath.ZERO_CREDITS, total, 0, quantity, 0, 0,
+                null);
+    }
+
+    /**
+     * Una venta entre dos usuarios, a ese precio por token. Los dos tenían {@link #INITIAL_BALANCE}
+     * antes; la ganancia realizada va en 0, porque quien la necesita la calcula.
+     */
+    public static Trade sale(long id, long sellerId, long buyerId, long playerId, int quantity, String tokenPrice,
+                             Instant executedAt) {
+        BigDecimal price = new BigDecimal(tokenPrice);
+        BigDecimal total = MarketMath.total(quantity, price);
+        BigDecimal before = new BigDecimal(INITIAL_BALANCE);
+        return new Trade(id, executedAt, playerId, null, null, buyerId, sellerId, OwnerType.USER, quantity, price,
+                total, 1L, before, before.subtract(total), before, before.add(total), 0, quantity, quantity, 0,
+                MarketMath.ZERO_CREDITS);
+    }
+
+    /**
      * Tokens comprados de una vez por {@code cost}, sin ventas.
      */
     public static CostBasis costBasis(int quantity, String cost) {

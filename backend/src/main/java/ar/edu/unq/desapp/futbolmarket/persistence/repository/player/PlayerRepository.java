@@ -13,7 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Repository
 public class PlayerRepository {
@@ -124,6 +127,16 @@ public class PlayerRepository {
             return List.of();
         }
         return toPlayers(playerDAO.findAllByIdIn(playerIds));
+    }
+
+    /**
+     * Esos jugadores con su equipo, por id, en una sola consulta: los de las posiciones del portfolio
+     * a una fecha. Los que no existen no figuran y sin ids no se consulta la base.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Player> findIndexedByIds(Collection<Long> playerIds) {
+        return findAllByIds(playerIds).stream()
+                .collect(Collectors.toUnmodifiableMap(Player::id, Function.identity()));
     }
 
     private List<Player> toPlayers(List<PlayerSQL> players) {

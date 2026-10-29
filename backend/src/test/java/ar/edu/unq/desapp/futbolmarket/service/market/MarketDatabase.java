@@ -140,6 +140,16 @@ public final class MarketDatabase {
                 new BigDecimal(balance), hasher).user());
     }
 
+    /**
+     * Como {@link #user(String)}, registrada en ese instante: el portfolio a una fecha no admite
+     * días anteriores (research D6).
+     */
+    public AppUser user(String balance, Instant registeredAt) {
+        String username = "u" + UUID.randomUUID().toString().replace("-", "").substring(0, SUFFIX_LENGTH);
+        return userRepository.save(AppUser.register(username, username + "@correo.com", PASSWORD,
+                new BigDecimal(balance), hasher, registeredAt).user());
+    }
+
     public AppUser account(long userId) {
         return userRepository.findById(userId).orElseThrow();
     }

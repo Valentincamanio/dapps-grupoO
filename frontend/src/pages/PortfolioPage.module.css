@@ -4,3 +4,50 @@
   gap: 20px;
   min-width: 0;
 }
+
+/* La fecha va sobre papel, como el selector de fechas de la ficha */
+.dateBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+  min-width: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 1 280px;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-radius: 4px;
+  background: var(--chalk);
+  color: var(--ink);
+  box-shadow: var(--shadow-note);
+  font-family: var(--font-hand);
+}
+
+.field label {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.field input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 1.05rem;
+  padding: 4px 6px;
+  border: 2px solid var(--ink-soft);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+}
+
+.field input:focus-visible {
+  outline: 3px dashed var(--ink);
+  outline-offset: 2px;
+}

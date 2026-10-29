@@ -12,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +31,8 @@ class PortfolioTest {
     private static final Player KANE = activePlayer(12L, "Harry Kane");
     private static final Player SALAH = activePlayer(13L, "Mohamed Salah");
     private static final Player AARONSON = activePlayer(14L, "Brenden Aaronson");
+    private static final LocalDate AUGUST_25 = LocalDate.parse("2026-08-25");
+    private static final LocalDate SEPTEMBER_1 = LocalDate.parse("2026-09-01");
 
     @Test
     void diezTokensCompradosA1ConCotizacion103GananTresPorCiento() {
@@ -215,6 +218,109 @@ class PortfolioTest {
 
         assertThat(portfolio.positions()).isEmpty();
         assertThat(portfolio.totals().equity()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void al25DeAgostoDiezTokensSeValuanA103ConElScoreDeEsaCotizacionUS71() {
+        Quote august24 = quote(3L, KANE.id(), "103.00", "0.300000", at("2026-08-24T00:00"));
+        TradeReplay replay = TradeReplay.ofUser(USER_ID, List.of(
+                MarketFixtures.purchase(1L, USER_ID, KANE.id(), 10, "1.0000", at("2026-08-20T12:00"))));
+
+        Portfolio portfolio = Portfolio.at(USER_ID, AUGUST_25, new BigDecimal("990.00"), replay,
+                Map.of(KANE.id(), KANE), Map.of(KANE.id(), august24));
+
+        assertThat(portfolio.userId()).isEqualTo(USER_ID);
+        assertThat(portfolio.date()).isEqualTo(AUGUST_25);
+        assertThat(portfolio.positions()).singleElement().satisfies(position -> {
+            assertThat(position.tokens()).isEqualTo(10);
+            assertThat(position.committed()).isNull();
+            assertThat(position.averagePrice()).isEqualByComparingTo("1.0000");
+            assertThat(position.quote()).isEqualTo(august24);
+            assertThat(position.quote().score()).isEqualByComparingTo("0.300000");
+            assertThat(position.value()).isEqualByComparingTo("10.30");
+            assertThat(position.profit()).isEqualByComparingTo("0.30");
+        });
+    }
+
+    @Test
+    void alPrimeroDeSeptiembreQuinceTokensSeValuanA101US72() {
+        TradeReplay replay = TradeReplay.ofUser(USER_ID, List.of(
+                MarketFixtures.purchase(1L, USER_ID, KANE.id(), 10, "1.0000", at("2026-08-20T12:00")),
+                MarketFixtures.sale(2L, 30L, USER_ID, KANE.id(), 5, "1.0300", at("2026-08-26T12:00"))));
+
+        Portfolio portfolio = Portfolio.at(USER_ID, SEPTEMBER_1, new BigDecimal("984.85"), replay,
+                Map.of(KANE.id(), KANE),
+                Map.of(KANE.id(), quote(4L, KANE.id(), "101.00", "0.100000", at("2026-08-31T00:00"))));
+
+        assertThat(portfolio.positions()).singleElement().satisfies(position -> {
+            assertThat(position.tokens()).isEqualTo(15);
+            assertThat(position.averagePrice()).isEqualByComparingTo("1.0100");
+            assertThat(position.invested()).isEqualByComparingTo("15.15");
+            assertThat(position.value()).isEqualByComparingTo("15.15");
+            assertThat(position.profit()).isEqualByComparingTo("0.00");
+        });
+    }
+
+    @Test
+    void aUnaFechaLosTotalesTraenSoloElSaldoTotalYElPatrimonioEsSaldoMasValor() {
+        TradeReplay replay = TradeReplay.ofUser(USER_ID, List.of(
+                MarketFixtures.purchase(1L, USER_ID, KANE.id(), 10, "1.0000", at("2026-08-20T12:00"))));
+
+        Portfolio portfolio = Portfolio.at(USER_ID, AUGUST_25, new BigDecimal("990.00"), replay,
+                Map.of(KANE.id(), KANE), Map.of(KANE.id(), quote(3L, KANE.id(), "103.00", "0.300000", QUOTED_AT)));
+
+        PortfolioTotals totals = portfolio.totals();
+        assertThat(totals.availableBalance()).isNull();
+        assertThat(totals.reservedBalance()).isNull();
+        assertThat(totals.balance()).isEqualByComparingTo("990.00");
+        assertThat(totals.invested()).isEqualByComparingTo("10.00");
+        assertThat(totals.value()).isEqualByComparingTo("10.30");
+        assertThat(totals.realizedProfit()).isEqualByComparingTo("0.00");
+        assertThat(totals.equity()).isEqualByComparingTo("1000.30");
+    }
+
+    @Test
+    void aUnaFechaSinPosicionesElPatrimonioEsElSaldo() {
+        Portfolio portfolio = Portfolio.at(USER_ID, AUGUST_25, new BigDecimal("1000.00"),
+                TradeReplay.ofUser(USER_ID, List.of()), Map.of(), Map.of());
+
+        assertThat(portfolio.positions()).isEmpty();
+        assertThat(portfolio.totals().equity()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void elDelSuperusuarioAUnaFechaSonSusTokensSinVenderSinCostoNiComprometidos() {
+        TradeReplay replay = TradeReplay.ofSuperuser(
+                List.of(initialOrder(1L, KANE.id(), 100, QUOTED_AT), initialOrder(2L, SALAH.id(), 100, QUOTED_AT)),
+                List.of(MarketFixtures.purchase(3L, USER_ID, KANE.id(), 10, "1.0000", at("2026-08-20T12:00"))));
+
+        Portfolio portfolio = Portfolio.at(MarketFixtures.SUPERUSER_ID, AUGUST_25, new BigDecimal("10.00"), replay,
+                Map.of(KANE.id(), KANE, SALAH.id(), SALAH),
+                Map.of(KANE.id(), quote(3L, KANE.id(), "103.00", "0.300000", QUOTED_AT)));
+
+        assertThat(portfolio.positions()).singleElement().satisfies(position -> {
+            assertThat(position.player()).isEqualTo(KANE);
+            assertThat(position.tokens()).isEqualTo(90);
+            assertThat(position.committed()).isNull();
+            assertThat(position.averagePrice()).isNull();
+            assertThat(position.invested()).isNull();
+            assertThat(position.profit()).isNull();
+            assertThat(position.value()).isEqualByComparingTo("92.70");
+        });
+        assertThat(portfolio.totals().realizedProfit()).isNull();
+        assertThat(portfolio.totals().equity()).isEqualByComparingTo("102.70");
+    }
+
+    @Test
+    void unaPosicionAUnaFechaSinCotizacionEsUnErrorDeLosDatos() {
+        TradeReplay replay = TradeReplay.ofUser(USER_ID, List.of(
+                MarketFixtures.purchase(1L, USER_ID, KANE.id(), 10, "1.0000", at("2026-08-20T12:00"))));
+        Map<Long, Player> players = Map.of(KANE.id(), KANE);
+        Map<Long, Quote> noQuotes = Map.of();
+        BigDecimal balance = new BigDecimal("990.00");
+
+        assertThatThrownBy(() -> Portfolio.at(USER_ID, AUGUST_25, balance, replay, players, noQuotes))
+                .isInstanceOf(MarketInvariantException.class);
     }
 
     private static HoldingView view(Player player, CostBasis basis, int committed) {

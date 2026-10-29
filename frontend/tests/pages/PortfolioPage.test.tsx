@@ -1,10 +1,10 @@
 // Historia 2 de la 008: la pantalla Portfolio con el portfolio actual. Las posiciones y los totales
 // salen del backend simulado; la ganancia o pérdida se lee con signo y texto, sin depender del color.
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import type { Portfolio } from '../../src/types/market';
-import { CURRENT_PORTFOLIO, MARKET_USER_ID } from '../mocks/market';
+import { CURRENT_PORTFOLIO, MARKET_USER_ID, PORTFOLIO_AT_DATE, PORTFOLIO_DATE } from '../mocks/market';
 import { renderWithRouter } from '../mocks/renderWithRouter';
 import { server } from '../mocks/server';
 
@@ -104,6 +104,69 @@ describe('PortfolioPage', () => {
     renderWithRouter({ initialEntries: ['/pizarra'], session: 'valid' });
 
     expect(await screen.findByRole('link', { name: 'Portfolio' })).toHaveAttribute('href', '/portfolio');
+  });
+
+  it('elegir una fecha la escribe en la dirección y muestra el portfolio de ese día', async () => {
+    const { user, router } = renderPortfolio();
+    await screen.findByRole('table');
+
+    await user.type(screen.getByLabelText('Ver el portfolio de una fecha'), PORTFOLIO_DATE);
+
+    await waitFor(() => expect(router.state.location.search).toBe(`?date=${PORTFOLIO_DATE}`));
+    expect(await screen.findByRole('table', { name: /^Tus posiciones al 25\/08\/2026/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('rowheader')).toHaveLength(PORTFOLIO_AT_DATE.positions.length);
+    expect(totalOf('Saldo total')).toHaveTextContent('990,00 cr.');
+    expect(totalOf('Patrimonio')).toHaveTextContent('1.000,30 cr.');
+  });
+
+  it('a una fecha no muestra saldo libre, reservado ni comprometidos', async () => {
+    renderWithRouter({ initialEntries: [`/portfolio?date=${PORTFOLIO_DATE}`], session: 'valid' });
+
+    await screen.findByRole('table', { name: /^Tus posiciones al 25\/08\/2026/ });
+    expect(screen.getByRole('heading', { name: 'Totales al 25/08/2026' })).toBeInTheDocument();
+    expect(screen.queryByText('Saldo libre', { selector: 'dt' })).toBeNull();
+    expect(screen.queryByText('Saldo reservado', { selector: 'dt' })).toBeNull();
+    const [row] = screen.getAllByRole('row').slice(1);
+    expect(row.querySelector('[data-label="Comprometidos"]')).toHaveTextContent('—');
+    expect(screen.getByLabelText('Ver el portfolio de una fecha')).toHaveValue(PORTFOLIO_DATE);
+  });
+
+  it('volver al actual saca la fecha de la dirección', async () => {
+    const { user, router } = renderWithRouter({
+      initialEntries: [`/portfolio?date=${PORTFOLIO_DATE}`],
+      session: 'valid',
+    });
+    await screen.findByRole('table', { name: /^Tus posiciones al/ });
+
+    await user.click(screen.getByRole('button', { name: 'volver al actual' }));
+
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+    expect(await screen.findByRole('table', { name: 'Tus posiciones, valuadas con la cotización vigente' }))
+      .toBeInTheDocument();
+    expect(totalOf('Saldo libre')).toHaveTextContent('993,82 cr.');
+    expect(screen.getByLabelText('Ver el portfolio de una fecha')).toHaveValue('');
+    expect(screen.queryByRole('button', { name: 'volver al actual' })).toBeNull();
+  });
+
+  it('una fecha que el servidor rechaza se explica en español y se puede volver al actual', async () => {
+    const { user, router } = renderWithRouter({ initialEntries: ['/portfolio?date=2026-08-10'], session: 'valid' });
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('La fecha 2026-08-10 es anterior al registro del usuario (2026-08-17).');
+    expect(screen.queryByRole('table')).toBeNull();
+
+    await user.click(within(alert).getByRole('button', { name: 'volver al actual' }));
+
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+    expect(await screen.findByRole('table')).toBeInTheDocument();
+  });
+
+  it('una fecha mal escrita en la dirección muestra el mensaje del servidor', async () => {
+    renderWithRouter({ initialEntries: ['/portfolio?date=2026-13-01'], session: 'valid' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "La fecha '2026-13-01' no es válida: use el formato AAAA-MM-DD.",
+    );
   });
 
   it('sin sesión lleva a entrar', async () => {

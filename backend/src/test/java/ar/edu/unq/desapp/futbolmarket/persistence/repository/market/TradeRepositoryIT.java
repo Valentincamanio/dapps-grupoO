@@ -258,6 +258,47 @@ class TradeRepositoryIT {
      * el 26/08, siempre a las 12 de Argentina; una compra de Salah del 23/08; y una operación del
      * vendedor con el superusuario, que no es del comprador.
      */
+    @Test
+    void lasOperacionesAnterioresAUnInstanteVanDeLaMasViejaALaMasNuevaSinElInstante() {
+        History history = seedHistory();
+
+        List<Trade> before = repository.findOfUserBefore(buyer, AT.plus(Duration.ofDays(1)));
+
+        assertThat(before).extracting(Trade::id).containsExactly(history.salahPurchase(), history.purchaseFromAdmin());
+        assertThat(before).allSatisfy(trade -> assertThat(trade.buyerId()).isEqualTo(buyer));
+    }
+
+    @Test
+    void lasOperacionesDelMismoInstanteVanPorId() {
+        long first = save(trade(buyer, superuser, OwnerType.ADMIN, kane.id(), AT));
+        long second = save(trade(buyer, superuser, OwnerType.ADMIN, kane.id(), AT));
+
+        assertThat(repository.findOfUserBefore(buyer, AT.plusSeconds(1))).extracting(Trade::id)
+                .containsExactly(first, second);
+        assertThat(repository.findLastOfUserBefore(buyer, AT.plusSeconds(1))).map(Trade::id).contains(second);
+        assertThat(repository.findFirstOfUserAtOrAfter(buyer, AT)).map(Trade::id).contains(first);
+    }
+
+    @Test
+    void laUltimaAnteriorYLaPrimeraPosteriorAUnInstanteQueEntraEnLaPosterior() {
+        History history = seedHistory();
+        Instant end = AT.plus(Duration.ofDays(1));
+
+        assertThat(repository.findLastOfUserBefore(buyer, end)).map(Trade::id).contains(history.purchaseFromAdmin());
+        assertThat(repository.findFirstOfUserAtOrAfter(buyer, end)).map(Trade::id)
+                .contains(history.purchaseFromSeller());
+        assertThat(repository.findLastOfUserBefore(seller, end).orElseThrow().buyerId()).isEqualTo(seller);
+    }
+
+    @Test
+    void sinOperacionesAntesODespuesNoHayNinguna() {
+        seedHistory();
+
+        assertThat(repository.findOfUserBefore(buyer, AT.minus(Duration.ofDays(2)))).isEmpty();
+        assertThat(repository.findLastOfUserBefore(buyer, AT.minus(Duration.ofDays(2)))).isEmpty();
+        assertThat(repository.findFirstOfUserAtOrAfter(buyer, AT.plus(Duration.ofDays(3)))).isEmpty();
+    }
+
     private History seedHistory() {
         Player salah = database.player("8301", "Mohamed Salah", Position.FORWARD,
                 database.team("64", "Liverpool FC"));

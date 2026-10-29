@@ -1,5 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.repository.market;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -98,6 +99,15 @@ public class MarketOrderRepository {
     @Transactional(readOnly = true)
     public List<OrderView> findInitialOrdersOf(long ownerId) {
         return orderDAO.findInitialOrdersOf(ownerId, OPEN_STATUSES).stream().map(this::toView).toList();
+    }
+
+    /**
+     * Las órdenes iniciales del dueño creadas antes del instante, en cualquier estado: cada una
+     * cuenta 100 tokens en el portfolio del superusuario a una fecha.
+     */
+    @Transactional(readOnly = true)
+    public List<MarketOrder> findInitialOrdersCreatedBefore(long ownerId, Instant end) {
+        return orderDAO.findInitialOrdersCreatedBefore(ownerId, end).stream().map(mapper::toDomain).toList();
     }
 
     /**

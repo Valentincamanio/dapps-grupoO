@@ -300,6 +300,22 @@ class MarketOrderRepositoryIT {
     }
 
     @Test
+    void lasInicialesCreadasAntesDeUnInstanteCuentanEnCualquierEstado() {
+        MarketOrder soldOut = MarketOrder.initialFor(superuser, kane.id(), AT);
+        soldOut.fill(100);
+        long soldOutId = repository.save(soldOut).getId();
+        long salahId = repository.save(MarketOrder.initialFor(superuser, salah.id(), AT.minusSeconds(1))).getId();
+        repository.save(MarketOrder.initialFor(superuser, son.id(), AT.plusSeconds(1)));
+        repository.save(MarketOrder.sell(seller, kane.id(), 5, AT.minusSeconds(1)));
+
+        List<MarketOrder> initialOrders = repository.findInitialOrdersCreatedBefore(superuser, AT.plusSeconds(1));
+
+        assertThat(initialOrders).extracting(MarketOrder::getId).containsExactlyInAnyOrder(soldOutId, salahId);
+        assertThat(initialOrders).allSatisfy(order -> assertThat(order.getRequested()).isEqualTo(100));
+        assertThat(repository.findInitialOrdersCreatedBefore(superuser, AT.minusSeconds(1))).isEmpty();
+    }
+
+    @Test
     void unUsuarioNoTieneOrdenesIniciales() {
         repository.save(MarketOrder.initialFor(superuser, kane.id(), AT));
         repository.save(MarketOrder.sell(seller, kane.id(), 5, AT));

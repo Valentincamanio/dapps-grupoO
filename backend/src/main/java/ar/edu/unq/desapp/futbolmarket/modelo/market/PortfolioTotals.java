@@ -32,6 +32,16 @@ public record PortfolioTotals(BigDecimal availableBalance, BigDecimal reservedBa
                 realizedProfit, account.getBalance().add(value));
     }
 
+    /**
+     * Los totales a una fecha (FR-040): solo el saldo total de ese día, sin libre ni reservado.
+     */
+    public static PortfolioTotals at(BigDecimal balance, List<PortfolioPosition> positions,
+                                     BigDecimal realizedProfit) {
+        BigDecimal value = sum(positions, PortfolioPosition::value);
+        return new PortfolioTotals(null, null, balance, sum(positions, PortfolioPosition::invested), value,
+                sum(positions, PortfolioPosition::profit), realizedProfit, balance.add(value));
+    }
+
     private static BigDecimal sum(List<PortfolioPosition> positions, Function<PortfolioPosition, BigDecimal> field) {
         return positions.stream()
                 .map(field)

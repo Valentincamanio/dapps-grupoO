@@ -46,6 +46,15 @@ public record PortfolioPosition(Player player, int tokens, Integer committed, Bi
     }
 
     /**
+     * Los tokens sin vender del superusuario a una fecha: sin costo y, como toda posición a una
+     * fecha, sin comprometidos (FR-040).
+     */
+    public static PortfolioPosition unsoldAt(Player player, int tokens, Quote quote) {
+        return new PortfolioPosition(player, tokens, null, null, null, quote,
+                MarketMath.total(tokens, quote.tokenPrice()), null, null);
+    }
+
+    /**
      * Cada jugador tiene 100 tokens: cada token es el 1 % del jugador.
      */
     public int sharePercent() {

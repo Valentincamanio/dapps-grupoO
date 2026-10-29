@@ -96,6 +96,19 @@ public interface QuoteSQLDAO extends JpaRepository<QuoteSQL, Long> {
     Optional<QuoteSQL> findLastBefore(@Param("playerId") Long playerId, @Param("end") Instant end);
 
     /**
+     * Por cada uno de esos jugadores, la última cotización con vigencia anterior al instante, que
+     * queda excluido: la misma regla que {@link #findLastBefore}, en una consulta por lote (research
+     * D20 de la 008). Los que no tienen ninguna anterior no figuran.
+     */
+    @Query("""
+            select q from QuoteSQL q join fetch q.strategy
+            where q.player.id in :playerIds
+              and q.validFrom = (select max(other.validFrom) from QuoteSQL other
+                                 where other.player = q.player and other.validFrom < :end)
+            """)
+    List<QuoteSQL> findLastBeforeOf(@Param("playerIds") Collection<Long> playerIds, @Param("end") Instant end);
+
+    /**
      * La cotización del jugador que rige en el instante: la última con vigencia anterior o igual a
      * él (research D14 de la 008). A diferencia de {@link #findLastBefore}, el instante se incluye.
      */

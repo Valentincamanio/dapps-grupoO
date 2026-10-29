@@ -417,6 +417,72 @@ class PortfolioControllerIT {
         verifyNoInteractions(footballDataAdapter, whoScoredAdapter);
     }
 
+    @Test
+    void unaFechaInvalidaFuturaOAnteriorAlRegistroResponde400ConElValor() throws Exception {
+        TestUser user = helper.registerUser();
+        String bearer = bearer(user);
+
+        assertBadDate(portfolioAt(bearer, user.id(), "2026-13-01"),
+                "La fecha '2026-13-01' no es válida: use el formato AAAA-MM-DD.");
+        assertBadDate(portfolioAt(bearer, user.id(), "28/10/2026"),
+                "La fecha '28/10/2026' no es válida: use el formato AAAA-MM-DD.");
+        assertBadDate(portfolioAt(bearer, user.id(), "2026-10-29"), "La fecha 2026-10-29 es futura.");
+        assertBadDate(portfolioAt(bearer, user.id(), "2026-10-27"),
+                "La fecha 2026-10-27 es anterior al registro del usuario (2026-10-28).");
+    }
+
+    @Test
+    void conFechaLaFormaNoTraeLibreReservadoNiComprometidos() throws Exception {
+        TestUser user = helper.registerUser();
+        String bearer = bearer(user);
+        buy(bearer, kane, 10);
+
+        MvcTestResult result = portfolioAt(bearer, user.id(), "2026-10-28");
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        String raw = raw(result);
+        assertThat(raw).contains("\"date\":\"2026-10-28\"", "\"tokens\":10", "\"averagePrice\":1.0000",
+                "\"value\":10.30", "\"balance\":990.00", "\"realizedProfit\":0.00", "\"equity\":1000.30");
+        assertThat(raw).doesNotContain("availableBalance", "reservedBalance", "committed");
+        JsonNode position = json(result).get("positions").get(0);
+        assertThat(position.get("quote").get("validFrom").asString()).isEqualTo("2026-10-26T03:00:00Z");
+        assertThat(position.get("quote").get("score").decimalValue()).isEqualByComparingTo("0.300000");
+    }
+
+    @Test
+    void unaCuentaSinFechaDeRegistroAdmiteFechasAnteriores() throws Exception {
+        AppUser older = database.user("1000.00");
+
+        MvcTestResult result = portfolioAt(login(older), older.getId(), "2026-01-15");
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        JsonNode portfolio = json(result);
+        assertThat(portfolio.get("date").asString()).isEqualTo("2026-01-15");
+        assertThat(portfolio.get("positions").size()).isZero();
+        assertThat(portfolio.get("totals").get("balance").decimalValue()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void conFechaElPermisoSeVerificaAntesQueLaFecha() throws Exception {
+        TestUser user = helper.registerUser();
+        TestUser other = helper.registerUser();
+
+        MvcTestResult result = portfolioAt(bearer(user), other.id(), "2026-13-01");
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+        assertThat(json(result).get("message").asString()).isEqualTo(FORBIDDEN_MESSAGE);
+    }
+
+    private MvcTestResult portfolioAt(String authorization, long userId, String date) {
+        return mvc.get().uri(PORTFOLIO_PATH.formatted(userId) + "?date=" + date)
+                .header(AUTHORIZATION_HEADER, authorization).exchange();
+    }
+
+    private void assertBadDate(MvcTestResult result, String message) throws Exception {
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(json(result).get("message").asString()).isEqualTo(message);
+    }
+
     /**
      * Guarda las tenencias y descuenta sus tokens de la orden inicial de cada jugador, como si los
      * hubieran comprado ahí.

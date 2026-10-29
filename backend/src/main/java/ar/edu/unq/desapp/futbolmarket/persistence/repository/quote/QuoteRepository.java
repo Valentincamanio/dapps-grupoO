@@ -124,6 +124,20 @@ public class QuoteRepository {
     }
 
     /**
+     * Por id de jugador, la cotización que regía justo antes de ese instante, como {@link #findAt},
+     * para todos en una sola consulta: la valuación del portfolio a una fecha. Quien no figura no
+     * tenía ninguna; sin ids no se consulta la base.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Quote> findAtOf(Collection<Long> playerIds, Instant exclusiveEnd) {
+        if (playerIds.isEmpty()) {
+            return Map.of();
+        }
+        return toQuotes(quoteDAO.findLastBeforeOf(playerIds, exclusiveEnd)).stream()
+                .collect(Collectors.toUnmodifiableMap(Quote::playerId, Function.identity()));
+    }
+
+    /**
      * La cotización que rige en ese instante, incluido: el precio de una operación del mercado
      * (research D14 de la 008). Considera también a un jugador inactivo; vacía si todavía no tiene
      * ninguna.
