@@ -1,7 +1,8 @@
-// Post-it de un jugador: un único link a su ficha, sin ninguna otra acción.
-import type { ElementType, ReactNode } from 'react';
-import type { Player, Position } from '../types/api';
+// Tarjeta de un jugador: un único link a su ficha, sin ninguna otra acción.
+import type { CSSProperties, ElementType, ReactNode } from 'react';
+import type { Player } from '../types/api';
 import type { QuoteBadge } from '../types/quotes';
+import { hueOf, initialsOf } from '../utils/format';
 import { leagueLabel, positionLabel } from '../utils/positions';
 import { QuoteTag } from './QuoteTag';
 import styles from './PostIt.module.css';
@@ -24,13 +25,6 @@ interface PostItProps {
   quote?: QuoteBadge;
 }
 
-const COLOR_CLASS: Record<Position, string> = {
-  GOALKEEPER: styles.yellow,
-  DEFENDER: styles.blue,
-  MIDFIELDER: styles.green,
-  FORWARD: styles.pink,
-};
-
 function DefaultLink({ to, className, draggable, children }: LinkProps) {
   return (
     <a href={to} className={className} draggable={draggable}>
@@ -50,12 +44,18 @@ export function PostIt({
     <LinkComponent
       to={href}
       state={linkState}
-      className={`${styles.postIt} ${COLOR_CLASS[player.position]}`}
+      className={styles.postIt}
       draggable={false}
     >
-      <span className={styles.pin} aria-hidden="true" />
-      <span className={styles.position}>{positionLabel(player.position)}</span>
+      {/* Las iniciales van por CSS: son decoración y no son parte del texto del enlace */}
+      <span
+        className={styles.avatar}
+        style={{ '--hue': hueOf(player.team) } as CSSProperties}
+        data-initials={initialsOf(player.name)}
+        aria-hidden="true"
+      />
       <span className={styles.name}>{player.name}</span>
+      <span className={styles.position}>{positionLabel(player.position)}</span>
       <span className={styles.meta}>
         {player.team} · {leagueLabel(player.league)}
       </span>

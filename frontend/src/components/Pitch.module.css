@@ -1,76 +1,39 @@
 .pitch {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  width: 100%;
-  max-width: 420px;
-}
-
-.field {
-  position: relative;
-  aspect-ratio: 68 / 100;
-}
-
-.lines {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  stroke: var(--chalk-dim);
-  stroke-width: 0.6;
-  stroke-linecap: round;
-  pointer-events: none;
-}
-
-.zones {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-rows: 30fr 30fr 28fr 12fr;
+  gap: 6px;
 }
 
 .zone {
-  background: transparent;
-  border: 0;
-  color: var(--chalk);
-  font-family: var(--font-script);
-  font-size: 22px;
-  font-weight: 700;
-  text-shadow: var(--shadow-chalk-text);
-  transition: background 0.15s;
+  flex: none;
+  padding: 6px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* "Todos" va último para el teclado, pero se ve primero, como en las ligas */
+.zone:last-child {
+  order: -1;
+}
+
+.zone span {
+  display: inline-block;
+}
+
+.zone span::first-letter {
+  text-transform: uppercase;
 }
 
 .zone:hover {
-  background: rgba(244, 241, 230, 0.1);
+  color: var(--text);
 }
 
-.all {
-  align-self: center;
-  background: transparent;
-  border: 2px solid var(--chalk-dim);
-  border-radius: 50% 45% 55% 40% / 60% 50% 50% 45%;
-  padding: 0 18px;
-  font-family: var(--font-script);
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--chalk);
-}
-
-.active {
-  background: rgba(255, 232, 115, 0.25);
-  border-color: var(--yellow);
-  color: var(--yellow);
-}
-
-/* Versión compacta en celular */
-@media (max-width: 559px) {
-  .pitch {
-    max-width: 280px;
-    align-self: center;
-  }
-
-  .zone {
-    font-size: 16px;
-  }
+.active,
+.active:hover {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--bg);
 }

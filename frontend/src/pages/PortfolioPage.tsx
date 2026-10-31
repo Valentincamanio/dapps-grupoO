@@ -3,14 +3,16 @@
 // AAAA-MM-DD), el de ese día (US7): valuado con la cotización de entonces y con solo el saldo total.
 // Solo para usuarios comunes: el administrador no opera.
 import { useId } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { ChalkButton } from '../components/ChalkButton';
 import { ChalkNote } from '../components/ChalkNote';
 import { ChalkText } from '../components/ChalkText';
 import { PortfolioTotals } from '../components/PortfolioTotals';
 import { PositionTable } from '../components/PositionTable';
+import { SectionNav } from '../components/SectionNav';
 import { usePortfolio } from '../hooks/usePortfolio';
 import { formatDay } from '../utils/quotes';
+import { TEAM_SECTIONS } from '../utils/sections';
 import styles from './PortfolioPage.module.css';
 
 // Argentina, UTC−3 sin horario de verano
@@ -56,10 +58,15 @@ export function PortfolioPage() {
       : 'Tus posiciones, valuadas con la cotización vigente';
     return (
       <>
-        <PositionTable positions={portfolio.positions} caption={caption} />
         <PortfolioTotals
           totals={portfolio.totals}
           title={portfolio.date ? `Totales al ${formatDay(portfolio.date)}` : undefined}
+        />
+        <PositionTable
+          positions={portfolio.positions}
+          caption={caption}
+          playerHref={(playerId) => `/jugadores/${playerId}`}
+          LinkComponent={Link}
         />
       </>
     );
@@ -67,9 +74,16 @@ export function PortfolioPage() {
 
   return (
     <section className={styles.portfolio}>
-      <ChalkText as="h1" variant="title">
+      <ChalkText as="h1" variant="srOnly">
         Portfolio
       </ChalkText>
+      <SectionNav
+        title="Mi equipo"
+        label="secciones de mi equipo"
+        sections={TEAM_SECTIONS}
+        current="/portfolio"
+        LinkComponent={Link}
+      />
       <div className={styles.dateBar}>
         <div className={styles.field}>
           <label htmlFor={dateId}>Ver el portfolio de una fecha</label>

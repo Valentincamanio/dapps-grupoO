@@ -1,5 +1,5 @@
 // El vestuario: perfil, cambio de contraseña, regeneración de la clave de API y cierre de sesión.
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { ApiKeyReveal } from '../components/ApiKeyReveal';
 import { ChalkButton } from '../components/ChalkButton';
@@ -37,6 +37,7 @@ export function LockerRoomPage() {
   const [apiKey, setApiKey] = useState<string | null>(null);
 
   const guard = useLeaveGuard(apiKey !== null);
+  const leavingRef = useRef(false);
 
   async function submitPassword() {
     if (submitting) return;
@@ -97,10 +98,17 @@ export function LockerRoomPage() {
     }
   }
 
-  async function handleLogout() {
-    // Se navega antes de cerrar la sesión para que la guarda de rutas no mande a /login
-    await navigate('/pizarra', { replace: true });
-    logout();
+  // La sesión se cierra recién al salir de la pantalla: antes, la guarda de rutas mandaría a /login
+  useEffect(
+    () => () => {
+      if (leavingRef.current) logout();
+    },
+    [logout],
+  );
+
+  function handleLogout() {
+    leavingRef.current = true;
+    void navigate('/pizarra', { replace: true });
   }
 
   if (apiKey !== null) {
@@ -221,7 +229,7 @@ export function LockerRoomPage() {
         ) : null}
       </div>
 
-      <ChalkButton onClick={() => void handleLogout()}>cerrar sesión</ChalkButton>
+      <ChalkButton onClick={handleLogout}>cerrar sesión</ChalkButton>
     </section>
   );
 }

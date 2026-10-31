@@ -1,3 +1,44 @@
 .content {
+  max-width: 1120px;
   min-width: 0;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.enter {
+  display: inline-block;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.enter::first-letter {
+  text-transform: uppercase;
+}
+
+.enter:hover {
+  background: var(--accent-hover);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Lugar para la barra de abajo */
+@media (max-width: 720px) {
+  .content {
+    padding: 18px 16px 100px;
+  }
 }

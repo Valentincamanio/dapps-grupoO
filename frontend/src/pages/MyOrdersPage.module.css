@@ -1,11 +1,11 @@
 .orders {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   min-width: 0;
 }
 
 .detail {
-  margin: 0;
-  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 14px;
 }

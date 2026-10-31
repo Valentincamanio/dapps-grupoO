@@ -1,6 +1,6 @@
 # Frontend
 
-Pizarra táctica de FutbolMarket: React 18 + Vite + TypeScript.
+La Pizarra, el front de FutbolMarket: React 18 + Vite + TypeScript.
 
 ## Requisitos
 
@@ -22,15 +22,23 @@ Desde `frontend/`:
 
 ## Pantallas
 
-| Ruta | Qué muestra | Acceso |
-| --- | --- | --- |
-| `/pizarra` | Los jugadores en post-its, cada uno con su cotización y su variación semanal | Público |
-| `/jugadores/:id` | La ficha: valor del jugador, precio por token, variación y el gráfico de la evolución con rango de fechas | Público |
-| `/ranking` | El ranking por cotización, con filtros de liga, equipo y posición | Público |
-| `/vestuario` | El perfil del usuario | Con sesión |
-| `/admin/estrategias` | Las estrategias con sus versiones: crear, editar y activar (eligiendo si se recotiza ahora o la semana siguiente) | Solo `ADMIN` |
-| `/admin/recalculo` | El disparo manual del recálculo y su informe | Solo `ADMIN` |
-| `/admin/simulacion` | La simulación de una estrategia guardada o de unos parámetros, sin guardar nada | Solo `ADMIN` |
+La barra superior tiene los grupos de pantallas y cada grupo, sus pestañas. Las direcciones son las mismas de siempre.
+
+| Grupo | Pestaña | Ruta | Qué muestra | Acceso |
+| --- | --- | --- | --- | --- |
+| Jugadores | Todos | `/pizarra` | Los jugadores en tarjetas, con el buscador y sus filtros | Público |
+| Jugadores | Ranking | `/ranking` | El ranking por cotización, con filtros de liga, equipo y posición | Público |
+| Jugadores | Mercado | `/mercado` | Las órdenes con tokens pendientes | Público |
+| Mi equipo | Mis jugadores | `/portfolio` | El patrimonio y las posiciones, hoy o a una fecha | Solo `USER` |
+| Mi equipo | Órdenes | `/ordenes` | Las órdenes propias, con la cancelación | Solo `USER` |
+| Mi equipo | Movimientos | `/operaciones` | El historial de operaciones | Solo `USER` |
+| Administración | Estrategias | `/admin/estrategias` | Las estrategias con sus versiones: crear, editar y activar (eligiendo si se recotiza ahora o la semana siguiente) | Solo `ADMIN` |
+| Administración | Recálculo | `/admin/recalculo` | El disparo manual del recálculo y su informe | Solo `ADMIN` |
+| Administración | Simulación | `/admin/simulacion` | La simulación de una estrategia guardada o de unos parámetros, sin guardar nada | Solo `ADMIN` |
+
+`/vestuario` es la cuenta (con sesión) y se abre desde el avatar.
+
+`/jugadores/:id` es la ficha: precio, evolución, operar y órdenes pendientes. Abierta desde otra pantalla se ve como panel encima de ella, que conserva sus filtros y su hoja; abierta directamente, es una pantalla más.
 
 `/admin` lleva a `/admin/estrategias`. El enlace "Administración" del encabezado solo aparece para
 un usuario con rol `ADMIN`; un usuario común que entra por la dirección ve el aviso de falta de

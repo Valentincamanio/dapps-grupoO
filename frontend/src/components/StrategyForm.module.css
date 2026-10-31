@@ -6,13 +6,12 @@
 }
 
 .blocked {
-  font-family: var(--font-script);
-  font-size: 20px;
-  color: var(--chalk-dim);
+  color: var(--down);
+  font-size: 14px;
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }

@@ -1,22 +1,19 @@
 .filters {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-width: 0;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
-/* Cada grupo de pestañas se parte en renglones cuando no entra: nunca desplaza la página */
+/* Los grupos se desplazan de costado en vez de ocupar varios renglones */
 .group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px;
 }
 
 .team {
   display: flex;
-}
-
-.group button:focus-visible {
-  outline: 3px dashed var(--chalk);
-  outline-offset: 3px;
 }

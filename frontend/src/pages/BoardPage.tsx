@@ -1,10 +1,12 @@
-// La pizarra: hojas de post-its con los jugadores del catálogo.
-import { Link, useLocation } from 'react-router';
-import { Board } from '../components/Board';
+// Jugadores: hojas de tarjetas con los jugadores del catálogo, con el buscador y los filtros.
+import { Link, useLocation, useNavigate } from 'react-router';
 import { ChalkNote } from '../components/ChalkNote';
+import { ChalkText } from '../components/ChalkText';
 import { Pager } from '../components/Pager';
 import { Pitch } from '../components/Pitch';
 import { PostIt } from '../components/PostIt';
+import { SearchBox } from '../components/SearchBox';
+import { SectionNav } from '../components/SectionNav';
 import { TapeTab } from '../components/TapeTab';
 import { TeamSelect } from '../components/TeamSelect';
 import { useBoardFilters } from '../hooks/useBoardFilters';
@@ -14,11 +16,13 @@ import { usePlayers } from '../hooks/usePlayers';
 import { LEAGUES } from '../types/api';
 import { describeEmptyCombination } from '../utils/filters';
 import { leagueLabel, positionToZone, zoneToPosition } from '../utils/positions';
+import { PLAYER_SECTIONS } from '../utils/sections';
 import { deriveTeams } from '../utils/teams';
 import styles from './BoardPage.module.css';
 
 export function BoardPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { filters, setPage, setPosition, setLeague, setTeam, clear } = useBoardFilters();
   const catalog = useCatalog();
   const { status, sheet, retry } = usePlayers(filters);
@@ -94,43 +98,53 @@ export function BoardPage() {
   }
 
   return (
-    <Board>
-      <div className={styles.layout}>
-        <aside className={styles.filters}>
+    <section className={styles.page}>
+      <ChalkText as="h1" variant="srOnly">
+        Jugadores
+      </ChalkText>
+      <SectionNav
+        title="Jugadores"
+        label="secciones de jugadores"
+        sections={PLAYER_SECTIONS}
+        current="/pizarra"
+        LinkComponent={Link}
+      />
+      <div className={styles.filters}>
+        <SearchBox
+          players={catalog.players}
+          status={catalog.status}
+          onFocus={() => void catalog.ensureLoaded()}
+          onRetry={() => void catalog.retry()}
+          // Sin state: la ficha vuelve a la pizarra completa
+          onSelect={(player) => navigate(`/jugadores/${player.id}`)}
+        />
+        <TeamSelect
+          teams={deriveTeams(catalog.players, filters.league)}
+          value={filters.team}
+          status={catalog.status}
+          onOpen={() => void catalog.ensureLoaded()}
+          onSelect={setTeam}
+          onRetry={() => void catalog.retry()}
+        />
+        <div className={styles.chips}>
           <Pitch
             activeZone={positionToZone(filters.position)}
             onZoneSelect={(zone) => setPosition(zoneToPosition(zone))}
           />
-        </aside>
-        <div className={styles.content}>
-          <div className={styles.tabs} role="group" aria-label="filtrar por liga">
+        </div>
+        <div className={styles.chips} role="group" aria-label="filtrar por liga">
+          <TapeTab label="todas" active={filters.league === null} onSelect={() => void setLeague(null)} />
+          {LEAGUES.map((league) => (
             <TapeTab
-              label="todas"
-              active={filters.league === null}
-              onSelect={() => void setLeague(null)}
+              key={league}
+              label={leagueLabel(league)}
+              active={filters.league === league}
+              onSelect={() => void setLeague(league)}
             />
-            {LEAGUES.map((league) => (
-              <TapeTab
-                key={league}
-                label={leagueLabel(league)}
-                active={filters.league === league}
-                onSelect={() => void setLeague(league)}
-              />
-            ))}
-          </div>
-          <div className={styles.team}>
-            <TeamSelect
-              teams={deriveTeams(catalog.players, filters.league)}
-              value={filters.team}
-              status={catalog.status}
-              onOpen={() => void catalog.ensureLoaded()}
-              onSelect={setTeam}
-              onRetry={() => void catalog.retry()}
-            />
-          </div>
-          {renderContent()}
+          ))}
         </div>
       </div>
-    </Board>
+      {renderContent()}
+    </section>
   );
 }

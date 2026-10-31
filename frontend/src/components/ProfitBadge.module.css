@@ -1,50 +1,45 @@
 .badge {
   display: inline-flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px;
-  font-family: var(--font-hand);
-  font-weight: 700;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.chalk,
+.ink {
+  color: inherit;
+}
+
+.up {
+  background: var(--up-soft);
+  color: var(--up);
+}
+
+.down {
+  background: var(--down-soft);
+  color: var(--down);
+}
+
+.flat {
+  background: var(--surface-2);
+  color: var(--muted);
 }
 
 .triangle {
-  font-size: 0.8em;
+  font-size: 0.75em;
 }
 
-.text {
-  font-style: italic;
-}
-
-/* Solo para lectores de pantalla: el guion solo no dice nada */
+/* El signo y el triángulo ya lo dicen: el texto queda para los lectores de pantalla */
+.text,
 .hidden {
   position: absolute;
   width: 1px;
   height: 1px;
   overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-.chalk.up {
-  color: var(--chalk-up);
-}
-
-.chalk.down {
-  color: var(--chalk-down);
-}
-
-.chalk.flat {
-  color: var(--chalk-dim);
-}
-
-.ink.up {
-  color: var(--ink-up);
-}
-
-.ink.down {
-  color: var(--ink-down);
-}
-
-.ink.flat {
-  color: var(--ink-soft);
+  clip-path: inset(50%);
 }

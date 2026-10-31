@@ -3,17 +3,19 @@
 // ejecutado se conserva. Después de cancelar se recarga la lista, y useOrderCommands pone al día el
 // saldo de la barra.
 import { useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { ChalkNote } from '../components/ChalkNote';
 import { ChalkText } from '../components/ChalkText';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { OrderList } from '../components/OrderList';
 import { Pager } from '../components/Pager';
+import { SectionNav } from '../components/SectionNav';
 import { useMyOrders } from '../hooks/useMyOrders';
 import { useOrderCommands } from '../hooks/useOrderCommands';
 import type { UserOrder } from '../types/market';
 import { formatPendingTokens, formatTokens, sideLabel } from '../utils/market';
 import { formatCredits } from '../utils/quotes';
+import { TEAM_SECTIONS } from '../utils/sections';
 import styles from './MyOrdersPage.module.css';
 
 // Órdenes por hoja
@@ -105,6 +107,8 @@ export function MyOrdersPage() {
           orders={orders}
           onCancel={ask}
           cancellingId={busy ? confirming?.id : undefined}
+          playerHref={(playerId) => `/jugadores/${playerId}`}
+          LinkComponent={Link}
         />
         <Pager
           sheet={page.page + 1}
@@ -120,9 +124,16 @@ export function MyOrdersPage() {
 
   return (
     <section className={styles.orders}>
-      <ChalkText as="h1" variant="title">
+      <ChalkText as="h1" variant="srOnly">
         Mis órdenes
       </ChalkText>
+      <SectionNav
+        title="Mi equipo"
+        label="secciones de mi equipo"
+        sections={TEAM_SECTIONS}
+        current="/ordenes"
+        LinkComponent={Link}
+      />
       {renderOutcome()}
       {renderContent()}
       {confirming ? (

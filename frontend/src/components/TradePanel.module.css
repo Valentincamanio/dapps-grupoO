@@ -1,53 +1,97 @@
-/* El panel de operar va sobre el pizarrón, debajo de la hoja del jugador */
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-  font-family: var(--font-hand);
-  font-size: 18px;
-  color: var(--chalk);
-  overflow-wrap: anywhere;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--surface-2);
 }
 
 .notice {
-  margin: 0;
-  padding: 8px 12px;
-  border-left: 4px solid var(--yellow);
-  color: var(--yellow);
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 13px;
 }
 
-/* Cantidad y botones en una fila que, a 360 px, pasa a dos */
 .controls {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quantity {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: end;
+}
+
+.quantity input {
+  height: 44px;
+  border: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  appearance: textfield;
+}
+
+.quantity input::-webkit-inner-spin-button {
+  display: none;
+}
+
+.step {
+  height: 44px;
+  padding: 0;
+  background: var(--surface);
+  font-size: 22px;
+}
+
+.estimate {
+  display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px 20px;
-}
-
-.controls input {
-  width: 8ch;
-}
-
-.controls input:focus-visible {
-  outline: 3px dashed var(--chalk);
-  outline-offset: 3px;
+  justify-content: space-between;
+  gap: 2px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
-.actions button:focus-visible {
-  outline: 3px dashed var(--chalk);
-  outline-offset: 3px;
+.actions button {
+  padding: 13px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 16px;
+  border-radius: 14px;
+}
+
+.actions button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.actions button:last-child {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.actions button:last-child:hover:not(:disabled) {
+  background: var(--surface-3);
 }
 
 .error {
-  margin: 0;
-  color: var(--pink);
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--down-soft);
+  color: var(--down);
+  font-size: 14px;
 }
 
 .result {
@@ -55,46 +99,41 @@
   flex-direction: column;
   gap: 4px;
   padding: 10px 12px;
-  border: 2px dashed var(--chalk-dim);
-  border-radius: 6px;
-}
-
-.result p {
-  margin: 0;
+  border-radius: 12px;
+  background: var(--up-soft);
+  color: var(--up);
+  font-size: 14px;
 }
 
 .trades {
-  margin: 0;
-  padding-left: 20px;
+  padding-left: 18px;
+  font-size: 13px;
 }
 
-/* El detalle de la confirmación, dentro del diálogo */
 .summary {
-  display: grid;
-  gap: 4px;
-  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
 }
 
 .summary div {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0 8px;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .summary dt {
-  color: var(--chalk-dim);
-}
-
-.summary dt::after {
-  content: ':';
+  color: var(--muted);
 }
 
 .summary dd {
-  margin: 0;
+  font-weight: 600;
+  text-align: right;
 }
 
 .hint {
-  margin: 6px 0 0;
-  color: var(--chalk-dim);
-  font-size: 16px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
 }

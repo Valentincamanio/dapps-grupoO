@@ -1,13 +1,27 @@
 // Lista de órdenes: el listado del mercado, las pendientes de la ficha y las órdenes propias. Nunca
 // dice quién es el dueño, solo su tipo (FR-048). La variante "own" suma lo cancelado, la reserva y un
 // botón para cancelar las abiertas. Recibe los datos y el callback: no pide nada a la API.
+import type { ElementType, ReactNode } from 'react';
 import type { MarketOrder, UserOrder } from '../types/market';
 import { ownerTypeLabel, sideLabel, statusLabel } from '../utils/market';
 import { formatCredits, formatInstant } from '../utils/quotes';
 import { ChalkButton } from './ChalkButton';
 import styles from './OrderList.module.css';
 
-interface MarketVariantProps {
+interface LinkProps {
+  to: string;
+  className?: string;
+  children?: ReactNode;
+}
+
+// Con la dirección de la ficha, el nombre del jugador es un enlace
+interface PlayerLinkProps {
+  playerHref?: (playerId: number) => string;
+  // Por defecto un <a>; la página pasa el Link del router
+  LinkComponent?: ElementType;
+}
+
+interface MarketVariantProps extends PlayerLinkProps {
   variant: 'market';
   orders: MarketOrder[];
   caption?: string;
@@ -17,7 +31,7 @@ interface MarketVariantProps {
   layout?: 'table' | 'list';
 }
 
-interface OwnVariantProps {
+interface OwnVariantProps extends PlayerLinkProps {
   variant: 'own';
   orders: UserOrder[];
   caption?: string;
@@ -40,6 +54,14 @@ const DEFAULT_EMPTY_MESSAGES = {
   own: 'todavía no tenés órdenes.',
 };
 
+function DefaultLink({ to, className, children }: LinkProps) {
+  return (
+    <a href={to} className={className}>
+      {children}
+    </a>
+  );
+}
+
 function isOpen(order: MarketOrder): boolean {
   return order.status === 'PENDING' || order.status === 'PARTIAL';
 }
@@ -47,6 +69,7 @@ function isOpen(order: MarketOrder): boolean {
 export function OrderList(props: OrderListProps) {
   const { variant, orders } = props;
   const own = props.variant === 'own' ? props : null;
+  const { playerHref, LinkComponent = DefaultLink } = props;
 
   if (orders.length === 0) {
     return <p className={styles.empty}>{props.emptyMessage ?? DEFAULT_EMPTY_MESSAGES[variant]}</p>;
@@ -56,7 +79,7 @@ export function OrderList(props: OrderListProps) {
   }
 
   return (
-    <table className={styles.table}>
+    <table className={`${styles.table} ${own ? styles.own : ''}`}>
       <caption className={styles.caption}>{props.caption ?? DEFAULT_CAPTIONS[variant]}</caption>
       <thead>
         <tr>
@@ -77,9 +100,17 @@ export function OrderList(props: OrderListProps) {
         {orders.map((order) => (
           <tr key={order.id}>
             <th scope="row" data-label="Jugador" className={styles.player}>
-              {order.player.name}
+              {playerHref ? (
+                <LinkComponent to={playerHref(order.player.id)} className={styles.link}>
+                  {order.player.name}
+                </LinkComponent>
+              ) : (
+                order.player.name
+              )}
             </th>
-            <td data-label="Tipo">{sideLabel(order.side)}</td>
+            <td data-label="Tipo">
+              <span className={order.side === 'BUY' ? styles.buy : styles.sell}>{sideLabel(order.side)}</span>
+            </td>
             <td data-label="Dueño">{ownerTypeLabel(order.ownerType)}</td>
             <td data-label="Pedida" className={styles.number}>
               {order.requestedQuantity}
@@ -125,7 +156,9 @@ function OrderCards({ orders, caption }: { orders: MarketOrder[]; caption: strin
             <dl className={styles.fields}>
               <div>
                 <dt>Tipo</dt>
-                <dd>{sideLabel(order.side)}</dd>
+                <dd>
+                  <span className={order.side === 'BUY' ? styles.buy : styles.sell}>{sideLabel(order.side)}</span>
+                </dd>
               </div>
               <div>
                 <dt>Dueño</dt>

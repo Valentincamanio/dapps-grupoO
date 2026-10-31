@@ -69,6 +69,12 @@ export function TradePanel({
   const notTradable = block?.kind === 'not-tradable';
   const saleBlocked = block?.kind === 'sale-blocked';
 
+  // Los botones parten de lo escrito, o de la cantidad mínima si no es un número válido
+  function step(delta: number) {
+    const next = (quantity ?? MIN_QUANTITY - delta) + delta;
+    setRawQuantity(String(Math.min(MAX_QUANTITY, Math.max(MIN_QUANTITY, next))));
+  }
+
   async function confirm() {
     if (confirming === null || quantity === null) return;
     await (confirming === 'BUY' ? onBuy(quantity) : onSell(quantity));
@@ -88,18 +94,42 @@ export function TradePanel({
         </p>
       ) : null}
       <div className={styles.controls}>
-        <ChalkInput
-          label="Cantidad de tokens"
-          type="number"
-          inputMode="numeric"
-          min={MIN_QUANTITY}
-          max={MAX_QUANTITY}
-          step={1}
-          value={rawQuantity}
-          disabled={notTradable}
-          error={quantity === null && !notTradable ? QUANTITY_MESSAGE : undefined}
-          onChange={(event) => setRawQuantity(event.target.value)}
-        />
+        <div className={styles.quantity}>
+          <ChalkButton
+            className={styles.step}
+            aria-label="un token menos"
+            disabled={notTradable || quantity === MIN_QUANTITY}
+            onClick={() => step(-1)}
+          >
+            −
+          </ChalkButton>
+          <ChalkInput
+            label="Cantidad de tokens"
+            type="number"
+            inputMode="numeric"
+            min={MIN_QUANTITY}
+            max={MAX_QUANTITY}
+            step={1}
+            value={rawQuantity}
+            disabled={notTradable}
+            error={quantity === null && !notTradable ? QUANTITY_MESSAGE : undefined}
+            onChange={(event) => setRawQuantity(event.target.value)}
+          />
+          <ChalkButton
+            className={styles.step}
+            aria-label="un token más"
+            disabled={notTradable || quantity === MAX_QUANTITY}
+            onClick={() => step(1)}
+          >
+            +
+          </ChalkButton>
+        </div>
+        {quantity !== null && tokenPrice !== null && !notTradable ? (
+          <p className={styles.estimate}>
+            <span>Compra: ≈ {formatCredits(estimateBuy(quantity, initialPending, tokenPrice).total)}</span>
+            {saleBlocked ? null : <span>Venta: ≈ {formatCredits(estimateSell(quantity, tokenPrice).total)}</span>}
+          </p>
+        ) : null}
         <div className={styles.actions}>
           <ChalkButton disabled={notTradable || quantity === null || busy} onClick={() => setConfirming('BUY')}>
             Comprar

@@ -2,13 +2,14 @@
 // la más vieja, con los filtros player, side, from y to y la hoja en la dirección. La contraparte se
 // dice por su tipo, nunca quién es, y la ganancia realizada va solo en las ventas.
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { ChalkButton } from '../components/ChalkButton';
 import { ChalkNote } from '../components/ChalkNote';
 import { ChalkText } from '../components/ChalkText';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { Pager } from '../components/Pager';
 import { ProfitBadge } from '../components/ProfitBadge';
+import { SectionNav } from '../components/SectionNav';
 import { TapeTab } from '../components/TapeTab';
 import { useCatalog } from '../hooks/useCatalog';
 import { useTransactions } from '../hooks/useTransactions';
@@ -22,6 +23,7 @@ import {
 import type { QuoteRange } from '../types/quotes';
 import { counterpartyLabel, formatScore, sideLabel } from '../utils/market';
 import { formatCredits, formatInstant, formatTokenPrice } from '../utils/quotes';
+import { TEAM_SECTIONS } from '../utils/sections';
 import styles from './TransactionsPage.module.css';
 
 // Operaciones por hoja del historial
@@ -174,9 +176,16 @@ export function TransactionsPage() {
 
   return (
     <section className={styles.transactions}>
-      <ChalkText as="h1" variant="title">
+      <ChalkText as="h1" variant="srOnly">
         Operaciones
       </ChalkText>
+      <SectionNav
+        title="Mi equipo"
+        label="secciones de mi equipo"
+        sections={TEAM_SECTIONS}
+        current="/operaciones"
+        LinkComponent={Link}
+      />
       <div className={styles.filters}>
         <div className={styles.group} role="group" aria-label="filtrar por compra o venta">
           <TapeTab label="todas" active={filters.side === null} onSelect={() => change({ side: null })} />
@@ -233,8 +242,10 @@ function TransactionCard({ transaction }: { transaction: Transaction }) {
   return (
     <li className={styles.card}>
       <div className={styles.cardHeader}>
-        <span className={styles.player}>{transaction.player.name}</span>
-        <span className={styles.side}>{sideLabel(transaction.side)}</span>
+        <Link to={`/jugadores/${transaction.player.id}`} className={styles.player}>
+          {transaction.player.name}
+        </Link>
+        <span className={sale ? styles.sell : styles.buy}>{sideLabel(transaction.side)}</span>
       </div>
       <dl className={styles.fields}>
         <div>
@@ -253,21 +264,6 @@ function TransactionCard({ transaction }: { transaction: Transaction }) {
           <dt>Total</dt>
           <dd className={styles.number}>{formatCredits(transaction.total)}</dd>
         </div>
-        <div>
-          <dt>Contraparte</dt>
-          <dd>{counterpartyLabel(transaction.counterparty)}</dd>
-        </div>
-        <div>
-          <dt>Orden</dt>
-          <dd className={styles.number}>#{transaction.orderId}</dd>
-        </div>
-        <div>
-          <dt>Cotización</dt>
-          <dd>
-            {formatCredits(quote.value)} desde {formatInstant(quote.validFrom)}, score {formatScore(quote.score)},{' '}
-            {quote.strategy.name} v{quote.strategy.version}
-          </dd>
-        </div>
         {sale ? (
           <div>
             <dt>Ganancia realizada</dt>
@@ -277,6 +273,26 @@ function TransactionCard({ transaction }: { transaction: Transaction }) {
           </div>
         ) : null}
       </dl>
+      <details className={styles.more}>
+        <summary>ver detalle</summary>
+        <dl className={styles.fields}>
+          <div>
+            <dt>Contraparte</dt>
+            <dd>{counterpartyLabel(transaction.counterparty)}</dd>
+          </div>
+          <div>
+            <dt>Orden</dt>
+            <dd className={styles.number}>#{transaction.orderId}</dd>
+          </div>
+          <div>
+            <dt>Cotización</dt>
+            <dd>
+              {formatCredits(quote.value)} desde {formatInstant(quote.validFrom)}, score {formatScore(quote.score)},{' '}
+              {quote.strategy.name} v{quote.strategy.version}
+            </dd>
+          </div>
+        </dl>
+      </details>
     </li>
   );
 }

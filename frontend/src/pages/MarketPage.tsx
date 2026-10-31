@@ -1,13 +1,16 @@
 // El mercado (/mercado): las órdenes con tokens pendientes, públicas, con los filtros y la hoja en la
 // dirección (US5, FR-047 a FR-049). Nunca muestra quién es el dueño de una orden, solo su tipo.
-import { Board } from '../components/Board';
+import { Link } from 'react-router';
 import { ChalkNote } from '../components/ChalkNote';
+import { ChalkText } from '../components/ChalkText';
 import { MarketFilters } from '../components/MarketFilters';
 import { OrderList } from '../components/OrderList';
 import { Pager } from '../components/Pager';
+import { SectionNav } from '../components/SectionNav';
 import { useCatalog } from '../hooks/useCatalog';
 import { toMarketQuery, useMarketFilters } from '../hooks/useMarketFilters';
 import { useMarketOrders } from '../hooks/useMarketOrders';
+import { PLAYER_SECTIONS } from '../utils/sections';
 import { deriveTeams } from '../utils/teams';
 import styles from './MarketPage.module.css';
 
@@ -42,7 +45,12 @@ export function MarketPage() {
 
     return (
       <>
-        <OrderList variant="market" orders={orders} />
+        <OrderList
+          variant="market"
+          orders={orders}
+          playerHref={(playerId) => `/jugadores/${playerId}`}
+          LinkComponent={Link}
+        />
         <Pager
           sheet={page.page + 1}
           totalSheets={page.totalPages}
@@ -56,22 +64,29 @@ export function MarketPage() {
   }
 
   return (
-    <Board>
-      <div className={styles.content}>
-        <h1 className={styles.title}>Mercado</h1>
-        <MarketFilters
-          filters={filters}
-          teams={deriveTeams(catalog.players, filters.league)}
-          teamsStatus={catalog.status}
-          onTeamsOpen={() => void catalog.ensureLoaded()}
-          onTeamsRetry={() => void catalog.retry()}
-          onSideChange={setSide}
-          onLeagueChange={(league) => void setLeague(league)}
-          onTeamChange={setTeam}
-          onOwnerTypeChange={setOwnerType}
-        />
-        {renderContent()}
-      </div>
-    </Board>
+    <section className={styles.content}>
+      <ChalkText as="h1" variant="srOnly">
+        Mercado
+      </ChalkText>
+      <SectionNav
+        title="Jugadores"
+        label="secciones de jugadores"
+        sections={PLAYER_SECTIONS}
+        current="/mercado"
+        LinkComponent={Link}
+      />
+      <MarketFilters
+        filters={filters}
+        teams={deriveTeams(catalog.players, filters.league)}
+        teamsStatus={catalog.status}
+        onTeamsOpen={() => void catalog.ensureLoaded()}
+        onTeamsRetry={() => void catalog.retry()}
+        onSideChange={setSide}
+        onLeagueChange={(league) => void setLeague(league)}
+        onTeamChange={setTeam}
+        onOwnerTypeChange={setOwnerType}
+      />
+      {renderContent()}
+    </section>
   );
 }

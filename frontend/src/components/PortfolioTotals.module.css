@@ -1,57 +1,120 @@
+/* Tarjeta verde del patrimonio; los colores de adentro se pisan para leerse sobre el verde */
 .totals {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: var(--chalk);
+  --text: #ffffff;
+  --muted: rgba(255, 255, 255, 0.78);
+  --up: #d6ffe6;
+  --down: #ffd9d4;
+  --up-soft: rgba(255, 255, 255, 0.16);
+  --down-soft: rgba(0, 0, 0, 0.2);
+  --surface-2: rgba(255, 255, 255, 0.16);
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #0f5a35, #12804a 60%, #1d9a5c);
+  color: var(--text);
 }
 
+/* El círculo central de la cancha, de adorno */
+.totals::after {
+  content: '';
+  position: absolute;
+  top: -70px;
+  right: -60px;
+  width: 220px;
+  height: 220px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* El título queda para los lectores de pantalla: lo primero que se ve es el patrimonio */
 .title {
-  margin: 0;
-  font-family: var(--font-script);
-  font-size: 24px;
-  font-weight: 400;
-  color: var(--chalk-dim);
-}
-
-/* En celular un total por renglón; desde pantallas medianas, en columnas que se acomodan solas */
-.list {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px 24px;
-  margin: 0;
-}
-
-.item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
-  padding: 6px 0;
-  border-bottom: 1px dashed var(--chalk-faint);
-}
-
-.label {
-  font-family: var(--font-script);
-  font-size: 20px;
-  color: var(--chalk-dim);
-}
-
-.value {
-  margin: 0;
-  font-family: var(--font-marker);
-  font-size: 18px;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
-.highlighted .label,
-.highlighted .value {
-  color: var(--yellow);
-  font-size: 22px;
+.list {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 10px;
 }
 
-@media (min-width: 760px) {
+.item {
+  grid-column: span 3;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.value {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.highlighted {
+  grid-column: 1 / -1;
+  order: -1;
+  padding: 0 0 8px;
+  background: none;
+}
+
+.highlighted .label {
+  font-size: 13px;
+}
+
+.highlighted .value {
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+/* Lo secundario va en una línea chica, al final */
+.secondary {
+  grid-column: span 4;
+  order: 1;
+  padding: 0 2px;
+  background: none;
+}
+
+.secondary .value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 520px) {
   .list {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .item {
+    grid-column: span 3;
+  }
+
+  .secondary {
+    grid-column: span 2;
+  }
+
+  .highlighted {
+    grid-column: 1 / -1;
+  }
+
+  .highlighted .value {
+    font-size: 30px;
   }
 }

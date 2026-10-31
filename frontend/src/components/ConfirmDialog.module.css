@@ -2,37 +2,29 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 60;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(8, 16, 12, 0.45);
 }
 
-/* Un pedazo de pizarrón; a 360 px ocupa el ancho menos los márgenes */
 .dialog {
   width: 100%;
-  max-width: 460px;
+  max-width: 420px;
   max-height: calc(100vh - 32px);
   overflow-y: auto;
-  padding: 18px 20px 20px;
-  border: 3px solid var(--wood-frame);
-  border-radius: 8px;
-  background: var(--board);
-  box-shadow: var(--shadow-board);
-  color: var(--chalk);
-  font-family: var(--font-hand);
-  font-size: 18px;
+  padding: 22px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
   overflow-wrap: anywhere;
 }
 
 .title {
-  margin: 0 0 10px;
-  font-family: var(--font-script);
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--yellow);
+  margin-bottom: 12px;
+  font-size: 20px;
 }
 
 .body {
@@ -41,14 +33,24 @@
   gap: 6px;
 }
 
+/* Confirmar va al final, a la derecha, y resaltado */
 .actions {
   display: flex;
+  flex-direction: row-reverse;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 18px;
 }
 
-.actions button:focus-visible {
-  outline: 3px dashed var(--chalk);
-  outline-offset: 3px;
+.actions button {
+  flex: 1;
+}
+
+.actions button[data-confirm] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.actions button[data-confirm]:hover:not(:disabled) {
+  background: var(--accent-hover);
 }

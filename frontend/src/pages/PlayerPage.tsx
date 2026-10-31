@@ -1,12 +1,12 @@
-// Ficha de un jugador: hoja de scout dentro del pizarrón, con su cotización y su evolución. Debajo
-// de la hoja, sobre el pizarrón, sus órdenes pendientes (para todos) y el panel para operar (solo un
-// usuario común, FR-065).
+// Ficha de un jugador: su cotización y su evolución, el panel para operar (solo un usuario común,
+// FR-065) y sus órdenes pendientes (para todos). Abierta desde otra pantalla se ve dentro del panel
+// lateral de AppLayout, que le dice a dónde vuelve; abierta directamente, es una pantalla más.
 import { useId, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router';
-import { Board } from '../components/Board';
+import { Link, useLocation, useOutletContext, useParams } from 'react-router';
 import { ChalkNote } from '../components/ChalkNote';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { OrderList } from '../components/OrderList';
+import { ProfitBadge } from '../components/ProfitBadge';
 import { QuoteChart } from '../components/QuoteChart';
 import { QuotePanel } from '../components/QuotePanel';
 import { QuoteTable } from '../components/QuoteTable';
@@ -16,11 +16,15 @@ import { useMarketOrders } from '../hooks/useMarketOrders';
 import { useOrderCommands } from '../hooks/useOrderCommands';
 import { usePlayer } from '../hooks/usePlayer';
 import { usePlayerQuote } from '../hooks/usePlayerQuote';
+import { usePortfolio } from '../hooks/usePortfolio';
 import { useQuoteHistory } from '../hooks/useQuoteHistory';
 import { useSession } from '../hooks/useSession';
 import type { Player } from '../types/api';
 import type { OrderSide } from '../types/market';
 import type { QuoteRange } from '../types/quotes';
+import { formatTokens } from '../utils/market';
+import { formatCredits } from '../utils/quotes';
+import type { PlayerPanelContext } from './AppLayout';
 import styles from './PlayerPage.module.css';
 
 // Las pendientes de un jugador entran en una sola hoja: la orden inicial, la más vieja, va primero
@@ -64,9 +68,11 @@ export function PlayerPage() {
   const quoteHeadingId = useId();
   const historyHeadingId = useId();
 
-  // Vuelve a la pizarra con los mismos filtros y hoja desde donde se abrió la ficha
+  // Dentro del panel vuelve a la pantalla de atrás. Si no, a la pizarra con los mismos filtros y hoja
+  const panel = useOutletContext<PlayerPanelContext | undefined>();
   const boardSearch = (location.state as PlayerLocationState | null)?.boardSearch;
-  const backLink = <Link to={`/pizarra${boardSearch ?? ''}`}>volver a la pizarra</Link>;
+  const back = panel?.back ?? { to: `/pizarra${boardSearch ?? ''}`, label: 'volver a la pizarra' };
+  const backLink = <Link to={back.to}>{back.label}</Link>;
 
   function renderQuote() {
     if (quote.noQuote) {
@@ -163,11 +169,7 @@ export function PlayerPage() {
     );
   }
 
-  return (
-    <Board>
-      <div className={styles.content}>{renderContent()}</div>
-    </Board>
-  );
+  return <div className={panel ? styles.inPanel : styles.content}>{renderContent()}</div>;
 }
 
 interface PlayerMarketProps {
@@ -180,8 +182,11 @@ interface PlayerMarketProps {
 // Las órdenes pendientes del jugador, incluida la inicial con los tokens que le quedan (FR-064), y el
 // panel para operar. Se monta con el jugador ya cargado, así las órdenes se piden una sola vez
 function PlayerMarket({ player, quoteReady, tokenPrice }: PlayerMarketProps) {
-  const { profile } = useSession();
+  const { status, profile } = useSession();
+  const location = useLocation();
   const orders = useMarketOrders({ playerId: player.id, size: PLAYER_ORDERS_SIZE });
+  // Cambia con cada operación que sale bien, para volver a pedir lo que el usuario tiene
+  const [trades, setTrades] = useState(0);
   const { trade, buy, sell } = useOrderCommands();
   const ordersHeadingId = useId();
   const tradeHeadingId = useId();
@@ -192,7 +197,10 @@ function PlayerMarket({ player, quoteReady, tokenPrice }: PlayerMarketProps) {
   async function place(side: OrderSide, quantity: number) {
     const order = { playerId: player.id, quantity };
     const result = await (side === 'BUY' ? buy(order) : sell(order));
-    if (result) orders.reload();
+    if (result) {
+      orders.reload();
+      setTrades((count) => count + 1);
+    }
   }
 
   function renderOrders() {
@@ -244,15 +252,41 @@ function PlayerMarket({ player, quoteReady, tokenPrice }: PlayerMarketProps) {
           <h2 id={tradeHeadingId} className={styles.marketHeading}>
             Operar
           </h2>
+          <MyPosition key={trades} playerId={player.id} />
           {renderTrade()}
         </section>
       ) : null}
-      <section className={styles.market} aria-labelledby={ordersHeadingId}>
-        <h2 id={ordersHeadingId} className={styles.marketHeading}>
-          Órdenes pendientes
-        </h2>
-        {renderOrders()}
-      </section>
+      {status === 'anonymous' ? (
+        <p className={styles.invite}>
+          <Link to="/login" state={{ from: location }}>
+            Entrá para comprar y vender tokens
+          </Link>
+        </p>
+      ) : null}
+      <details className={styles.orders}>
+        <summary>
+          <h2 id={ordersHeadingId} className={styles.marketHeading}>
+            Órdenes pendientes
+          </h2>
+        </summary>
+        <section aria-labelledby={ordersHeadingId}>{renderOrders()}</section>
+      </details>
     </>
+  );
+}
+
+// Lo que el usuario tiene de este jugador; si no tiene nada, o no se pudo saber, no se muestra
+function MyPosition({ playerId }: { playerId: number }) {
+  const { portfolio } = usePortfolio();
+  const position = portfolio?.positions.find((candidate) => candidate.player.id === playerId);
+  if (!position) return null;
+
+  return (
+    <p className={styles.mine}>
+      <span>
+        Tenés <b>{formatTokens(position.tokens)}</b> · valen {formatCredits(position.value)}
+      </span>
+      <ProfitBadge amount={position.profit} percent={position.profitPercent} />
+    </p>
   );
 }

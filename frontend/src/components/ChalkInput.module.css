@@ -1,35 +1,30 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  min-width: 0;
 }
 
 .label {
-  font-family: var(--font-script);
-  font-size: 22px;
-  color: var(--chalk);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.label::first-letter {
+  text-transform: uppercase;
 }
 
 .input {
-  background: transparent;
-  border: 0;
-  border-bottom: 2px dashed var(--chalk-dim);
-  padding: 4px 2px;
-  font-family: var(--font-hand);
-  font-size: 20px;
-  color: var(--chalk);
-}
-
-.input::placeholder {
-  color: var(--chalk-faint);
+  width: 100%;
+  padding: 11px 12px;
 }
 
 .invalid {
-  border-bottom-color: var(--pink);
+  border-color: var(--down);
 }
 
 .error {
-  font-family: var(--font-script);
-  font-size: 20px;
-  color: var(--pink);
+  color: var(--down);
+  font-size: 13px;
 }

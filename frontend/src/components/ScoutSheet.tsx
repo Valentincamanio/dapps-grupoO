@@ -1,4 +1,4 @@
-// Hoja de scout clavada al pizarrón: datos de un jugador, sin ninguna acción.
+// Encabezado de la ficha: datos de un jugador y salida, sin ninguna acción.
 import type { ReactNode } from 'react';
 import type { Player } from '../types/api';
 import { leagueLabel, positionLabel } from '../utils/positions';
@@ -14,7 +14,7 @@ interface ScoutSheetProps {
 export function ScoutSheet({ player, backLink, quoteSlot }: ScoutSheetProps) {
   return (
     <article className={quoteSlot ? `${styles.sheet} ${styles.wide}` : styles.sheet}>
-      <span className={styles.pin} aria-hidden="true" />
+      <div className={styles.back}>{backLink}</div>
       <h1 className={styles.name}>{player.name}</h1>
       <dl className={styles.data}>
         <div>
@@ -31,7 +31,6 @@ export function ScoutSheet({ player, backLink, quoteSlot }: ScoutSheetProps) {
         </div>
       </dl>
       {quoteSlot ? <div className={styles.quote}>{quoteSlot}</div> : null}
-      <div className={styles.back}>{backLink}</div>
     </article>
   );
 }
