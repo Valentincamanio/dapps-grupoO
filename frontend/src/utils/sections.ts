@@ -23,6 +23,8 @@ export const ADMIN_SECTIONS: Section[] = [
   { to: '/admin/estrategias', label: 'Estrategias' },
   { to: '/admin/recalculo', label: 'Recálculo' },
   { to: '/admin/simulacion', label: 'Simulación' },
+  { to: '/admin/potenciados', label: 'Potenciados' },
+  { to: '/admin/auditoria', label: 'Auditoría' },
 ];
 
 const BACK_LABELS: Record<string, string> = {

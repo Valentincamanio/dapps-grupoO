@@ -106,3 +106,13 @@
 .weights dd {
   overflow-wrap: anywhere;
 }
+
+/* Eliminar se ve como una acción delicada, sin competir con Editar y Activar */
+.delete {
+  background: var(--down-soft);
+  color: var(--down);
+}
+
+.delete:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--down) 18%, var(--surface));
+}

@@ -12,40 +12,40 @@ function linksOf(nav: HTMLElement): string[] {
 }
 
 describe('navegación', () => {
-  it('un visitante tiene en la barra solo Jugadores', async () => {
+  it('un visitante no tiene secciones en la barra', async () => {
     renderWithRouter({ initialEntries: ['/pizarra'] });
 
-    const nav = await screen.findByRole('navigation', { name: 'secciones' });
+    await screen.findByRole('navigation', { name: 'secciones de jugadores' });
 
-    expect(linksOf(nav)).toEqual(['Jugadores']);
+    expect(screen.queryByRole('navigation', { name: 'secciones' })).toBeNull();
   });
 
-  it('un usuario común tiene en la barra Jugadores y Mi equipo, sin las pantallas sueltas', async () => {
+  it('un usuario común tiene en la barra Mi equipo, sin las pantallas sueltas', async () => {
     renderWithRouter({ initialEntries: ['/pizarra'], session: 'valid' });
 
     const myTeam = await screen.findByRole('link', { name: 'Mi equipo' });
 
     expect(myTeam).toHaveAttribute('href', '/portfolio');
-    expect(linksOf(screen.getByRole('navigation', { name: 'secciones' }))).toEqual(['Jugadores', 'Mi equipo']);
+    expect(linksOf(screen.getByRole('navigation', { name: 'secciones' }))).toEqual(['Mi equipo']);
   });
 
-  it('el administrador tiene en la barra Jugadores y Administración', async () => {
+  it('el administrador tiene en la barra Administración', async () => {
     server.use(adminProfileHandler);
     renderWithRouter({ initialEntries: ['/pizarra'], session: 'valid' });
 
     await screen.findByRole('link', { name: 'Administración' });
 
-    expect(linksOf(screen.getByRole('navigation', { name: 'secciones' }))).toEqual(['Jugadores', 'Administración']);
+    expect(linksOf(screen.getByRole('navigation', { name: 'secciones' }))).toEqual(['Administración']);
   });
 
-  it.each(['/pizarra', '/ranking', '/mercado'])('%s marca Jugadores y ofrece sus tres pestañas', async (path) => {
+  it.each(['/pizarra', '/ranking', '/mercado'])('%s ofrece sus tres pestañas y el logo lleva al inicio', async (path) => {
     renderWithRouter({ initialEntries: [path] });
 
     const tabs = await screen.findByRole('navigation', { name: 'secciones de jugadores' });
 
     expect(linksOf(tabs)).toEqual(['Todos', 'Ranking', 'Mercado']);
     expect(within(tabs).getByRole('link', { current: 'page' })).toHaveAttribute('href', path);
-    expect(screen.getByRole('link', { name: 'Jugadores' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'La Pizarra, ir al inicio' })).toHaveAttribute('href', '/pizarra');
   });
 
   it.each(['/portfolio', '/ordenes', '/operaciones'])('%s marca Mi equipo y ofrece sus tres pestañas', async (path) => {

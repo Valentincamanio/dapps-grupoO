@@ -36,6 +36,28 @@ const PROFIT_TEXT: Record<VariationDirection, string> = {
 // El precio por token de la orden inicial del superusuario
 export const INITIAL_TOKEN_PRICE = 1;
 
+// Los filtros de Mis órdenes: las abiertas (las que se pueden cancelar) son las que se ven al entrar
+export const ORDER_FILTERS = ['abiertas', 'ejecutadas', 'canceladas', 'todas'] as const;
+export type OrderFilter = (typeof ORDER_FILTERS)[number];
+export const DEFAULT_ORDER_FILTER: OrderFilter = 'abiertas';
+
+const ORDER_FILTER_STATUSES: Record<OrderFilter, OrderStatus[] | undefined> = {
+  abiertas: ['PENDING', 'PARTIAL'],
+  ejecutadas: ['EXECUTED'],
+  canceladas: ['CANCELLED'],
+  todas: undefined,
+};
+
+// Los estados que pide un filtro; "todas" no filtra
+export function statusesOf(filter: OrderFilter): OrderStatus[] | undefined {
+  return ORDER_FILTER_STATUSES[filter];
+}
+
+// El filtro escrito en la dirección; uno que no existe vale el de entrada
+export function parseOrderFilter(value: string | null): OrderFilter {
+  return ORDER_FILTERS.includes(value as OrderFilter) ? (value as OrderFilter) : DEFAULT_ORDER_FILTER;
+}
+
 // Los precios por token tienen cuatro decimales y los totales dos
 const PRICE_UNITS = 10_000;
 const CENTS = 100;

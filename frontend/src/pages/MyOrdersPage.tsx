@@ -1,7 +1,8 @@
-// Las órdenes del usuario de la sesión (/ordenes): en cualquier estado, de la más nueva a la más vieja,
-// con la hoja en la dirección. Una pendiente o parcial se cancela después de confirmar (US6); lo
-// ejecutado se conserva. Después de cancelar se recarga la lista, y useOrderCommands pone al día el
-// saldo de la barra.
+// Las órdenes del usuario de la sesión (/ordenes): de la más nueva a la más vieja, con el filtro de
+// estado y la hoja en la dirección. Al entrar se ven las abiertas (pendientes y parciales); las
+// ejecutadas, las canceladas o todas, eligiendo el filtro. Una pendiente o parcial se cancela después
+// de confirmar (US6); lo ejecutado se conserva. Después de cancelar se recarga la lista, y
+// useOrderCommands pone al día el saldo de la barra.
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ChalkNote } from '../components/ChalkNote';
@@ -10,10 +11,20 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { OrderList } from '../components/OrderList';
 import { Pager } from '../components/Pager';
 import { SectionNav } from '../components/SectionNav';
+import { TapeTab } from '../components/TapeTab';
 import { useMyOrders } from '../hooks/useMyOrders';
 import { useOrderCommands } from '../hooks/useOrderCommands';
 import type { UserOrder } from '../types/market';
-import { formatPendingTokens, formatTokens, sideLabel } from '../utils/market';
+import {
+  DEFAULT_ORDER_FILTER,
+  formatPendingTokens,
+  formatTokens,
+  ORDER_FILTERS,
+  parseOrderFilter,
+  sideLabel,
+  statusesOf,
+  type OrderFilter,
+} from '../utils/market';
 import { formatCredits } from '../utils/quotes';
 import { TEAM_SECTIONS } from '../utils/sections';
 import styles from './MyOrdersPage.module.css';
@@ -39,16 +50,27 @@ function releasedText(order: UserOrder): string {
 export function MyOrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sheet = parseSheet(searchParams);
-  const { status, page, orders, reload } = useMyOrders({ page: sheet - 1, size: SHEET_SIZE });
+  const filter = parseOrderFilter(searchParams.get('estado'));
+  const { status, page, orders, reload } = useMyOrders({
+    page: sheet - 1,
+    size: SHEET_SIZE,
+    status: statusesOf(filter),
+  });
   const { cancellation, cancel } = useOrderCommands();
   // La orden que se está por cancelar, mientras se confirma
   const [confirming, setConfirming] = useState<UserOrder | null>(null);
   const busy = cancellation.status === 'running';
 
-  function goToSheet(next: number) {
+  // El filtro de entrada no se escribe en la dirección
+  function navigate(nextFilter: OrderFilter, nextSheet: number) {
     const params = new URLSearchParams();
-    if (next > 1) params.set('page', String(next));
+    if (nextFilter !== DEFAULT_ORDER_FILTER) params.set('estado', nextFilter);
+    if (nextSheet > 1) params.set('page', String(nextSheet));
     setSearchParams(params, { replace: false });
+  }
+
+  function goToSheet(next: number) {
+    navigate(filter, next);
   }
 
   function ask(order: UserOrder) {
@@ -91,7 +113,14 @@ export function MyOrdersPage() {
         </ChalkNote>
       );
     }
-    if (page.totalElements === 0) return <ChalkNote variant="info">todavía no tenés órdenes</ChalkNote>;
+    if (page.totalElements === 0) {
+      if (filter === 'todas') return <ChalkNote variant="info">todavía no tenés órdenes</ChalkNote>;
+      return (
+        <ChalkNote variant="info" action={{ label: 'ver todas', onClick: () => navigate('todas', 1) }}>
+          no tenés órdenes {filter}
+        </ChalkNote>
+      );
+    }
     if (orders.length === 0) {
       return (
         <ChalkNote variant="info" action={{ label: 'volver a la primera hoja', onClick: () => goToSheet(1) }}>
@@ -134,6 +163,11 @@ export function MyOrdersPage() {
         current="/ordenes"
         LinkComponent={Link}
       />
+      <div className={styles.filters} role="group" aria-label="filtrar por estado">
+        {ORDER_FILTERS.map((option) => (
+          <TapeTab key={option} label={option} active={filter === option} onSelect={() => navigate(option, 1)} />
+        ))}
+      </div>
       {renderOutcome()}
       {renderContent()}
       {confirming ? (

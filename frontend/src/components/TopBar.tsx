@@ -1,17 +1,20 @@
-// Encabezado de la app: logo, secciones (quien lo usa decide cuáles ve cada rol), saldo libre opcional
-// y enlace de cuenta. En el celular las secciones pasan a una barra fija abajo (CSS).
+// Encabezado de la app: logo (lleva al inicio), secciones (quien lo usa decide cuáles ve cada rol),
+// el botón de tema, saldo libre opcional y enlace de cuenta. En el celular las secciones pasan a una
+// barra fija abajo (CSS).
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import styles from './TopBar.module.css';
 
 interface TopBarProps {
   navSlot?: ReactNode;
+  // Va a la izquierda del saldo
+  themeToggle?: ReactNode;
   // El saldo libre ya formateado: lo que se puede usar, sin lo reservado para compras (FR-062)
   balance?: string;
   accountLink: ReactNode;
 }
 
-export function TopBar({ navSlot, balance, accountLink }: TopBarProps) {
+export function TopBar({ navSlot, themeToggle, balance, accountLink }: TopBarProps) {
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
@@ -32,6 +35,7 @@ export function TopBar({ navSlot, balance, accountLink }: TopBarProps) {
           </nav>
         ) : null}
         <div className={styles.right}>
+          {themeToggle}
           {balance !== undefined ? (
             <div className={styles.balance}>
               Saldo libre: <b>{balance}</b>

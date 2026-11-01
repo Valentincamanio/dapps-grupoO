@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ar.edu.unq.desapp.futbolmarket.modelo.league.League;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrderFilter;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderSide;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderView;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OwnerType;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.TradeFilter;
@@ -158,6 +160,28 @@ class MarketQueryServiceTest {
         when(orderRepository.findOfOwner(OWNER, 0, 10)).thenReturn(page);
 
         assertThat(service.ordersOf(OWNER, OWNER, 0, 10)).isSameAs(page);
+    }
+
+    @Test
+    void lasOrdenesFiltradasPorEstadoSonLaHojaDelRepositoryConEsosEstados() {
+        QuotePage<OrderView> page = new QuotePage<>(List.of(
+                new OrderView(sell(2L, OWNER, KANE.id(), 5, at("2026-10-28T10:00")), KANE)), 0, 10, 1);
+        Set<OrderStatus> open = Set.of(OrderStatus.PENDING, OrderStatus.PARTIAL);
+        when(userRepository.findById(OWNER)).thenReturn(Optional.of(user(OWNER, "1000.00")));
+        when(orderRepository.findOfOwner(OWNER, open, 0, 10)).thenReturn(page);
+
+        QuotePage<OrderView> result = service.ordersOf(OWNER, OWNER, open, 0, 10);
+
+        assertThat(result).isSameAs(page);
+    }
+
+    @Test
+    void lasOrdenesFiltradasDeOtraCuentaSon403() {
+        when(userRepository.findById(OTHER)).thenReturn(Optional.of(user(OTHER, "1000.00")));
+
+        assertThatThrownBy(() -> service.ordersOf(OTHER, OWNER, Set.of(OrderStatus.EXECUTED), 0, 10))
+                .isInstanceOf(AccountAccessDeniedException.class);
+        verifyNoInteractions(orderRepository);
     }
 
     @Test

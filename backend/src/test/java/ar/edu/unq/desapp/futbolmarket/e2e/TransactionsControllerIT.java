@@ -312,6 +312,49 @@ class TransactionsControllerIT {
     }
 
     @Test
+    void lasOrdenesSeFiltranPorUnoOVariosEstadosYLaHojaCuentaSoloEsas() throws Exception {
+        Scenario scenario = scenario();
+
+        JsonNode cancelled = json(orders(scenario.ana(), scenario.ana().id(), "?status=CANCELLED"));
+        JsonNode executed = json(orders(scenario.ana(), scenario.ana().id(), "?status=EXECUTED&size=2"));
+        JsonNode open = json(orders(scenario.ana(), scenario.ana().id(), "?status=PENDING&status=PARTIAL"));
+
+        assertThat(cancelled.get("content").values()).extracting(order -> order.get("id").asLong())
+                .containsExactly(scenario.anaCancelledSale());
+        assertThat(executed.get("content").values()).extracting(order -> order.get("id").asLong())
+                .containsExactly(scenario.anaSecondSale(), scenario.anaFirstSale());
+        assertThat(executed.get("totalElements").asLong()).isEqualTo(3);
+        assertThat(executed.get("hasNext").asBoolean()).isTrue();
+        assertThat(open.get("totalElements").asLong()).isZero();
+    }
+
+    @Test
+    void lasAbiertasSonLasPendientesYLasParciales() throws Exception {
+        TestUser ana = helper.registerUser();
+        TestUser bruno = helper.registerUser();
+        buy(ana, 100);
+        long partial = orderId(buy(bruno, 10));
+        sell(ana, 4);
+        onDay(29);
+        long pending = orderId(buy(bruno, 3));
+
+        // Separados por coma, como los manda la web
+        JsonNode open = json(orders(bruno, bruno.id(), "?status=PENDING,PARTIAL"));
+
+        assertThat(open.get("content").values()).extracting(order -> order.get("id").asLong())
+                .containsExactly(pending, partial);
+    }
+
+    @Test
+    void unEstadoNoAdmitidoResponde400() throws Exception {
+        TestUser ana = helper.registerUser();
+
+        MvcTestResult result = orders(ana, ana.id(), "?status=ABIERTA");
+
+        assertBadRequest(result, INVALID_PARAMETERS);
+    }
+
+    @Test
     void lasOrdenesTienenLasMismasReglasDeAcceso() throws Exception {
         TestUser ana = helper.registerUser();
         TestUser bruno = helper.registerUser();

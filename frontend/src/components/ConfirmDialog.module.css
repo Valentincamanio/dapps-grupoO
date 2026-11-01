@@ -54,3 +54,13 @@
 .actions button[data-confirm]:hover:not(:disabled) {
   background: var(--accent-hover);
 }
+
+/* Una acción delicada: confirmar se ve en rojo en vez del verde de siempre */
+.actions button.danger[data-confirm] {
+  background: var(--down);
+  color: #fff;
+}
+
+.actions button.danger[data-confirm]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--down) 85%, #000);
+}

@@ -107,6 +107,21 @@ public interface MarketOrderSQLDAO extends JpaRepository<MarketOrderSQL, Long> {
     Page<MarketOrderSQL> findByOwnerId(@Param("ownerId") Long ownerId, Pageable pageable);
 
     /**
+     * Las órdenes del dueño en alguno de esos estados, en el mismo orden que {@link #findByOwnerId}.
+     */
+    @Query(value = """
+            select o from MarketOrderSQL o
+            join fetch o.player p
+            join fetch p.team
+            where o.owner.id = :ownerId
+              and o.status in :statuses
+            order by o.createdAt desc, o.id desc
+            """,
+            countQuery = "select count(o) from MarketOrderSQL o where o.owner.id = :ownerId and o.status in :statuses")
+    Page<MarketOrderSQL> findByOwnerIdAndStatusIn(@Param("ownerId") Long ownerId,
+                                                 @Param("statuses") Collection<String> statuses, Pageable pageable);
+
+    /**
      * El listado del mercado (research D22): las órdenes con tokens pendientes, con el jugador y su
      * equipo en la misma consulta, de la más vieja a la más nueva y con el id como desempate. Un
      * filtro nulo no filtra. El tipo de usuario dueño sale de la marca de inicial ({@code initial}

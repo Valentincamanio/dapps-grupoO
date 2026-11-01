@@ -1,0 +1,120 @@
+.section {
+  margin-bottom: 8px;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 4px 0 14px;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 18px;
+}
+
+.title svg {
+  color: var(--gold);
+}
+
+.week {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.info {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  z-index: 5;
+  width: 280px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--text);
+  box-shadow: var(--shadow);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 0.12s;
+}
+
+.info:hover .tip,
+.info:focus-visible .tip {
+  opacity: 1;
+}
+
+.ends {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Aire arriba para la cinta del multiplicador, que sobresale de cada tarjeta */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 12px;
+  padding-top: 10px;
+  list-style: none;
+}
+
+@media (max-width: 720px) {
+  .ends {
+    margin-left: 0;
+  }
+
+  /* En el celular el cartel ocupa el ancho del encabezado, no se ubica respecto del botón */
+  .head {
+    position: relative;
+  }
+
+  .info {
+    position: static;
+  }
+
+  .tip {
+    top: 100%;
+    right: 0;
+    left: 0;
+    width: auto;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tip {
+    transition: none;
+  }
+}

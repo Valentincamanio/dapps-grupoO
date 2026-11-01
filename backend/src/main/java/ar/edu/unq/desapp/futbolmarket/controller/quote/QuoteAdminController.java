@@ -87,7 +87,9 @@ public class QuoteAdminController {
                     + "estrategia guardada usa su versión más reciente; los parámetros se validan con las mismas "
                     + "reglas que al crear una estrategia y no se guardan. No modifica cotizaciones, estrategias ni "
                     + "la activa, y no espera a un recálculo ni a una sincronización. Los filtros y la paginación "
-                    + "son los del catálogo. Cada página vuelve a calcular todo.")
+                    + "son los del catálogo; con playerId, la hoja trae solo a ese jugador (vacía si no está activo "
+                    + "o no cumple los filtros), sin cambiar su simulada. Los potenciados de cada semana rigen "
+                    + "igual que al cotizarla. Cada página vuelve a calcular todo.")
     @ApiResponse(responseCode = "200", description = "Hoja de la simulación; puede estar vacía.")
     @ApiResponse(responseCode = "400",
             description = "Vienen strategyId y parameters, o ninguno; parámetros inválidos (pesos que no suman "
@@ -108,10 +110,11 @@ public class QuoteAdminController {
             @RequestParam(required = false) League league,
             @RequestParam(required = false) @Pattern(regexp = "\\s*\\S.*") String team,
             @RequestParam(required = false) Position position,
+            @RequestParam(required = false) @Min(1) Long playerId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size
     ) {
         return SimulationPageResponse.from(simulationService.simulate(request.strategyId(),
-                request.simulationParameters(), new PlayerFilter(league, team, position), page, size));
+                request.simulationParameters(), new PlayerFilter(league, team, position), playerId, page, size));
     }
 }

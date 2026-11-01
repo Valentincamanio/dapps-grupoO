@@ -1,5 +1,7 @@
 package ar.edu.unq.desapp.futbolmarket.controller.market;
 
+import java.util.Set;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +15,7 @@ import ar.edu.unq.desapp.futbolmarket.controller.market.dto.PortfolioResponse;
 import ar.edu.unq.desapp.futbolmarket.controller.market.dto.TransactionPageResponse;
 import ar.edu.unq.desapp.futbolmarket.controller.market.dto.UserOrderPageResponse;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderSide;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.TradeFilter;
 import ar.edu.unq.desapp.futbolmarket.service.market.MarketQueryService;
 import ar.edu.unq.desapp.futbolmarket.service.market.PortfolioService;
@@ -161,10 +164,12 @@ public class PortfolioController {
 
     @Operation(
             summary = "Órdenes de un usuario",
-            description = "Todas sus órdenes, en cualquier estado, de la más nueva a la más vieja, con la "
-                    + "paginación del catálogo.")
+            description = "Sus órdenes de la más nueva a la más vieja, con la paginación del catálogo. Sin status, "
+                    + "en cualquier estado; con uno o más status (status=PENDING&status=PARTIAL), solo las que "
+                    + "están en alguno de ellos.")
     @ApiResponse(responseCode = "200", description = "Una hoja de órdenes; puede estar vacía.")
-    @ApiResponse(responseCode = "400", description = "Identificador inválido o paginación fuera de rango.",
+    @ApiResponse(responseCode = "400", description = "Identificador inválido, estado no admitido o paginación "
+            + "fuera de rango.",
             content = @Content(schema = @Schema(implementation = ApiError.class),
                     examples = @ExampleObject(value = ORDERS_INVALID_PARAMETERS_EXAMPLE)))
     @ApiResponse(responseCode = "401", description = UNAUTHORIZED_DESCRIPTION,
@@ -179,8 +184,12 @@ public class PortfolioController {
     @GetMapping("/{id}/orders")
     public UserOrderPageResponse getOrders(@AuthenticationPrincipal @Parameter(hidden = true) Long requesterId,
                                            @PathVariable @Min(1) Long id,
+                                           @Parameter(description = "Estados a mostrar; se repite para varios.")
+                                           @RequestParam(required = false) Set<OrderStatus> status,
                                            @RequestParam(defaultValue = "0") @Min(0) int page,
                                            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size) {
-        return UserOrderPageResponse.from(marketQueryService.ordersOf(requesterId, id, page, size));
+        return UserOrderPageResponse.from(status == null || status.isEmpty()
+                ? marketQueryService.ordersOf(requesterId, id, page, size)
+                : marketQueryService.ordersOf(requesterId, id, status, page, size));
     }
 }

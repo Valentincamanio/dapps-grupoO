@@ -22,19 +22,21 @@ Desde `frontend/`:
 
 ## Pantallas
 
-La barra superior tiene los grupos de pantallas y cada grupo, sus pestañas. Las direcciones son las mismas de siempre.
+La barra superior tiene los grupos de pantallas y cada grupo, sus pestañas. Las direcciones son las mismas de siempre. Los jugadores no tienen enlace propio en la barra: el logo "La Pizarra" lleva a `/pizarra`. A la izquierda del saldo está el botón de tema (claro u oscuro); arranca siguiendo al sistema y lo elegido queda guardado en el navegador.
 
 | Grupo | Pestaña | Ruta | Qué muestra | Acceso |
 | --- | --- | --- | --- | --- |
-| Jugadores | Todos | `/pizarra` | Los jugadores en tarjetas, con el buscador y sus filtros | Público |
+| Jugadores | Todos | `/pizarra` | Los potenciados de la semana (si hay) y los jugadores en tarjetas, con el buscador y sus filtros | Público |
 | Jugadores | Ranking | `/ranking` | El ranking por cotización, con filtros de liga, equipo y posición | Público |
 | Jugadores | Mercado | `/mercado` | Las órdenes con tokens pendientes | Público |
 | Mi equipo | Mis jugadores | `/portfolio` | El patrimonio y las posiciones, hoy o a una fecha | Solo `USER` |
-| Mi equipo | Órdenes | `/ordenes` | Las órdenes propias, con la cancelación | Solo `USER` |
+| Mi equipo | Órdenes | `/ordenes` | Las órdenes propias, con la cancelación. Al entrar se ven las abiertas; el filtro (`?estado=ejecutadas`, `canceladas` o `todas`) muestra las demás | Solo `USER` |
 | Mi equipo | Movimientos | `/operaciones` | El historial de operaciones | Solo `USER` |
-| Administración | Estrategias | `/admin/estrategias` | Las estrategias con sus versiones: crear, editar y activar (eligiendo si se recotiza ahora o la semana siguiente) | Solo `ADMIN` |
-| Administración | Recálculo | `/admin/recalculo` | El disparo manual del recálculo y su informe | Solo `ADMIN` |
-| Administración | Simulación | `/admin/simulacion` | La simulación de una estrategia guardada o de unos parámetros, sin guardar nada | Solo `ADMIN` |
+| Administración | Estrategias | `/admin/estrategias` | Las estrategias con sus versiones: crear, editar, activar (eligiendo si se recotiza ahora o la semana siguiente) y eliminar, con confirmación | Solo `ADMIN` |
+| Administración | Recálculo | `/admin/recalculo` | El disparo manual del recálculo y su informe, y las sincronizaciones manuales del catálogo (Football-Data.org) y de las estadísticas (WhoScored), de las cinco ligas o de una | Solo `ADMIN` |
+| Administración | Simulación | `/admin/simulacion` | La simulación de una estrategia guardada o de unos parámetros, sin guardar nada; con el buscador, la de un solo jugador | Solo `ADMIN` |
+| Administración | Auditoría | `/admin/auditoria` | Cada orden creada, operación y cancelación del mercado, con su autor y el antes y después de cada parte, filtrable por tipo, jugador, usuario y fechas | Solo `ADMIN` |
+| Administración | Potenciados | `/admin/potenciados` | Los 4 potenciados de cada semana y su porcentaje; la semana en curso se cambia con confirmación y las cerradas quedan como registro | Solo `ADMIN` |
 
 `/vestuario` es la cuenta (con sesión) y se abre desde el avatar.
 
@@ -46,7 +48,8 @@ permiso, y sin sesión se pasa por `/login`. Los endpoints que usa cada pantalla
 [README de la raíz](../README.md#cotizaciones-y-estrategias-de-valuación).
 
 En los tests, la API se simula con MSW (`tests/mocks/`): `handlers.ts` para el catálogo y la sesión, y
-`quoteHandlers.ts` para las cotizaciones, las estrategias, el recálculo y la simulación.
+`quoteHandlers.ts` para las cotizaciones, las estrategias, el recálculo y la simulación, y
+`boostHandlers.ts` para los potenciados.
 
 ## Proxy a la API
 

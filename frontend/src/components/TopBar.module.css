@@ -101,7 +101,8 @@
   flex: none;
 }
 
-/* En el celular las secciones son una barra fija abajo; con una sola, no hace falta */
+/* En el celular las secciones son una barra fija abajo, aunque haya una sola: el inicio se
+   alcanza con el logo y la sección del rol, solo desde acá */
 @media (max-width: 720px) {
   /* Con backdrop-filter, la barra fija de abajo se ubicaría respecto del encabezado */
   .header {
@@ -124,10 +125,6 @@
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--line);
     background: var(--surface);
-  }
-
-  .nav:has(> a:only-child) {
-    display: none;
   }
 
   .nav a {

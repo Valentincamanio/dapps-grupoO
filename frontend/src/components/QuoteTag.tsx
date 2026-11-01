@@ -8,9 +8,11 @@ import styles from './QuoteTag.module.css';
 
 interface QuoteTagProps {
   badge: QuoteBadge;
+  // Un potenciado dice "cotización actual": la del cierre todavía no salió
+  label?: string;
 }
 
-export function QuoteTag({ badge }: QuoteTagProps) {
+export function QuoteTag({ badge, label = 'cotización' }: QuoteTagProps) {
   if (badge.status === 'loading') {
     return <span className={`${styles.tag} ${styles.muted}`}>cargando cotización...</span>;
   }
@@ -24,7 +26,7 @@ export function QuoteTag({ badge }: QuoteTagProps) {
   const { quote } = badge;
   return (
     <span className={styles.tag}>
-      <span className={styles.label}>cotización</span>
+      <span className={styles.label}>{label}</span>
       <span className={styles.value}>{formatCredits(quote.value)}</span>
       <VariationBadge variation={quote.variation} tone="ink" />
       {quote.score === undefined ? null : <span className={styles.label}>score {formatScore(quote.score)}</span>}

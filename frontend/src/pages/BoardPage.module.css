@@ -29,3 +29,21 @@
   gap: 12px;
   list-style: none;
 }
+
+/* Separa los potenciados del resto de la pizarra */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 14px;
+  color: var(--faint);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.divider::after {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+  content: '';
+}

@@ -100,10 +100,10 @@ describe('PortfolioPage', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('la barra ofrece el enlace al portfolio al usuario común', async () => {
+  it('la barra ofrece el enlace al portfolio (Mi equipo) al usuario común', async () => {
     renderWithRouter({ initialEntries: ['/pizarra'], session: 'valid' });
 
-    expect(await screen.findByRole('link', { name: 'Portfolio' })).toHaveAttribute('href', '/portfolio');
+    expect(await screen.findByRole('link', { name: 'Mi equipo' })).toHaveAttribute('href', '/portfolio');
   });
 
   it('elegir una fecha la escribe en la dirección y muestra el portfolio de ese día', async () => {

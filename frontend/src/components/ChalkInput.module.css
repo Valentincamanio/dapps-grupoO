@@ -20,6 +20,36 @@
   padding: 11px 12px;
 }
 
+/* La contraseña deja lugar a la derecha para el ojo */
+.control {
+  position: relative;
+}
+
+.withToggle {
+  padding-right: 44px;
+}
+
+.toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+
+.toggle:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 .invalid {
   border-color: var(--down);
 }

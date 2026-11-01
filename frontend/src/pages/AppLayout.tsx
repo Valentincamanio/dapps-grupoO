@@ -15,8 +15,10 @@ import {
 import { Board } from '../components/Board';
 import { NavIcon } from '../components/NavIcon';
 import { SidePanel } from '../components/SidePanel';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { TopBar } from '../components/TopBar';
 import { useSession } from '../hooks/useSession';
+import { useTheme } from '../hooks/useTheme';
 import { formatBalance, initialsOf } from '../utils/format';
 import { backLabelOf, topSectionOf, type TopSection } from '../utils/sections';
 import styles from './AppLayout.module.css';
@@ -41,6 +43,7 @@ function currentAttribute(active: TopSection | null, section: TopSection): 'page
 
 export function AppLayout() {
   const { status, profile } = useSession();
+  const { theme, toggle: toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const navigationType = useNavigationType();
@@ -61,6 +64,26 @@ export function AppLayout() {
   const closePanel = useCallback(() => navigate(backTo), [navigate, backTo]);
 
   const active = topSectionOf(page.location.pathname);
+  // Los jugadores no tienen entrada propia: el logo lleva a la pizarra. Sin secciones del rol (un
+  // visitante) no hay barra de secciones
+  let navSlot: ReactNode;
+  if (profile?.role === 'USER') {
+    // El portfolio, las operaciones y las órdenes son de quien opera: solo USER
+    navSlot = (
+      <Link to="/portfolio" aria-current={currentAttribute(active, 'team')}>
+        <NavIcon section="team" />
+        Mi equipo
+      </Link>
+    );
+  } else if (profile?.role === 'ADMIN') {
+    // La entrada a la administración existe solo para ADMIN (FR-064)
+    navSlot = (
+      <Link to="/admin" aria-current={currentAttribute(active, 'admin')}>
+        <NavIcon section="admin" />
+        Administración
+      </Link>
+    );
+  }
   const accountLink =
     status === 'anonymous' ? (
       <Link to="/login" state={{ from: location }} className={styles.enter}>
@@ -77,28 +100,8 @@ export function AppLayout() {
       {/* Con el panel abierto, lo de atrás no recibe el foco ni el teclado */}
       <div {...(background ? { inert: '' } : {})}>
         <TopBar
-          navSlot={
-            <>
-              <Link to="/pizarra" aria-current={currentAttribute(active, 'players')}>
-                <NavIcon section="players" />
-                Jugadores
-              </Link>
-              {/* El portfolio, las operaciones y las órdenes son de quien opera: solo USER */}
-              {profile?.role === 'USER' ? (
-                <Link to="/portfolio" aria-current={currentAttribute(active, 'team')}>
-                  <NavIcon section="team" />
-                  Mi equipo
-                </Link>
-              ) : null}
-              {/* La entrada a la administración existe solo para ADMIN (FR-064) */}
-              {profile?.role === 'ADMIN' ? (
-                <Link to="/admin" aria-current={currentAttribute(active, 'admin')}>
-                  <NavIcon section="admin" />
-                  Administración
-                </Link>
-              ) : null}
-            </>
-          }
+          navSlot={navSlot}
+          themeToggle={<ThemeToggle theme={theme} onToggle={toggleTheme} />}
           balance={profile ? formatBalance(profile.availableBalance) : undefined}
           accountLink={accountLink}
         />

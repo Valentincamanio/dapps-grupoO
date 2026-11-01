@@ -5,6 +5,16 @@
   min-width: 0;
 }
 
+/* Los filtros se desplazan de costado en vez de ocupar varios renglones */
+.filters {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: none;
+}
+
 .detail {
   color: var(--muted);
   font-size: 14px;

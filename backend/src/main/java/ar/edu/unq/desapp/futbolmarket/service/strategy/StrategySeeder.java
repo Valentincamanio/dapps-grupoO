@@ -18,8 +18,9 @@ import lombok.RequiredArgsConstructor;
  * Siembra las estrategias de arranque (research D13), como {@code AdminAccountInitializer}.
  *
  * <p>Corre en todos los perfiles y es idempotente: crea cada estrategia de {@link StartingStrategies}
- * solo si no hay una con ese nombre (sin distinguir mayúsculas ni espacios de los extremos), y no
- * toca las existentes aunque el administrador las haya editado (FR-031, US4.2). La primera que
+ * solo si no hay ni hubo una con ese nombre (sin distinguir mayúsculas ni espacios de los extremos):
+ * una que el administrador eliminó no vuelve. No toca las existentes aunque el administrador las
+ * haya editado (FR-031, US4.2). La primera que
  * entra en un catálogo vacío queda activa, así que en una base nueva la activa es la A; en una base
  * con estrategias el catálogo ya tiene exactamente una activa y la semilla no la cambia.</p>
  *
@@ -39,7 +40,7 @@ public class StrategySeeder implements ApplicationRunner {
         List<String> created = new ArrayList<>();
         List<String> existing = new ArrayList<>();
         for (StartingStrategies.Definition definition : StartingStrategies.all()) {
-            if (catalog.findByName(definition.name()) != null) {
+            if (catalog.knows(definition.name())) {
                 existing.add(definition.name());
                 continue;
             }

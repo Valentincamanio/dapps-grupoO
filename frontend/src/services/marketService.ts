@@ -7,8 +7,8 @@ import type {
   OrderCancellation,
   OrderExecution,
   OrderRequest,
-  PageQuery,
   UserOrderPage,
+  UserOrderQuery,
 } from '../types/market';
 import { request } from './httpClient';
 
@@ -34,7 +34,12 @@ export function cancelOrder(orderId: number): Promise<OrderCancellation> {
   return request<OrderCancellation>('POST', `/orders/${orderId}/cancel`);
 }
 
-// De la más nueva a la más vieja; solo las ve su dueño o el administrador
-export function getUserOrders(userId: number, query: PageQuery = {}, signal?: AbortSignal): Promise<UserOrderPage> {
-  return request<UserOrderPage>('GET', `/users/${userId}/orders`, { query, signal });
+// De la más nueva a la más vieja; solo las ve su dueño o el administrador. Los estados viajan
+// separados por coma (status=PENDING,PARTIAL); sin estados, en cualquiera
+export function getUserOrders(userId: number, query: UserOrderQuery = {}, signal?: AbortSignal): Promise<UserOrderPage> {
+  const { status, ...rest } = query;
+  return request<UserOrderPage>('GET', `/users/${userId}/orders`, {
+    query: { ...rest, status: status && status.length > 0 ? status.join(',') : undefined },
+    signal,
+  });
 }

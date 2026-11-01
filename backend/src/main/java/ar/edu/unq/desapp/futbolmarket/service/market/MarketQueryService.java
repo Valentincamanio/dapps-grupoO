@@ -1,9 +1,12 @@
 package ar.edu.unq.desapp.futbolmarket.service.market;
 
+import java.util.Set;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.market.MarketOrderFilter;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderStatus;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.OrderView;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.TradeFilter;
 import ar.edu.unq.desapp.futbolmarket.modelo.market.TradeView;
@@ -52,5 +55,15 @@ public class MarketQueryService {
     public QuotePage<OrderView> ordersOf(long requesterId, long userId, int page, int size) {
         AccountAccess.accountOf(userRepository, requesterId, userId);
         return orderRepository.findOfOwner(userId, page, size);
+    }
+
+    /**
+     * Igual, solo con las órdenes en alguno de esos estados.
+     */
+    @Transactional(readOnly = true)
+    public QuotePage<OrderView> ordersOf(long requesterId, long userId, Set<OrderStatus> statuses, int page,
+                                         int size) {
+        AccountAccess.accountOf(userRepository, requesterId, userId);
+        return orderRepository.findOfOwner(userId, statuses, page, size);
     }
 }

@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -137,7 +138,18 @@ public class MarketOrderRepository {
      */
     @Transactional(readOnly = true)
     public QuotePage<OrderView> findOfOwner(long ownerId, int page, int size) {
-        Page<MarketOrderSQL> rows = orderDAO.findByOwnerId(ownerId, PageRequest.of(page, size));
+        return findOfOwner(ownerId, Set.of(), page, size);
+    }
+
+    /**
+     * Igual, solo con las órdenes en alguno de esos estados; sin estados, en cualquiera.
+     */
+    @Transactional(readOnly = true)
+    public QuotePage<OrderView> findOfOwner(long ownerId, Set<OrderStatus> statuses, int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size);
+        Page<MarketOrderSQL> rows = statuses.isEmpty()
+                ? orderDAO.findByOwnerId(ownerId, pageable)
+                : orderDAO.findByOwnerIdAndStatusIn(ownerId, statuses.stream().map(OrderStatus::name).toList(), pageable);
         return new QuotePage<>(rows.getContent().stream().map(this::toView).toList(), rows.getNumber(),
                 rows.getSize(), rows.getTotalElements());
     }

@@ -8,17 +8,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,9 +37,11 @@ import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyDetail;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyVersion;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.ValuationMetric;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.WeightSet;
+import ar.edu.unq.desapp.futbolmarket.modelo.strategy.exception.ActiveStrategyDeletionException;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.exception.DuplicateStrategyNameException;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.exception.StrategyNotFoundException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.strategy.StrategyRepository;
+import ar.edu.unq.desapp.futbolmarket.service.quote.QuoteCacheInvalidator;
 
 @ExtendWith(MockitoExtension.class)
 class StrategyServiceTest {
@@ -50,6 +56,13 @@ class StrategyServiceTest {
 
     @Mock
     private StrategyRepository strategyRepository;
+
+    // Los usa solo la baja: el instante con que se renombra y el caché que se vacía después
+    @Mock
+    private QuoteCacheInvalidator cacheInvalidator;
+
+    @Mock
+    private Clock clock;
 
     @InjectMocks
     private StrategyService strategyService;
@@ -151,6 +164,44 @@ class StrategyServiceTest {
         assertThatThrownBy(() -> strategyService.get(MISSING_ID))
                 .isInstanceOf(StrategyNotFoundException.class)
                 .hasMessage("No existe una estrategia con id 99.");
+    }
+
+    @Test
+    void eliminarUnaInactivaGuardaSuBajaRenombradaYVaciaElCache() {
+        when(strategyRepository.findCatalog()).thenReturn(startingCatalog());
+        when(clock.instant()).thenReturn(Instant.parse("2026-11-01T17:35:00Z"));
+
+        strategyService.delete(BALANCED_ID);
+
+        ArgumentCaptor<Strategy> deleted = ArgumentCaptor.forClass(Strategy.class);
+        InOrder order = inOrder(strategyRepository, cacheInvalidator);
+        order.verify(strategyRepository).saveDeletion(deleted.capture());
+        order.verify(cacheInvalidator).invalidateAll();
+        assertThat(deleted.getValue().id()).isEqualTo(BALANCED_ID);
+        assertThat(deleted.getValue().deleted()).isTrue();
+        assertThat(deleted.getValue().name()).isEqualTo(BALANCED_BY_POSITION_NAME + " (eliminada el 01/11/2026 14:35)");
+    }
+
+    @Test
+    void eliminarLaActivaRespondeConflictoSinGuardarNiVaciarElCache() {
+        when(strategyRepository.findCatalog()).thenReturn(startingCatalog());
+
+        assertThatThrownBy(() -> strategyService.delete(MATCH_PERFORMANCE_ID))
+                .isInstanceOf(ActiveStrategyDeletionException.class);
+        verify(strategyRepository, never()).saveDeletion(any(Strategy.class));
+        verify(cacheInvalidator, never()).invalidateAll();
+    }
+
+    @Test
+    void elListadoNoIncluyeLasEliminadas() {
+        when(strategyRepository.findCatalog()).thenReturn(new StrategyCatalog(List.of(
+                strategy(MATCH_PERFORMANCE_ID, MATCH_PERFORMANCE),
+                new Strategy(BALANCED_ID, BALANCED_BY_POSITION_NAME,
+                        strategy(BALANCED_ID, BALANCED_BY_POSITION).versions(), true)), MATCH_PERFORMANCE_ID));
+
+        List<StrategyDetail> strategies = strategyService.list();
+
+        assertThat(strategies).extracting(detail -> detail.strategy().name()).containsExactly(MATCH_PERFORMANCE_NAME);
     }
 
     private static StrategyCatalog startingCatalog() {

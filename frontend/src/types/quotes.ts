@@ -229,6 +229,8 @@ export interface SimulationQuery {
   league?: League;
   team?: string;
   position?: Position;
+  // Solo ese jugador; su simulada no cambia
+  playerId?: number;
   page?: number;
   size?: number;
 }
@@ -262,4 +264,36 @@ export interface WeightsFormState {
   defaultWeights: WeightsText;
   // Solo las posiciones con juego propio
   positionWeights: Partial<Record<Position, WeightsText>>;
+}
+
+// Potenciados (GET /players/boosts/current, GET y PUT /quotes/boosts). Una semana cerrada queda
+// como registro; la en curso y las próximas se pueden cambiar
+export const BOOST_WEEK_STATUSES = ['CLOSED', 'CURRENT', 'UPCOMING'] as const;
+export type BoostWeekStatus = (typeof BOOST_WEEK_STATUSES)[number];
+
+export interface BoostedPlayer {
+  playerId: number;
+  name: string;
+  position: Position;
+  team: string;
+  league: League;
+  teamCrest?: string | null;
+  // 300 es ×3: en el cierre de la semana su factor de escala se multiplica por eso
+  percent: number;
+}
+
+export interface BoostedWeek {
+  // Lunes y domingo de la semana, AAAA-MM-DD en hora de Argentina
+  weekStart: string;
+  weekEnd: string;
+  // Instante ISO 8601 del cierre (el lunes 00:00 siguiente)
+  endsAt: string;
+  status: BoostWeekStatus;
+  // En el orden en que se eligieron; vacía si la semana no tiene potenciados
+  players: BoostedPlayer[];
+}
+
+export interface BoostInput {
+  playerId: number;
+  percent: number;
 }

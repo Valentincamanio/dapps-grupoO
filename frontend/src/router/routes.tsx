@@ -1,5 +1,7 @@
 // Rutas de la app; cada historia agrega las suyas como hijas del layout.
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
+import { AdminAuditPage } from '../pages/AdminAuditPage';
+import { AdminBoostsPage } from '../pages/AdminBoostsPage';
 import { AdminRecalculationPage } from '../pages/AdminRecalculationPage';
 import { AdminSimulationPage } from '../pages/AdminSimulationPage';
 import { AdminStrategiesPage } from '../pages/AdminStrategiesPage';
@@ -87,6 +89,22 @@ export const appRoutes: RouteObject[] = [
         element: (
           <RequireRole>
             <AdminSimulationPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: 'admin/potenciados',
+        element: (
+          <RequireRole>
+            <AdminBoostsPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: 'admin/auditoria',
+        element: (
+          <RequireRole>
+            <AdminAuditPage />
           </RequireRole>
         ),
       },

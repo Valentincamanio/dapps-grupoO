@@ -13,6 +13,7 @@ import type {
   Balances,
   MarketOrderPage,
   OrderSide,
+  OrderStatus,
   OwnerType,
   Portfolio,
   QuoteUsed,
@@ -21,7 +22,7 @@ import type {
   UserOrder,
   UserOrderPage,
 } from '../../src/types/market';
-import { ORDER_SIDES, OWNER_TYPES } from '../../src/types/market';
+import { ORDER_SIDES, ORDER_STATUSES, OWNER_TYPES } from '../../src/types/market';
 import {
   CURRENT_PORTFOLIO,
   currentQuoteUsed,
@@ -464,11 +465,16 @@ export function createMarketHandlers(accounts: MarketAccounts) {
       const userId = accountAccess(request, raw, path);
       if (userId instanceof Response) return userId;
 
-      const sheet = paging(new URL(request.url).searchParams);
+      const search = new URL(request.url).searchParams;
+      const sheet = paging(search);
       if (sheet === null) return badRequest(path);
+      // Los estados llegan separados por coma o repetidos; sin estados, en cualquiera
+      const statuses = search.getAll('status').flatMap((value) => value.split(','));
+      if (!statuses.every((value) => ORDER_STATUSES.includes(value as OrderStatus))) return badRequest(path);
       const own = orders
         .filter(({ ownerId }) => ownerId === userId)
         .map(({ order }) => order)
+        .filter((order) => statuses.length === 0 || statuses.includes(order.status))
         .sort((a, b) => byCreation(b, a));
       const body: UserOrderPage = sheetOf(own, sheet);
       return HttpResponse.json(body);

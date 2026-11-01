@@ -7,7 +7,8 @@ import { renderWithRouter } from '../mocks/renderWithRouter';
 import { server } from '../mocks/server';
 
 const USER_PATHS = ['/portfolio', '/operaciones', '/ordenes'];
-const USER_LINKS = ['Portfolio', 'Operaciones', 'Mis órdenes'];
+// El portfolio, las órdenes y las operaciones son las pestañas de "Mi equipo", el enlace de la barra
+const USER_LINKS = ['Mi equipo'];
 
 function expectLinks(present: string[], absent: string[]) {
   present.forEach((name) => expect(screen.getByRole('link', { name })).toBeInTheDocument());
@@ -41,13 +42,11 @@ describe('acceso a las pantallas del mercado', () => {
     expect(screen.getByRole('link', { name: 'Mercado' })).toHaveAttribute('href', '/mercado');
   });
 
-  it('un usuario común tiene Mercado, Portfolio, Operaciones y Mis órdenes, sin Administración', async () => {
+  it('un usuario común tiene Mercado y Mi equipo, sin Administración', async () => {
     renderWithRouter({ initialEntries: ['/ranking'], session: 'valid' });
 
-    expect(await screen.findByRole('link', { name: 'Portfolio' })).toHaveAttribute('href', '/portfolio');
+    expect(await screen.findByRole('link', { name: 'Mi equipo' })).toHaveAttribute('href', '/portfolio');
     expectLinks(['Mercado', ...USER_LINKS], ['Administración']);
-    expect(screen.getByRole('link', { name: 'Operaciones' })).toHaveAttribute('href', '/operaciones');
-    expect(screen.getByRole('link', { name: 'Mis órdenes' })).toHaveAttribute('href', '/ordenes');
   });
 
   it('el administrador tiene Mercado y Administración, sin los enlaces de usuario', async () => {

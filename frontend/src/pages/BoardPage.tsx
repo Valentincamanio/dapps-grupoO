@@ -1,5 +1,7 @@
-// Jugadores: hojas de tarjetas con los jugadores del catálogo, con el buscador y los filtros.
+// Jugadores: arriba, los potenciados de la semana (si el administrador eligió alguno); después, hojas
+// de tarjetas con los jugadores del catálogo, con el buscador y los filtros.
 import { Link, useLocation, useNavigate } from 'react-router';
+import { BoostedSection } from '../components/BoostedSection';
 import { ChalkNote } from '../components/ChalkNote';
 import { ChalkText } from '../components/ChalkText';
 import { Pager } from '../components/Pager';
@@ -11,18 +13,52 @@ import { TapeTab } from '../components/TapeTab';
 import { TeamSelect } from '../components/TeamSelect';
 import { useBoardFilters } from '../hooks/useBoardFilters';
 import { useCatalog } from '../hooks/useCatalog';
+import { useCountdown } from '../hooks/useCountdown';
+import { useCurrentBoosts } from '../hooks/useCurrentBoosts';
 import { useCurrentQuotes } from '../hooks/useCurrentQuotes';
 import { usePlayers } from '../hooks/usePlayers';
 import { LEAGUES } from '../types/api';
+import type { BoostedWeek } from '../types/quotes';
 import { describeEmptyCombination } from '../utils/filters';
 import { leagueLabel, positionToZone, zoneToPosition } from '../utils/positions';
 import { PLAYER_SECTIONS } from '../utils/sections';
 import { deriveTeams } from '../utils/teams';
 import styles from './BoardPage.module.css';
 
+// Las tarjetas doradas de la semana, con su propia consulta de cotizaciones y la cuenta regresiva
+function BoostedBoard({ week, boardSearch }: { week: BoostedWeek; boardSearch: string }) {
+  const quotes = useCurrentQuotes(week.players.map((player) => player.playerId));
+  const countdown = useCountdown(week.endsAt);
+  return (
+    <BoostedSection week={week} countdown={countdown}>
+      {week.players.map((boosted) => (
+        <li key={boosted.playerId}>
+          <PostIt
+            player={{
+              id: boosted.playerId,
+              name: boosted.name,
+              position: boosted.position,
+              team: boosted.team,
+              league: boosted.league,
+            }}
+            href={`/jugadores/${boosted.playerId}`}
+            LinkComponent={Link}
+            linkState={{ boardSearch }}
+            quote={quotes.badgeFor(boosted.playerId)}
+            boostPercent={boosted.percent}
+          />
+        </li>
+      ))}
+    </BoostedSection>
+  );
+}
+
 export function BoardPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  // Sin potenciados, o si no se pudieron leer, la pizarra se ve como siempre
+  const boosts = useCurrentBoosts();
+  const boostedWeek = boosts.week && boosts.week.players.length > 0 ? boosts.week : null;
   const { filters, setPage, setPosition, setLeague, setTeam, clear } = useBoardFilters();
   const catalog = useCatalog();
   const { status, sheet, retry } = usePlayers(filters);
@@ -109,6 +145,12 @@ export function BoardPage() {
         current="/pizarra"
         LinkComponent={Link}
       />
+      {boostedWeek ? (
+        <>
+          <BoostedBoard week={boostedWeek} boardSearch={location.search} />
+          <p className={styles.divider}>Todos los jugadores</p>
+        </>
+      ) : null}
       <div className={styles.filters}>
         <SearchBox
           players={catalog.players}

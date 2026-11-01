@@ -1,6 +1,7 @@
-/* Variables de diseño, tomadas de mockups/nuevo-flujo.html. El modo oscuro sigue al sistema. */
+/* Variables de diseño, tomadas de mockups/nuevo-flujo.html. El modo oscuro sigue al sistema, salvo
+   que la persona elija un tema con el botón de la barra: entonces <html> lleva data-theme. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* Superficies */
   --bg: #f4f6f4;
@@ -28,6 +29,15 @@
   --warn: #8a5c00;
   --warn-soft: #fff4d6;
 
+  /* Potenciados: el dorado que los distingue del resto */
+  --gold: #a87412;
+  --gold-1: #f3d27a;
+  --gold-2: #c8922a;
+  --gold-3: #8f6413;
+  --gold-soft: #fff6dc;
+  --gold-ink: #3a2804;
+  --gold-glow: rgba(200, 146, 42, 0.28);
+
   /* Sombras */
   --shadow: 0 1px 2px rgba(15, 26, 20, 0.05), 0 4px 16px rgba(15, 26, 20, 0.06);
   --shadow-lg: 0 20px 60px rgba(15, 26, 20, 0.22);
@@ -41,8 +51,10 @@
   --font-display: 'Bricolage Grotesque', 'Inter', system-ui, sans-serif;
 }
 
+/* El oscuro se repite: una vez para el sistema (si no se eligió el claro) y otra para la elección */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
     --bg: #0c1210;
     --surface: #141c18;
     --surface-2: #1b2520;
@@ -61,7 +73,45 @@
     --down-soft: #3a1c19;
     --warn: #f2c14e;
     --warn-soft: #352b12;
+    --gold: #f0c45a;
+    --gold-1: #ffe08a;
+    --gold-2: #d9a23a;
+    --gold-3: #9c6b14;
+    --gold-soft: #2c2410;
+    --gold-ink: #241703;
+    --gold-glow: rgba(240, 196, 90, 0.22);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
     --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
   }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0c1210;
+  --surface: #141c18;
+  --surface-2: #1b2520;
+  --surface-3: #24302a;
+  --line: #24302a;
+  --text: #e9f0ec;
+  --muted: #9aa9a1;
+  --faint: #6d7c74;
+  --accent: #3cc983;
+  --accent-hover: #5bd897;
+  --accent-ink: #06130c;
+  --accent-soft: #173426;
+  --up: #45d48c;
+  --up-soft: #163024;
+  --down: #ff7a6e;
+  --down-soft: #3a1c19;
+  --warn: #f2c14e;
+  --warn-soft: #352b12;
+  --gold: #f0c45a;
+  --gold-1: #ffe08a;
+  --gold-2: #d9a23a;
+  --gold-3: #9c6b14;
+  --gold-soft: #2c2410;
+  --gold-ink: #241703;
+  --gold-glow: rgba(240, 196, 90, 0.22);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
 }

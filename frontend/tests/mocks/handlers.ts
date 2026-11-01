@@ -2,10 +2,13 @@
 import { http, HttpResponse } from 'msw';
 import type { ApiError, League, Player, PlayerPage, Position, Profile, Role } from '../../src/types/api';
 import { LEAGUES, POSITIONS } from '../../src/types/api';
+import { auditHandlers } from './auditHandlers';
+import { boostHandlers, resetBoostMock } from './boostHandlers';
 import { SEED_RESERVED_BALANCE } from './market';
 import { createMarketHandlers, resetMarketMock } from './marketHandlers';
 import { PLAYERS } from './players';
 import { quoteHandlers } from './quoteHandlers';
+import { syncHandlers } from './syncHandlers';
 
 interface MockUser {
   id: number;
@@ -57,6 +60,7 @@ export function resetMockDb(): void {
   ];
   tokens = new Map([[SEED_TOKEN, 1]]);
   resetMarketMock();
+  resetBoostMock();
 }
 
 resetMockDb();
@@ -277,4 +281,4 @@ const marketHandlers = createMarketHandlers({
   exists: (userId) => users.some((user) => user.id === userId),
 });
 
-export const handlers = [...quoteHandlers, ...marketHandlers, ...playerHandlers, ...authHandlers];
+export const handlers = [...boostHandlers, ...syncHandlers, ...auditHandlers, ...quoteHandlers, ...marketHandlers, ...playerHandlers, ...authHandlers];

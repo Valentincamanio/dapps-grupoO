@@ -187,6 +187,11 @@ export interface PageQuery {
   size?: number;
 }
 
+// GET /users/{id}/orders: sin estados, en cualquiera; con estados, solo las que están en alguno
+export interface UserOrderQuery extends PageQuery {
+  status?: OrderStatus[];
+}
+
 // Tipos propios de la interfaz (data-model §10)
 
 // Filtros de /mercado en la dirección; null = sin filtro

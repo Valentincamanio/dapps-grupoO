@@ -13,9 +13,14 @@
   font-size: 18px;
 }
 
+/* Origen, estrategia y horario van separados, y bajan de renglón si no entran */
 .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   color: var(--muted);
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .interrupted {

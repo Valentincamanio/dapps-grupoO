@@ -15,6 +15,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyVersion;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.match.MatchRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.performance.PlayerMatchStatsRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.quote.BoostRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.quote.QuoteRepository;
 import lombok.RequiredArgsConstructor;
 
@@ -22,6 +23,9 @@ import lombok.RequiredArgsConstructor;
  * Escribe una semana de cotizaciones en una transacción: se guarda completa o no queda nada
  * (FR-012, SC-016). Qué cotizaciones nacen lo decide {@link WeeklyQuotation}; acá solo se lee y se
  * guarda.
+ *
+ * <p>La calculada de una semana usa los potenciados de esa semana; la recotizada, los de la semana en
+ * curso al recotizar, que son los que se ven en el inicio.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -31,13 +35,15 @@ public class QuoteWeekWriter {
     private final PlayerMatchStatsRepository statsRepository;
     private final QuoteRepository quoteRepository;
     private final MatchRepository matchRepository;
+    private final BoostRepository boostRepository;
 
     @Transactional
     public WeekResult quoteWeek(QuoteWeek week, StrategyVersion strategy) {
         var activePlayers = playerRepository.findAllActive();
         var weekStats = statsRepository.findAllByMatchBetween(week.start(), week.end());
         var lastBeforeWeek = quoteRepository.findLastBeforeWeek(week);
-        var quotes = WeeklyQuotation.quoteWeek(week, strategy, activePlayers, weekStats, lastBeforeWeek);
+        var quotes = WeeklyQuotation.quoteWeek(week, strategy, activePlayers, weekStats, lastBeforeWeek,
+                boostRepository.findWeek(week));
         return WeekResult.of(week, quoteRepository.saveAll(quotes));
     }
 
@@ -51,7 +57,8 @@ public class QuoteWeekWriter {
      *     {@link QuotingPlan}, como cualquier recálculo.</li>
      *     <li>Si la última semana cerrada tiene cotizaciones, suma las recotizadas de los jugadores
      *     que no la tienen cotizada con esa versión. Si sigue pendiente, queda en el informe con su
-     *     motivo y no hay nada que recotizar.</li>
+     *     motivo y no hay nada que recotizar. Los potenciados que rigen son los de la semana en
+     *     curso.</li>
      * </ol>
      */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -69,7 +76,8 @@ public class QuoteWeekWriter {
         }
         var requoted = WeeklyQuotation.requoteWeek(lastClosed, strategy, playerRepository.findAllActive(),
                 statsRepository.findAllByMatchBetween(lastClosed.start(), lastClosed.end()),
-                quoteRepository.findLastBeforeWeek(lastClosed), latestOfWeek, now);
+                quoteRepository.findLastBeforeWeek(lastClosed), latestOfWeek, now,
+                boostRepository.findWeek(QuoteWeek.containing(now)));
         if (!requoted.isEmpty()) {
             report.quotedWeek(WeekResult.of(lastClosed, quoteRepository.saveAll(requoted)));
         }

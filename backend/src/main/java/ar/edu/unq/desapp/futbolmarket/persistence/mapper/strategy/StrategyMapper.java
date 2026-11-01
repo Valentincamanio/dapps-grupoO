@@ -64,12 +64,16 @@ public class StrategyMapper {
         return row;
     }
 
+    /**
+     * La baja está en la fila de la versión 1, que es la raíz.
+     */
     private Strategy toStrategy(Long strategyId, List<StrategySQL> rows) {
-        List<StrategyVersion> versions = rows.stream()
+        List<StrategySQL> sorted = rows.stream()
                 .sorted(Comparator.comparingInt(StrategySQL::getVersionNumber))
-                .map(this::toVersion)
                 .toList();
-        return new Strategy(strategyId, versions.getFirst().name(), versions);
+        List<StrategyVersion> versions = sorted.stream().map(this::toVersion).toList();
+        StrategySQL root = sorted.getFirst();
+        return new Strategy(strategyId, versions.getFirst().name(), versions, root.isDeleted(), root.getOriginalName());
     }
 
     private static WeightSet toWeightSet(Map<String, BigDecimal> weights) {

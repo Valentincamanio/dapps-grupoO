@@ -14,6 +14,8 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   // Mientras se espera la respuesta no se puede confirmar de nuevo ni cancelar
   busy?: boolean;
+  // Una acción delicada, como eliminar: el botón de confirmar se ve en rojo
+  danger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -24,6 +26,7 @@ export function ConfirmDialog({
   confirmLabel = 'Confirmar',
   cancelLabel = 'Cancelar',
   busy = false,
+  danger = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -85,7 +88,7 @@ export function ConfirmDialog({
         </h2>
         {children ? <div className={styles.body}>{children}</div> : null}
         <div className={styles.actions}>
-          <ChalkButton data-confirm busy={busy} onClick={onConfirm}>
+          <ChalkButton data-confirm busy={busy} className={danger ? styles.danger : undefined} onClick={onConfirm}>
             {confirmLabel}
           </ChalkButton>
           <ChalkButton disabled={busy} onClick={onCancel}>

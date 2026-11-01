@@ -1,6 +1,6 @@
 // Simulación (FR-067): calcula sin guardar nada cómo quedarían las cotizaciones con una estrategia
 // guardada o con parámetros cargados acá, y las compara con las actuales, con los filtros de liga,
-// equipo y posición y la paginación del catálogo.
+// equipo y posición, un buscador para ver un solo jugador y la paginación del catálogo.
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { AdminNav } from '../components/AdminNav';
@@ -9,6 +9,7 @@ import { ChalkNote } from '../components/ChalkNote';
 import { ChalkText } from '../components/ChalkText';
 import { Pager } from '../components/Pager';
 import { ParametersFields } from '../components/ParametersFields';
+import { SearchBox } from '../components/SearchBox';
 import { SimulationTable } from '../components/SimulationTable';
 import { TapeTab } from '../components/TapeTab';
 import { TeamSelect } from '../components/TeamSelect';
@@ -214,6 +215,27 @@ export function AdminSimulationPage() {
       </form>
 
       <div className={styles.filters}>
+        {/* Un jugador buscado acota la hoja a él solo; su simulada es la misma que en la lista */}
+        <div className={styles.search}>
+          {simulation.player ? (
+            <p className={styles.chosen}>
+              <span>
+                solo <b>{simulation.player.name}</b>
+              </span>
+              <button type="button" className={styles.clear} onClick={() => simulation.setPlayer(null)}>
+                ver todos
+              </button>
+            </p>
+          ) : (
+            <SearchBox
+              players={catalog.players}
+              status={catalog.status}
+              onFocus={() => void catalog.ensureLoaded()}
+              onRetry={() => void catalog.retry()}
+              onSelect={simulation.setPlayer}
+            />
+          )}
+        </div>
         <div className={styles.tabs} role="group" aria-label="filtrar por liga">
           <TapeTab
             label="todas"

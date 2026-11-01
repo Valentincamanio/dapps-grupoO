@@ -45,7 +45,7 @@ afterEach(() => server.events.removeAllListeners());
 
 describe('MyOrdersPage', () => {
   it('muestra las órdenes de la más nueva a la más vieja con su estado y sus cantidades', async () => {
-    renderMyOrders();
+    renderMyOrders('/ordenes?estado=todas');
 
     expect(await screen.findByRole('heading', { name: 'Mis órdenes' })).toBeInTheDocument();
     const [cancelled, pending, partial, executed, ...older] = await rows();
@@ -69,7 +69,7 @@ describe('MyOrdersPage', () => {
 
   it('cancelar pide confirmación y nada se envía antes de confirmar', async () => {
     const posted = trackCancellations();
-    const { user } = renderMyOrders();
+    const { user } = renderMyOrders('/ordenes?estado=todas');
     await rows();
 
     await user.click(screen.getByRole('button', { name: CANCEL_PARTIAL }));
@@ -88,7 +88,7 @@ describe('MyOrdersPage', () => {
 
   it('después de cancelar la orden queda cancelada y cambia el saldo libre de la barra', async () => {
     const posted = trackCancellations();
-    const { user } = renderMyOrders();
+    const { user } = renderMyOrders('/ordenes?estado=todas');
     await rows();
     await waitFor(() => expect(balanceInBar()).toHaveTextContent(formatBalance(SEED_BALANCE - SEED_RESERVED_BALANCE)));
 
@@ -120,7 +120,7 @@ describe('MyOrdersPage', () => {
         { once: true },
       ),
     );
-    const { user } = renderMyOrders();
+    const { user } = renderMyOrders('/ordenes?estado=todas');
     await rows();
 
     await user.click(screen.getByRole('button', { name: CANCEL_PARTIAL }));
@@ -141,7 +141,7 @@ describe('MyOrdersPage', () => {
 
   it('si el servidor falla avisa, y reintentar trae las órdenes', async () => {
     server.use(http.get(ORDERS_PATH, () => HttpResponse.error(), { once: true }));
-    const { user } = renderMyOrders();
+    const { user } = renderMyOrders('/ordenes?estado=todas');
 
     expect(await screen.findByText('no se pudieron cargar tus órdenes')).toBeInTheDocument();
 

@@ -55,3 +55,8 @@
   flex-direction: column;
   gap: 10px;
 }
+
+.warning {
+  color: var(--muted);
+  font-size: 14px;
+}

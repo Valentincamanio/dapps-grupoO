@@ -43,6 +43,17 @@ public final class WeeklyQuotation {
      */
     public static List<Quote> quoteWeek(QuoteWeek week, StrategyVersion strategy, List<Player> activePlayers,
                                         List<PlayerMatchStats> weekStats, Map<Long, Quote> lastBeforeWeek) {
+        return quoteWeek(week, strategy, activePlayers, weekStats, lastBeforeWeek, WeekBoosts.none(week));
+    }
+
+    /**
+     * Igual que sin potenciados, pero el factor de escala de cada potenciado de la semana se
+     * multiplica por su porcentaje. El score no cambia: los pares se comparan como siempre.
+     */
+    public static List<Quote> quoteWeek(QuoteWeek week, StrategyVersion strategy, List<Player> activePlayers,
+                                        List<PlayerMatchStats> weekStats, Map<Long, Quote> lastBeforeWeek,
+                                        WeekBoosts boosts) {
+        requireSameWeek(week, boosts);
         var quotes = new ArrayList<Quote>();
         weekScores(week, strategy, activePlayers, weekStats).forEach((playerId, score) -> {
             var previous = lastBeforeWeek.get(playerId);
@@ -50,8 +61,9 @@ public final class WeeklyQuotation {
                 quotes.add(initial(playerId, week, strategy));
             }
             var baseValue = previous == null ? Quote.INITIAL_VALUE : previous.value();
-            quotes.add(new Quote(null, playerId, week, week.end(), strategy.valueFor(baseValue, score), baseValue,
-                    score, QuoteType.CALCULATED, strategy.ref()));
+            var value = strategy.valueFor(baseValue, score, boosts.multiplierFor(playerId));
+            quotes.add(new Quote(null, playerId, week, week.end(), value, baseValue, score, QuoteType.CALCULATED,
+                    strategy.ref()));
         });
         return List.copyOf(quotes);
     }
@@ -73,9 +85,25 @@ public final class WeeklyQuotation {
     public static List<Quote> requoteWeek(QuoteWeek week, StrategyVersion strategy, List<Player> activePlayers,
                                           List<PlayerMatchStats> weekStats, Map<Long, Quote> lastBeforeWeek,
                                           Map<Long, Quote> latestOfWeek, Instant now) {
+        return requoteWeek(week, strategy, activePlayers, weekStats, lastBeforeWeek, latestOfWeek, now,
+                WeekBoosts.none(QuoteWeek.containing(now)));
+    }
+
+    /**
+     * Igual que sin potenciados, pero con los de la semana en curso al recotizar ({@code now}), no
+     * con los de la semana recotizada: mientras un jugador está potenciado, cualquier recotización
+     * lleva su factor de escala multiplicado. Al cerrar su semana se le aplica una vez más, en la
+     * calculada, y después rigen los potenciados de la semana siguiente.
+     *
+     * @param currentBoosts los potenciados de la semana que contiene a {@code now}.
+     */
+    public static List<Quote> requoteWeek(QuoteWeek week, StrategyVersion strategy, List<Player> activePlayers,
+                                          List<PlayerMatchStats> weekStats, Map<Long, Quote> lastBeforeWeek,
+                                          Map<Long, Quote> latestOfWeek, Instant now, WeekBoosts currentBoosts) {
         if (!week.isClosedAt(now)) {
             throw new QuoteInvariantException("Solo se recotiza una semana cerrada y " + week + " no lo está.");
         }
+        requireSameWeek(QuoteWeek.containing(now), currentBoosts);
         var quotes = new ArrayList<Quote>();
         weekScores(week, strategy, activePlayers, weekStats).forEach((playerId, score) -> {
             var latest = latestOfWeek.get(playerId);
@@ -84,10 +112,18 @@ public final class WeeklyQuotation {
             }
             var previous = lastBeforeWeek.get(playerId);
             var baseValue = previous == null ? Quote.INITIAL_VALUE : previous.value();
-            quotes.add(new Quote(null, playerId, week, now, strategy.valueFor(baseValue, score), baseValue, score,
-                    QuoteType.REQUOTED, strategy.ref()));
+            var value = strategy.valueFor(baseValue, score, currentBoosts.multiplierFor(playerId));
+            quotes.add(new Quote(null, playerId, week, now, value, baseValue, score, QuoteType.REQUOTED,
+                    strategy.ref()));
         });
         return List.copyOf(quotes);
+    }
+
+    private static void requireSameWeek(QuoteWeek week, WeekBoosts boosts) {
+        if (!week.equals(boosts.week())) {
+            throw new QuoteInvariantException("Los potenciados son de " + boosts.week() + " y se esperaban los de "
+                    + week + ".");
+        }
     }
 
     /**
