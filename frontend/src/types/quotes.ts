@@ -1,6 +1,7 @@
 // Tipos de la API de cotizaciones copiados del contrato
-// specs/007-cotizacion-estrategias/contracts/quotes-api.yaml (parte de lectura).
-// No se agregan campos que el backend no devuelve: ninguna respuesta trae score ni estadísticas.
+// specs/007-cotizacion-estrategias/contracts/quotes-api.yaml (parte de lectura), versión 1.1.0.
+// No se agregan campos que el backend no devuelve: desde la 008 cada cotización trae su score, y
+// ninguna respuesta trae estadísticas.
 import type { League, PlayerPage, Position } from './api';
 
 export const QUOTE_TYPES = ['INITIAL', 'CALCULATED', 'REQUOTED'] as const;
@@ -35,6 +36,9 @@ export interface Quote {
   validFrom: string;
   type: QuoteType;
   strategy: StrategyRef;
+  // De -1 a +1, seis decimales. La API lo envía siempre; es opcional para los objetos que arman
+  // los tests de la 007 sin él (research D27 de la 008)
+  score?: number;
 }
 
 export interface PlayerQuote extends Quote {
@@ -225,6 +229,8 @@ export interface SimulationQuery {
   league?: League;
   team?: string;
   position?: Position;
+  // Solo ese jugador; su simulada no cambia
+  playerId?: number;
   page?: number;
   size?: number;
 }
@@ -258,4 +264,36 @@ export interface WeightsFormState {
   defaultWeights: WeightsText;
   // Solo las posiciones con juego propio
   positionWeights: Partial<Record<Position, WeightsText>>;
+}
+
+// Potenciados (GET /players/boosts/current, GET y PUT /quotes/boosts). Una semana cerrada queda
+// como registro; la en curso y las próximas se pueden cambiar
+export const BOOST_WEEK_STATUSES = ['CLOSED', 'CURRENT', 'UPCOMING'] as const;
+export type BoostWeekStatus = (typeof BOOST_WEEK_STATUSES)[number];
+
+export interface BoostedPlayer {
+  playerId: number;
+  name: string;
+  position: Position;
+  team: string;
+  league: League;
+  teamCrest?: string | null;
+  // 300 es ×3: en el cierre de la semana su factor de escala se multiplica por eso
+  percent: number;
+}
+
+export interface BoostedWeek {
+  // Lunes y domingo de la semana, AAAA-MM-DD en hora de Argentina
+  weekStart: string;
+  weekEnd: string;
+  // Instante ISO 8601 del cierre (el lunes 00:00 siguiente)
+  endsAt: string;
+  status: BoostWeekStatus;
+  // En el orden en que se eligieron; vacía si la semana no tiene potenciados
+  players: BoostedPlayer[];
+}
+
+export interface BoostInput {
+  playerId: number;
+  percent: number;
 }

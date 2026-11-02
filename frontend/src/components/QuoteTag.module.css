@@ -1,26 +1,34 @@
 .tag {
   display: flex;
   flex-wrap: wrap;
+  grid-column: 1 / -1;
   align-items: baseline;
   gap: 2px 8px;
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--ink-soft);
-  font-family: var(--font-hand);
-  font-size: 16px;
-  color: var(--ink);
-}
-
-.muted {
-  color: var(--ink-soft);
-  font-style: italic;
-}
-
-.label {
-  color: var(--ink-soft);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
 }
 
 .value {
-  font-family: var(--font-marker);
-  font-size: 18px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.label:first-child {
+  flex-basis: 100%;
+}
+
+.label:last-child {
+  margin-left: auto;
+}
+
+.muted {
+  color: var(--faint);
+  font-size: 13px;
 }

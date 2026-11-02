@@ -1,0 +1,82 @@
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+.type {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.ORDER_CREATED {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.TRADE_EXECUTED {
+  background: var(--up-soft);
+  color: var(--up);
+}
+
+.ORDER_CANCELLED {
+  background: var(--down-soft);
+  color: var(--down);
+}
+
+.when,
+.actor {
+  color: var(--muted);
+}
+
+.id {
+  margin-left: auto;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.what {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.player {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.muted,
+.detail {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.parties {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

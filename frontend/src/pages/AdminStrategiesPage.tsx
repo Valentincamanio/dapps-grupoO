@@ -1,20 +1,22 @@
 // Administración de estrategias (FR-065): la lista con sus versiones y la activa, el alta, la
-// edición (versión nueva) y la activación eligiendo cuándo recotizar. Un rechazo, también un 409
-// por un recálculo o una sincronización en curso, muestra el motivo sin cerrar lo que se estaba
-// haciendo: el formulario conserva lo escrito y la activación, la opción elegida.
+// edición (versión nueva), la activación eligiendo cuándo recotizar y la baja, con una advertencia
+// que hay que confirmar. Un rechazo, también un 409 por un recálculo o una sincronización en curso,
+// muestra el motivo sin cerrar lo que se estaba haciendo: el formulario conserva lo escrito, la
+// activación, la opción elegida, y la baja, su advertencia.
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { AdminNav } from '../components/AdminNav';
 import { ChalkButton } from '../components/ChalkButton';
 import { ChalkNote } from '../components/ChalkNote';
 import { ChalkText } from '../components/ChalkText';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ReportView } from '../components/ReportView';
 import { DEFAULT_REQUOTE, RequoteChoice } from '../components/RequoteChoice';
 import { StrategyForm, type StrategyFormValues } from '../components/StrategyForm';
 import { StrategyList } from '../components/StrategyList';
 import { useMutation } from '../hooks/useMutation';
 import { useStrategies } from '../hooks/useStrategies';
-import { activateStrategy, createStrategy, createVersion } from '../services/strategyService';
+import { activateStrategy, createStrategy, createVersion, deleteStrategy } from '../services/strategyService';
 import type { RecalculationReport, RequoteTiming, StrategyDto, StrategyInput } from '../types/quotes';
 import styles from './AdminStrategiesPage.module.css';
 
@@ -61,6 +63,13 @@ export function AdminStrategiesPage() {
   const create = useMutation(({ name, input }: CreateArgs) => createStrategy(name, input));
   const edit = useMutation(({ id, input, requote }: VersionArgs) => createVersion(id, input, requote));
   const activate = useMutation(({ id, requote }: ActivateArgs) => activateStrategy(id, requote));
+  // La baja responde 204 sin cuerpo: true distingue el éxito del undefined de un fallo
+  const remove = useMutation(async (id: number) => {
+    await deleteStrategy(id);
+    return true;
+  });
+  // La estrategia cuya baja se está confirmando
+  const [deleting, setDeleting] = useState<StrategyDto | null>(null);
 
   // Al abrir o cerrar un panel el foco va a su título, así el teclado sigue desde ahí
   // (al cargar la página no se mueve)
@@ -115,6 +124,19 @@ export function AdminStrategiesPage() {
     });
   }
 
+  function askDelete(strategy: StrategyDto) {
+    remove.reset();
+    setDeleting(strategy);
+  }
+
+  // Si falla, la advertencia sigue abierta con el motivo
+  async function confirmDelete(strategy: StrategyDto) {
+    const deleted = await remove.run(strategy.id);
+    if (!deleted) return;
+    setDeleting(null);
+    finish({ message: `se eliminó la estrategia ${strategy.name}`, report: null });
+  }
+
   function renderList() {
     if (status === 'loading' || status === 'idle') return <ChalkNote variant="loading" />;
     if (status === 'error' || !strategies) {
@@ -130,6 +152,7 @@ export function AdminStrategiesPage() {
         strategies={strategies}
         onEdit={(strategy) => open({ kind: 'edit', strategy })}
         onActivate={(strategy) => open({ kind: 'activate', strategy })}
+        onDelete={askDelete}
       />
     );
   }
@@ -226,6 +249,24 @@ export function AdminStrategiesPage() {
       ) : (
         renderPanel()
       )}
+      {deleting ? (
+        <ConfirmDialog
+          title={`¿Eliminar ${deleting.name}?`}
+          confirmLabel="Eliminar"
+          cancelLabel="Volver"
+          danger
+          busy={remove.status === 'running'}
+          onConfirm={() => void confirmDelete(deleting)}
+          onCancel={() => setDeleting(null)}
+        >
+          <p className={styles.warning}>
+            Deja de aparecer en la lista y ya no se puede editar, activar ni simular. Las cotizaciones que
+            calculó se conservan, y en su historial figura como «{deleting.name} (eliminada el …)». El nombre
+            queda libre para una estrategia nueva. No se puede deshacer.
+          </p>
+          {remove.error ? <ChalkNote variant="error">{remove.error.message}</ChalkNote> : null}
+        </ConfirmDialog>
+      ) : null}
     </section>
   );
 }

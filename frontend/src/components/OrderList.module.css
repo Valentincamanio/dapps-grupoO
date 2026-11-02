@@ -1,0 +1,117 @@
+.table .link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.table .link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.player {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+}
+
+.status::first-letter {
+  text-transform: uppercase;
+}
+
+.buy,
+.sell {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.buy::first-letter,
+.sell::first-letter {
+  text-transform: uppercase;
+}
+
+.buy {
+  background: var(--up-soft);
+  color: var(--up);
+}
+
+.sell {
+  background: var(--down-soft);
+  color: var(--down);
+}
+
+/* En las propias, el dueño es siempre el usuario y lo cancelado ya lo dice el estado */
+.own th:nth-child(3),
+.own td:nth-child(3),
+.own td[data-label='Cancelada'] {
+  display: none;
+}
+
+.own thead th:nth-child(7) {
+  display: none;
+}
+
+/* A 360 px, lo que falta para saber en qué está la orden */
+@media (max-width: 720px) {
+  .table td[data-label='Pedida'],
+  .table td[data-label='Ejecutada'] {
+    display: none !important;
+  }
+
+  .own td:nth-child(3),
+  .own td[data-label='Cancelada'] {
+    display: none !important;
+  }
+}
+
+.empty {
+  color: var(--muted);
+}
+
+/* La ficha: una línea por orden */
+.cards {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+}
+
+.card {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.card:first-child {
+  border-top: 0;
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.fields div {
+  display: flex;
+  gap: 4px;
+}
+
+.fields dt {
+  color: var(--muted);
+}

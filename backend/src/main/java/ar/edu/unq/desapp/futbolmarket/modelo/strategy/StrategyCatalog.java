@@ -1,12 +1,17 @@
 package ar.edu.unq.desapp.futbolmarket.modelo.strategy;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
+import ar.edu.unq.desapp.futbolmarket.modelo.strategy.exception.ActiveStrategyDeletionException;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.exception.DuplicateStrategyNameException;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.exception.InvalidStrategyNameException;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.exception.StrategyInvariantException;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.exception.StrategyNotFoundException;
 
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteWeek;
+
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +31,9 @@ public final class StrategyCatalog {
     public static final int MAX_NAME_LENGTH = 100;
 
     private static final int NO_ACTIVE = -1;
+    // La hora de Argentina, como las semanas de cotización
+    private static final DateTimeFormatter DELETED_AT =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(QuoteWeek.ZONE);
 
     private final List<Strategy> strategies;
     private final int activeIndex;
@@ -50,6 +58,13 @@ public final class StrategyCatalog {
 
     public List<Strategy> strategies() {
         return strategies;
+    }
+
+    /**
+     * Las estrategias que se muestran y se pueden usar: todas menos las eliminadas.
+     */
+    public List<Strategy> listed() {
+        return strategies.stream().filter(strategy -> !strategy.deleted()).toList();
     }
 
     /**
@@ -110,6 +125,50 @@ public final class StrategyCatalog {
                 strategies.get(index).latest(), deactivated);
     }
 
+    /**
+     * Elimina la estrategia: deja de listarse y de poder usarse, pero se conserva para las
+     * cotizaciones que calculó. Se renombra a "X (eliminada el 01/11/2026 14:35)", así su nombre
+     * queda libre para una nueva y el historial distingue una de otra. La activa no se elimina;
+     * primero hay que activar otra.
+     *
+     * @return la estrategia ya eliminada y renombrada, para guardarla.
+     */
+    public Strategy delete(Long strategyId, Instant now) {
+        var index = indexOf(strategyId);
+        var strategy = strategies.get(index);
+        if (index == activeIndex) {
+            throw new ActiveStrategyDeletionException(strategy.name());
+        }
+        return strategy.markDeleted(deletedName(strategy.name(), now));
+    }
+
+    /**
+     * Si hay o hubo una estrategia con ese nombre, también eliminada: la semilla no vuelve a crear
+     * una de arranque que el administrador eliminó.
+     */
+    public boolean knows(String name) {
+        return strategies.stream().anyMatch(strategy -> strategy.wasNamed(name));
+    }
+
+    /**
+     * El nombre de una eliminada, que no choca con ningún otro: si dos con el mismo nombre se
+     * eliminan en el mismo minuto, la segunda lleva un número. Entra en el largo máximo recortando
+     * el nombre original.
+     */
+    private String deletedName(String name, Instant now) {
+        var when = DELETED_AT.format(now);
+        var candidate = withSuffix(name, " (eliminada el " + when + ")");
+        for (int copy = 2; findByName(candidate) != null; copy++) {
+            candidate = withSuffix(name, " (eliminada el " + when + ", " + copy + ")");
+        }
+        return candidate;
+    }
+
+    private static String withSuffix(String name, String suffix) {
+        var room = MAX_NAME_LENGTH - suffix.length();
+        return (name.length() > room ? name.substring(0, room).strip() : name) + suffix;
+    }
+
     public StrategyVersion activeVersion() {
         return activeStrategy().latest();
     }
@@ -139,9 +198,13 @@ public final class StrategyCatalog {
         return strategies.stream().filter(strategy -> strategy.nameKey().equals(key)).findFirst().orElse(null);
     }
 
+    /**
+     * Una eliminada no se encuentra: editarla, activarla, simularla o consultarla da 404.
+     */
     private int indexOf(Long strategyId) {
         return IntStream.range(0, strategies.size())
                 .filter(i -> strategyId != null && strategyId.equals(strategies.get(i).id()))
+                .filter(i -> !strategies.get(i).deleted())
                 .findFirst()
                 .orElseThrow(() -> new StrategyNotFoundException(strategyId));
     }

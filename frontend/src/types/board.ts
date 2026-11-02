@@ -42,3 +42,6 @@ export interface AsyncState<T> {
   data?: T;
   error?: ApiError;
 }
+
+// El tema de la app; sin elegir, sigue al del sistema
+export type Theme = 'light' | 'dark';

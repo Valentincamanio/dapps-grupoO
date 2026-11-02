@@ -1,8 +1,10 @@
 package ar.edu.unq.desapp.futbolmarket.service.auth;
 
+import java.time.Clock;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.user.ApiKey;
@@ -30,6 +32,7 @@ public class AuthService {
     private final PasswordHasher passwordHasher;
     private final SessionTokenIssuer sessionTokenIssuer;
     private final AuthProperties authProperties;
+    private final Clock clock;
 
     /**
      * El hash descartable se calcula una sola vez, sobre un valor al azar que nunca va a coincidir
@@ -38,12 +41,27 @@ public class AuthService {
      */
     private final String discardablePasswordHash;
 
+    /**
+     * Se conserva para los tests de la 001 que construyen el servicio a mano (research D6 de la
+     * 008): registra con la hora del sistema.
+     */
     public AuthService(AppUserRepository appUserRepository, PasswordHasher passwordHasher,
                        SessionTokenIssuer sessionTokenIssuer, AuthProperties authProperties) {
+        this(appUserRepository, passwordHasher, sessionTokenIssuer, authProperties, Clock.systemUTC());
+    }
+
+    /**
+     * El que usa Spring: el instante del registro sale del mismo reloj que el resto del mercado,
+     * así los tests de integración pueden registrar cuentas en el pasado.
+     */
+    @Autowired
+    public AuthService(AppUserRepository appUserRepository, PasswordHasher passwordHasher,
+                       SessionTokenIssuer sessionTokenIssuer, AuthProperties authProperties, Clock clock) {
         this.appUserRepository = appUserRepository;
         this.passwordHasher = passwordHasher;
         this.sessionTokenIssuer = sessionTokenIssuer;
         this.authProperties = authProperties;
+        this.clock = clock;
         this.discardablePasswordHash = passwordHasher.hash(UUID.randomUUID().toString());
     }
 
@@ -54,7 +72,7 @@ public class AuthService {
                 .ensureAvailable();
 
         RegisteredUser registered = AppUser.register(username, email, rawPassword,
-                authProperties.initialBalance(), passwordHasher);
+                authProperties.initialBalance(), passwordHasher, clock.instant());
         return new RegisteredUser(appUserRepository.save(registered.user()), registered.apiKey());
     }
 

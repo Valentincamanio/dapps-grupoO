@@ -1,19 +1,22 @@
 .button {
-  background: transparent;
-  border: 2px solid var(--chalk-dim);
-  border-radius: 50% 45% 55% 40% / 60% 50% 50% 45%;
-  padding: 4px 18px;
-  font-family: var(--font-script);
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--chalk);
-  transition: background 0.15s;
+  display: inline-block;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  font-weight: 600;
+  transition: background 0.12s;
+}
+
+/* Los textos están en minúscula: arrancan con mayúscula al verse */
+.button::first-letter {
+  text-transform: uppercase;
 }
 
 .button:hover:not(:disabled) {
-  background: rgba(244, 241, 230, 0.12);
+  background: var(--line);
 }
 
 .button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
 }

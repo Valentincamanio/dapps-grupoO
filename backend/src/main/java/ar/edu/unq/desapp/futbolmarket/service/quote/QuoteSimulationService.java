@@ -23,6 +23,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteWeek;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuotingPlan;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.SimulatedQuote;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.SimulationResult;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.WeekBoosts;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.WeeklyQuotation;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.exception.InvalidSimulationRequestException;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyVersion;
@@ -30,6 +31,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.strategy.WeightSet;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.match.MatchRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.performance.PlayerMatchStatsRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.quote.BoostRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.quote.QuoteRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.strategy.StrategyRepository;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +44,8 @@ import lombok.RequiredArgsConstructor;
  * cotización actual de cada jugador, y reproduce en memoria, desde 100,00, todas las semanas que
  * hoy se cotizarían como si no hubiera nada cotizado, con {@link WeeklyQuotation#quoteWeek}: el
  * mismo código que el recálculo. Por eso simular la activa sobre un historial cotizado íntegramente
- * con su versión vigente da lo mismo que lo guardado (US7.7).</p>
+ * con su versión vigente da lo mismo que lo guardado (US7.7). También lee una sola vez los
+ * potenciados de todas las semanas, que en cada semana simulada rigen igual que al cotizarla.</p>
  *
  * <p>No tiene estado: cada hoja vuelve a calcular todo. El orden es el del ranking (simulada
  * descendente, nombre e id), así dos simulaciones iguales dan lo mismo (SC-010).</p>
@@ -65,6 +68,7 @@ public class QuoteSimulationService {
     private final MatchRepository matchRepository;
     private final PlayerMatchStatsRepository statsRepository;
     private final QuoteRepository quoteRepository;
+    private final BoostRepository boostRepository;
     private final Clock clock;
 
     /**
@@ -80,6 +84,15 @@ public class QuoteSimulationService {
      * los dos, no ambos ni ninguno.
      */
     public SimulationResult simulate(Long strategyId, Parameters parameters, PlayerFilter filter, int page, int size) {
+        return simulate(strategyId, parameters, filter, null, page, size);
+    }
+
+    /**
+     * Igual, y con {@code playerId} la hoja muestra solo a ese jugador (si existe, está activo y
+     * cumple los filtros). La simulación no cambia: sus pares siguen siendo todos los activos.
+     */
+    public SimulationResult simulate(Long strategyId, Parameters parameters, PlayerFilter filter, Long playerId,
+                                     int page, int size) {
         if ((strategyId == null) == (parameters == null)) {
             throw new InvalidSimulationRequestException();
         }
@@ -91,14 +104,16 @@ public class QuoteSimulationService {
         var finishedMatches = matchRepository.findAllFinished();
         var statsByWeek = byWeek(statsRepository.findAll());
         var currentByPlayer = quoteRepository.findLatestByPlayer();
+        var boostsByWeek = boostRepository.findAllByWeek();
 
         var plan = QuotingPlan.of(Optional.empty(), QuotingPlan.firstWeekWithStats(finishedMatches), finishedMatches,
                 clock.instant());
         var weeks = plan.weeksToQuote();
-        var simulatedByPlayer = replay(weeks, strategy, activePlayers, statsByWeek);
+        var simulatedByPlayer = replay(weeks, strategy, activePlayers, statsByWeek, boostsByWeek);
 
         var rows = activePlayers.stream()
                 .filter(player -> matches(player, filter))
+                .filter(player -> playerId == null || playerId.equals(player.id()))
                 .map(player -> new SimulatedQuote(player, valueOf(currentByPlayer.get(player.id()), null),
                         valueOf(simulatedByPlayer.get(player.id()), Quote.INITIAL_VALUE)))
                 .sorted(RANKING_ORDER)
@@ -123,10 +138,12 @@ public class QuoteSimulationService {
      * de jugador su última calculada.
      */
     private static Map<Long, Quote> replay(List<QuoteWeek> weeks, StrategyVersion strategy, List<Player> activePlayers,
-                                           Map<QuoteWeek, List<PlayerMatchStats>> statsByWeek) {
+                                           Map<QuoteWeek, List<PlayerMatchStats>> statsByWeek,
+                                           Map<QuoteWeek, WeekBoosts> boostsByWeek) {
         var last = new HashMap<Long, Quote>();
         for (QuoteWeek week : weeks) {
-            WeeklyQuotation.quoteWeek(week, strategy, activePlayers, statsByWeek.getOrDefault(week, List.of()), last)
+            WeeklyQuotation.quoteWeek(week, strategy, activePlayers, statsByWeek.getOrDefault(week, List.of()), last,
+                            boostsByWeek.getOrDefault(week, WeekBoosts.none(week)))
                     .stream()
                     .filter(quote -> quote.type() == QuoteType.CALCULATED)
                     .forEach(quote -> last.put(quote.playerId(), quote));

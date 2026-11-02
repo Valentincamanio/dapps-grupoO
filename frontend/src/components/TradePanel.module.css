@@ -1,0 +1,139 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--surface-2);
+}
+
+.notice {
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 13px;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quantity {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: end;
+}
+
+.quantity input {
+  height: 44px;
+  border: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  appearance: textfield;
+}
+
+.quantity input::-webkit-inner-spin-button {
+  display: none;
+}
+
+.step {
+  height: 44px;
+  padding: 0;
+  background: var(--surface);
+  font-size: 22px;
+}
+
+.estimate {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.actions button {
+  padding: 13px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 16px;
+  border-radius: 14px;
+}
+
+.actions button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.actions button:last-child {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.actions button:last-child:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.error {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--down-soft);
+  color: var(--down);
+  font-size: 14px;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--up-soft);
+  color: var(--up);
+  font-size: 14px;
+}
+
+.trades {
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.summary dt {
+  color: var(--muted);
+}
+
+.summary dd {
+  font-weight: 600;
+  text-align: right;
+}
+
+.hint {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}

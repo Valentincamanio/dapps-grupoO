@@ -2,28 +2,44 @@ package ar.edu.unq.desapp.futbolmarket.modelo.user;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Objects;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.CredentialPolicy;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.PasswordHasher;
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.InsufficientCreditsException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.MarketInvariantException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.exception.TradingNotAllowedException;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteWeek;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.AccountAccessDeniedException;
+import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.DateBeforeRegistrationException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidPasswordChangeException;
 import ar.edu.unq.desapp.futbolmarket.modelo.user.exception.InvalidUserDataException;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
  * Persona registrada y titular de las dos credenciales: la contraseña y la clave de API.
  *
  * <p>No tiene constructores públicos con estado arbitrario: se crea solo a través de sus
- * fábricas, que son las que aplican las invariantes. Tampoco tiene setters; el saldo y los dos
+ * fábricas, que son las que aplican las invariantes. Tampoco tiene setters; los saldos y los dos
  * hashes solo cambian a través de métodos de esta clase.</p>
+ *
+ * <p>{@code balance} es el saldo total; {@code reserved}, la parte reservada para compras
+ * pendientes, y el libre es la diferencia (research D5 de la 008). Reservar y liberar no mueven el
+ * total: solo lo mueven pagar y cobrar, así los créditos de todas las cuentas se conservan.</p>
  */
 @Getter
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class AppUser {
 
     private static final String WRONG_CURRENT_PASSWORD_MESSAGE = "La contraseña actual es incorrecta.";
     private static final String SAME_PASSWORD_MESSAGE = "La nueva contraseña debe ser distinta de la actual.";
     private static final String INVALID_NEW_PASSWORD_MESSAGE = "La nueva contraseña no cumple las reglas de formato.";
+    private static final BigDecimal NO_RESERVATION = BigDecimal.ZERO.setScale(CredentialPolicy.BALANCE_SCALE);
 
     private final Long id;
     private final String username;
@@ -32,17 +48,9 @@ public class AppUser {
     private String passwordHash;
     private String apiKeyHash;
     private BigDecimal balance;
-
-    private AppUser(Long id, String username, String email, String passwordHash, String apiKeyHash,
-                    Role role, BigDecimal balance) {
-        this.id = id;
-        this.username = username;
-        this.email = email;
-        this.passwordHash = passwordHash;
-        this.apiKeyHash = apiKeyHash;
-        this.role = role;
-        this.balance = balance;
-    }
+    private BigDecimal reserved;
+    /** Nulo en las cuentas creadas antes de la 008 (research D6). */
+    private final Instant registeredAt;
 
     /**
      * Crea la cuenta del registro público: rol {@code USER}, el saldo inicial configurado y una
@@ -50,7 +58,16 @@ public class AppUser {
      */
     public static RegisteredUser register(String username, String email, String rawPassword,
                                           BigDecimal initialBalance, PasswordHasher hasher) {
-        AppUser user = newAccount(username, email, rawPassword, Role.USER, initialBalance, hasher);
+        return register(username, email, rawPassword, initialBalance, hasher, null);
+    }
+
+    /**
+     * Como {@link #register(String, String, String, BigDecimal, PasswordHasher)}, con el instante
+     * del registro (research D6 de la 008).
+     */
+    public static RegisteredUser register(String username, String email, String rawPassword,
+                                          BigDecimal initialBalance, PasswordHasher hasher, Instant registeredAt) {
+        AppUser user = newAccount(username, email, rawPassword, Role.USER, initialBalance, hasher, registeredAt);
         ApiKey apiKey = user.issueApiKey();
         return new RegisteredUser(user, apiKey);
     }
@@ -61,7 +78,15 @@ public class AppUser {
      */
     public static AppUser createAdmin(String username, String email, String rawPassword,
                                       PasswordHasher hasher) {
-        return newAccount(username, email, rawPassword, Role.ADMIN, BigDecimal.ZERO, hasher);
+        return createAdmin(username, email, rawPassword, hasher, null);
+    }
+
+    /**
+     * Como {@link #createAdmin(String, String, String, PasswordHasher)}, con el instante del alta.
+     */
+    public static AppUser createAdmin(String username, String email, String rawPassword,
+                                      PasswordHasher hasher, Instant registeredAt) {
+        return newAccount(username, email, rawPassword, Role.ADMIN, BigDecimal.ZERO, hasher, registeredAt);
     }
 
     /**
@@ -70,7 +95,93 @@ public class AppUser {
      */
     public static AppUser reconstitute(Long id, String username, String email, String passwordHash,
                                        String apiKeyHash, Role role, BigDecimal balance) {
-        return new AppUser(id, username, email, passwordHash, apiKeyHash, role, balance);
+        return reconstitute(id, username, email, passwordHash, apiKeyHash, role, balance, NO_RESERVATION, null);
+    }
+
+    /**
+     * Como la de siete argumentos, con el saldo reservado y el instante del registro.
+     */
+    public static AppUser reconstitute(Long id, String username, String email, String passwordHash,
+                                       String apiKeyHash, Role role, BigDecimal balance, BigDecimal reserved,
+                                       Instant registeredAt) {
+        return new AppUser(id, username, email, role, passwordHash, apiKeyHash, balance, reserved, registeredAt);
+    }
+
+    public BigDecimal availableBalance() {
+        return balance.subtract(reserved);
+    }
+
+    /**
+     * Pasa créditos del libre al reservado para una compra pendiente (FR-015 y FR-019).
+     */
+    public void reserve(BigDecimal amount) {
+        requireNotNegative(amount);
+        if (amount.compareTo(availableBalance()) > 0) {
+            throw new InsufficientCreditsException(amount, availableBalance());
+        }
+        reserved = reserved.add(amount);
+    }
+
+    /**
+     * Devuelve al libre créditos reservados, al cancelar o al ajustar la reserva de una compra.
+     */
+    public void release(BigDecimal amount) {
+        requireWithinReservation(amount);
+        reserved = reserved.subtract(amount);
+    }
+
+    /**
+     * Paga una operación con lo reservado: baja el total y el reservado, y el libre no cambia.
+     */
+    public void payFromReserve(BigDecimal amount) {
+        requireWithinReservation(amount);
+        balance = balance.subtract(amount);
+        reserved = reserved.subtract(amount);
+    }
+
+    /**
+     * Cobra una venta.
+     */
+    public void receive(BigDecimal amount) {
+        if (amount.signum() <= 0) {
+            throw new MarketInvariantException("Lo que se cobra tiene que ser mayor que 0: " + amount + ".");
+        }
+        balance = balance.add(amount);
+    }
+
+    /**
+     * Solo los usuarios comunes operan; el superusuario solo vende por sus órdenes iniciales
+     * (FR-010).
+     */
+    public void requireCanTrade() {
+        if (role != Role.USER) {
+            throw new TradingNotAllowedException();
+        }
+    }
+
+    /**
+     * El portfolio, el historial y las órdenes de una cuenta los ven su dueño y el administrador
+     * (FR-042 y FR-046).
+     */
+    public void requireCanAccessAccountOf(long userId) {
+        if (role != Role.ADMIN && !Objects.equals(id, userId)) {
+            throw new AccountAccessDeniedException();
+        }
+    }
+
+    /**
+     * Rechaza un día anterior al del registro, en hora de Argentina (FR-041). Una cuenta anterior
+     * a la 008 no tiene fecha de registro, ni operaciones de antes, así que para ella no hay
+     * límite.
+     */
+    public void requireRegisteredBy(LocalDate day) {
+        if (registeredAt == null) {
+            return;
+        }
+        LocalDate registrationDay = LocalDate.ofInstant(registeredAt, QuoteWeek.ZONE);
+        if (day.isBefore(registrationDay)) {
+            throw new DateBeforeRegistrationException(day, registrationDay);
+        }
     }
 
     /**
@@ -118,8 +229,8 @@ public class AppUser {
     /** No incluye ninguno de los dos hashes. */
     @Override
     public String toString() {
-        return "AppUser{id=%s, username='%s', email='%s', role=%s, balance=%s}"
-                .formatted(id, username, email, role, balance);
+        return "AppUser{id=%s, username='%s', email='%s', role=%s, balance=%s, reserved=%s}"
+                .formatted(id, username, email, role, balance, reserved);
     }
 
     /**
@@ -127,10 +238,24 @@ public class AppUser {
      * contraseña y fijar la escala del saldo. Cada fábrica decide el rol, el saldo y la clave.
      */
     private static AppUser newAccount(String username, String email, String rawPassword, Role role,
-                                      BigDecimal balance, PasswordHasher hasher) {
+                                      BigDecimal balance, PasswordHasher hasher, Instant registeredAt) {
         validateCredentials(username, email, rawPassword);
-        return new AppUser(null, username, email, hasher.hash(rawPassword), null, role,
-                normalizedBalance(balance));
+        return new AppUser(null, username, email, role, hasher.hash(rawPassword), null,
+                normalizedBalance(balance), NO_RESERVATION, registeredAt);
+    }
+
+    private static void requireNotNegative(BigDecimal amount) {
+        if (amount.signum() < 0) {
+            throw new MarketInvariantException("Un monto de créditos no puede ser negativo: " + amount + ".");
+        }
+    }
+
+    private void requireWithinReservation(BigDecimal amount) {
+        requireNotNegative(amount);
+        if (amount.compareTo(reserved) > 0) {
+            throw new MarketInvariantException("No se pueden mover " + amount + " créditos con " + reserved
+                    + " reservados.");
+        }
     }
 
     /**

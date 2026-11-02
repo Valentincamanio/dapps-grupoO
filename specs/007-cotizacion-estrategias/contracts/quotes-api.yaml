@@ -1,11 +1,15 @@
 openapi: 3.0.3
 info:
   title: API de consulta de cotizaciones y ranking de jugadores
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Contrato de la feature `007-cotizacion-estrategias` de Futbol Market: las consultas públicas
     de cotizaciones. Los endpoints de administrador están en `quotes-admin-api.yaml` y
     `strategies-api.yaml`; los tres archivos comparten los esquemas definidos acá.
+
+    **Versión 1.1.0 (feature `008-mercado-tokens-portfolio`, FR-058).** Toda cotización informa
+    su `score`. Es el único cambio: no se agrega, quita ni renombra ningún otro campo, ruta ni
+    parámetro.
 
     **Qué es una cotización.** Es el valor del 100 % del jugador, en créditos, con dos decimales
     (`value`). Sus 100 tokens son ese 100 %: cada token es el 1 % y vale la cotización dividida
@@ -13,8 +17,9 @@ info:
     vale 100,00. Esta API **no redondea a créditos enteros**: eso lo hace la funcionalidad de
     mercado sobre el total que paga o recibe un usuario.
 
-    **Qué no informa.** Ninguna respuesta lleva estadísticas crudas, métricas normalizadas ni el
-    score de una cotización (FR-006 del spec). El score se guarda pero no se expone.
+    **Qué no informa.** Ninguna respuesta lleva estadísticas crudas ni métricas normalizadas
+    (FR-006 del spec). Desde la 1.1.0 el score **sí** se informa: la 008 cambia el FR-006 en lo
+    que prohibía exponerlo (FR-058 de la 008).
 
     **Acceso.** Todas las rutas son **públicas**: no piden credencial. Salen de la excepción
     transitoria de `SecurityConfig` que deja públicas las lecturas bajo `GET /players/**` (marca
@@ -103,12 +108,14 @@ paths:
                     content:
                       - value: 100.00
                         tokenPrice: 1.0000
+                        score: 0.000000
                         weekStart: '2026-08-17'
                         validFrom: '2026-08-17T03:00:00Z'
                         type: INITIAL
                         strategy: { id: 1, name: Rendimiento de partido, version: 1 }
                       - value: 103.00
                         tokenPrice: 1.0300
+                        score: 0.300000
                         variation: { amount: 3.00, percent: 3.00 }
                         weekStart: '2026-08-17'
                         validFrom: '2026-08-24T03:00:00Z'
@@ -116,6 +123,7 @@ paths:
                         strategy: { id: 1, name: Rendimiento de partido, version: 1 }
                       - value: 104.00
                         tokenPrice: 1.0400
+                        score: 0.400000
                         variation: { amount: 4.00, percent: 4.00 }
                         weekStart: '2026-08-17'
                         validFrom: '2026-08-26T15:30:00Z'
@@ -179,6 +187,7 @@ paths:
                 playerId: 12
                 value: 103.00
                 tokenPrice: 1.0300
+                score: 0.300000
                 variation: { amount: 3.00, percent: 3.00 }
                 weekStart: '2026-08-17'
                 validFrom: '2026-08-24T03:00:00Z'
@@ -304,6 +313,7 @@ paths:
                   - playerId: 12
                     value: 103.00
                     tokenPrice: 1.0300
+                    score: 0.300000
                     variation: { amount: 3.00, percent: 3.00 }
                     weekStart: '2026-08-17'
                     validFrom: '2026-08-24T03:00:00Z'
@@ -363,6 +373,7 @@ paths:
                     quote:
                       value: 112.40
                       tokenPrice: 1.1240
+                      score: 0.190000
                       variation: { amount: 2.10, percent: 1.90 }
                       weekStart: '2026-10-05'
                       validFrom: '2026-10-12T03:00:00Z'
@@ -503,8 +514,10 @@ components:
           example: 3.00
     Quote:
       type: object
-      description: La cotización de un jugador en una semana. Nunca lleva estadísticas ni score.
-      required: [value, tokenPrice, weekStart, validFrom, type, strategy]
+      description: |
+        La cotización de un jugador en una semana. Nunca lleva estadísticas ni métricas
+        normalizadas; desde la 1.1.0 lleva el score (FR-058 de la 008).
+      required: [value, tokenPrice, score, weekStart, validFrom, type, strategy]
       properties:
         value:
           type: number
@@ -514,6 +527,14 @@ components:
           type: number
           description: Precio por token (`value / 100`), con cuatro decimales, sin otro redondeo.
           example: 1.0300
+        score:
+          type: number
+          minimum: -1
+          maximum: 1
+          description: |
+            El score con que se calculó la cotización, entre −1 y +1, con seis decimales y signo.
+            La `INITIAL` informa 0. Una `REQUOTED` informa el de su recotización. Nuevo en la 1.1.0.
+          example: 0.300000
         variation:
           allOf:
             - $ref: '#/components/schemas/Variation'

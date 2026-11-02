@@ -32,3 +32,9 @@ export function createVersion(
 export function activateStrategy(id: number, requote?: RequoteTiming, signal?: AbortSignal): Promise<StrategyChange> {
   return request<StrategyChange>('POST', `/strategies/${id}/activate`, { body: { requote }, signal });
 }
+
+// Baja lógica: deja de listarse y de poder usarse, y las cotizaciones que calculó se conservan. La
+// activa no se elimina (409)
+export function deleteStrategy(id: number, signal?: AbortSignal): Promise<void> {
+  return request<void>('DELETE', `/strategies/${id}`, { signal });
+}

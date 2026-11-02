@@ -1,30 +1,46 @@
 .note {
   display: flex;
-  align-items: baseline;
   flex-wrap: wrap;
-  gap: 12px;
-  font-family: var(--font-script);
-  font-size: 24px;
-  color: var(--chalk-dim);
+  align-items: center;
+  gap: 8px 14px;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
-.error {
-  color: var(--pink);
+.note span:first-child::first-letter {
+  text-transform: uppercase;
 }
 
-.success {
-  color: var(--green);
+.info {
+  background: var(--surface-2);
 }
 
 .loading {
-  color: var(--yellow);
+  background: none;
+  color: var(--faint);
+}
+
+.error {
+  background: var(--down-soft);
+  color: var(--down);
+}
+
+.success {
+  background: var(--up-soft);
+  color: var(--up);
 }
 
 .action {
-  background: none;
   border: 0;
-  color: var(--pink);
-  font-family: var(--font-script);
-  font-size: 22px;
+  background: none;
+  color: inherit;
+  font-weight: 600;
   text-decoration: underline;
+}
+
+.action::first-letter {
+  text-transform: uppercase;
 }

@@ -1,0 +1,825 @@
+# Modelo de datos: Mercado de tokens y portfolio de usuarios
+
+**Feature**: `008-mercado-tokens-portfolio` | **Fecha**: 2026-10-28 | **Plan**: [plan.md](./plan.md) |
+**Investigación**: [research.md](./research.md)
+
+Este documento fija las clases del modelo, sus invariantes, las tablas, las consultas y los tipos del frontend.
+No contiene cuerpos de métodos: el comportamiento se describe con reglas y ejemplos. Las decisiones están
+justificadas en `research.md` (D1 a D31). Las diferencias con el código relevadas antes de implementar (T002) están
+en la sección 12.
+
+## 1. Vista general
+
+```text
+                 ┌──────────────────────────── PlayerBook (un jugador, un pedido) ────────────────────────────┐
+                 │  Player · Quote vigente · MarketOrder inicial · MarketOrder pendientes del otro lado        │
+                 │  AppUser involucrados (bloqueados) · Holding del jugador                                    │
+                 │                                                                                             │
+ pedido ───────► │  placeBuy / placeSell / cancel ──► OrderMatcher.match ──► MatchPlan (Fill…, remanente)      │
+                 │                                   │                                                         │
+                 │                                   └─► aplica: AppUser (reserve/pay/receive/release)         │
+                 │                                              Holding (CostBasis, committed)                 │
+                 │                                              MarketOrder (fill/cancel)                      │
+                 │                                              Trade + AuditEntry                             │
+                 └──────────────────────────────────── BookOutcome ───────────────────────────────────────────┘
+
+ Lecturas:  Holding + Quote vigente ──► Portfolio.current        Trade… ──► TradeReplay ──► Portfolio.at(fecha)
+```
+
+- `modelo/market/` es puro: solo JDK y clases de modelo de otros contextos (`AppUser`, `Player`, `Quote`,
+  `QuoteDay`, `QuotePage`, `PlayerFilter`, `League`).
+- El superusuario no tiene `Holding`: su tenencia de un jugador es el pendiente de su orden inicial (D7).
+- Para cada jugador con orden inicial: **pendiente de la inicial + Σ `Holding.quantity` = 100** (FR-026).
+
+## 2. Modelo: contexto `market`
+
+### 2.1 Enums
+
+| Enum | Valores | Notas |
+|---|---|---|
+| `OrderSide` | `BUY`, `SELL` | tipo de orden; en el historial, el lado del usuario |
+| `OrderStatus` | `PENDING`, `PARTIAL`, `EXECUTED`, `CANCELLED` | se deriva de las cantidades (D9); `isOpen()` para los dos primeros |
+| `OwnerType` | `USER`, `ADMIN` | tipo de usuario dueño de una orden y contraparte de una operación |
+| `CancelReason` | `USER_REQUEST`, `INSUFFICIENT_CREDITS` | motivo de una cancelación |
+| `AuditEventType` | `ORDER_CREATED`, `TRADE_EXECUTED`, `ORDER_CANCELLED` | |
+| `AuditActorType` | `USER`, `SUPERUSER`, `SYSTEM` | autor de un registro de auditoría |
+| `NotTradableReason` | `INACTIVE`, `WITHOUT_QUOTE`, `WITHOUT_INITIAL_ORDER` | arma el mensaje de `PlayerNotTradableException` |
+
+### 2.2 `MarketMath`
+
+Clase final de utilidad, sin estado, con las escalas como constantes (D4):
+`CREDIT_SCALE = 2`, `PRICE_SCALE = 4`, `PERCENT_SCALE = 2`, `TOKENS_PER_PLAYER = 100`,
+`MAX_ORDER_QUANTITY = 100`, `INITIAL_TOKEN_PRICE = 1.0000`.
+
+| Función | Regla | Ejemplo |
+|---|---|---|
+| `total(quantity, tokenPrice)` | `quantity × tokenPrice`, 2 decimales `HALF_UP`, un solo redondeo | `total(3, 1.0333) = 3.10`; `total(10, 1.0345) = 10.35` |
+| `maxAffordable(available, tokenPrice, limit)` | mayor `n ≤ limit` con `total(n, tokenPrice) ≤ available` | `maxAffordable(10.30, 1.1000, 10) = 9` |
+| `averagePrice(cost, quantity)` | `cost / quantity`, 4 decimales `HALF_UP` | `averagePrice(15.15, 15) = 1.0100` |
+| `percent(part, whole)` | `part / whole × 100`, 2 decimales; vacío si `whole = 0` | `percent(0.30, 10.00) = 3.00` |
+
+Implementación (T009 y T010): las escalas no repiten el literal (`CREDIT_SCALE` es la del saldo de la cuenta y
+`PRICE_SCALE` y `PERCENT_SCALE` las de `Quote`, sección 12.2) y se suma `ZERO_CREDITS` (0,00). Los montos de los
+mensajes y de la auditoría los escribe `MarketFormat` (`credits`, `price` y `tokens`, que dice "1 token" o "N
+tokens"): coma decimal y sin separador de miles, como los ejemplos del spec.
+
+### 2.3 `MarketOrder`
+
+Una orden de compra o de venta. Entidad con identidad; cambia solo por sus métodos.
+
+| Campo | Tipo | Regla |
+|---|---|---|
+| `id` | `Long` | nulo hasta guardarse |
+| `side` | `OrderSide` | |
+| `ownerId` | `long` | el titular; el superusuario solo en las iniciales |
+| `playerId` | `long` | |
+| `requested` | `int` | 1 a 100 (`MAX_ORDER_QUANTITY`); 100 en la inicial |
+| `executed` | `int` | 0 ≤ `executed` ≤ `requested` |
+| `cancelled` | `int` | 0 ≤ `cancelled`; `executed + cancelled ≤ requested` |
+| `reservedCredits` | `BigDecimal` (2) | solo compras; 0 en ventas y cuando no queda pendiente |
+| `reservationPrice` | `BigDecimal` (4) o nulo | precio por token vigente al crear una compra; nulo en ventas |
+| `createdAt` | `Instant` | del `Clock` |
+| `initial` | `boolean` | orden inicial del superusuario |
+| `cancelReason` | `CancelReason` o nulo | solo si `cancelled > 0` |
+
+Derivados: `pending() = requested − executed − cancelled`; `status()` (tabla de D9); `ownerType()` (`ADMIN` si
+`initial`, si no `USER`); `isOpen()`.
+
+Fábricas y métodos:
+
+| Método | Efecto | Lanza |
+|---|---|---|
+| `MarketOrder.initialFor(superuserId, playerId, at)` | venta inicial por 100 | — |
+| `MarketOrder.buy(ownerId, playerId, quantity, reservation, reservationPrice, at)` | compra con su reserva total | `MarketInvariantException` si la cantidad está fuera de 1..100 |
+| `MarketOrder.sell(ownerId, playerId, quantity, at)` | venta | ídem |
+| `fill(n)` | `executed += n` | `MarketInvariantException` si `n > pending` |
+| `consumeReservation(amount)` | en una compra, paga una operación con su reserva: `reservedCredits −= amount` | `MarketInvariantException` si `amount > reservedCredits` |
+| `adjustReservation(available)` | `reservedCredits = min(total(pending, reservationPrice), available)` (D11); devuelve cuánto cambió, para mover lo mismo en la cuenta | — |
+| `cancelRemainder(reason)` | `cancelled += pending`, `reservedCredits = 0` | `OrderNotCancellableException` si no está abierta |
+| `requireOwnedBy(requesterId)` | — | `OrderNotOwnedException` si es ajena **o inicial** |
+
+Una lectura de órdenes (`OrderView(order, player)`) suma el jugador para mostrarla: la usan el portfolio del
+superusuario (US2), el listado del mercado (US5) y las órdenes propias (US6). Es un modelo de lectura, como
+`TradeView`, y no se guarda. El plan no la nombraba (T012).
+
+Una lectura de tenencias (`HoldingView(holding, player)`) es lo mismo para el portfolio actual (US2): la tenencia con
+su jugador, que `HoldingRepository.findPositionsOf` arma en una sola consulta con `join fetch`. Tampoco se guarda
+(T060).
+
+Implementación (T013):
+
+- `cancelRemainder(reason)` devuelve la reserva que libera (0 en una venta), para devolver lo mismo a la cuenta, y
+  rechaza la orden inicial con `MarketInvariantException` además de la regla de `requireOwnedBy`.
+- `cancelBeyond(keep)` (D9) es solo de compras: cancela por saldo insuficiente todo el pendiente salvo `keep`, con
+  `1 ≤ keep < pendiente`, y no toca la reserva (la ajusta `adjustReservation` después de pagar lo ejecutado). Si no
+  alcanza para ningún token, se usa `cancelRemainder(INSUFFICIENT_CREDITS)`.
+- La orden leída de la base se reconstruye con `MarketOrder.reconstitute(MarketOrder.State)` (T020): el record
+  `State` lleva los doce campos, para no tener una fábrica de doce parámetros. `Holding` suma
+  `reconstitute(id, ownerId, playerId, basis, committed)` (T021).
+
+### 2.4 `CostBasis`
+
+Valor inmutable que comparten `Holding` y `TradeReplay` (D12).
+
+| Campo | Regla |
+|---|---|
+| `quantity` | tokens que tiene, ≥ 0 |
+| `acquiredQuantity` | tokens comprados desde la última vez que `quantity` fue 0 |
+| `acquiredCost` | lo pagado por esos tokens (2 decimales) |
+
+| Método | Regla |
+|---|---|
+| `acquire(n, paid)` | suma a los tres |
+| `dispose(n, received)` | devuelve `Disposal(basis, realized)` con `realized = received − n × averagePrice()`, redondeado a 2 decimales (FR-029); el costo adquirido no cambia; si `quantity` llega a 0, los acumuladores se reinician |
+| `averagePrice()` | `MarketMath.averagePrice(acquiredCost, acquiredQuantity)`; 0 sin compras |
+| `invested()` | `quantity × averagePrice()`, 2 decimales |
+
+Ejemplo: `acquire(10, 10.00)`, `acquire(5, 5.15)` → promedio 1,0100, invertido 15,15; `dispose(5, 5.25)` →
+realizada +0,20, quedan 10, promedio 1,0100, invertido 10,10.
+
+### 2.5 `Holding`
+
+La tenencia de un **usuario** de un jugador (el superusuario no tiene).
+
+| Campo | Regla |
+|---|---|
+| `id`, `ownerId`, `playerId` | uno por titular y jugador |
+| `basis` | `CostBasis` |
+| `committed` | tokens comprometidos en sus ventas pendientes; 0 ≤ `committed` ≤ `quantity` |
+
+Métodos: `freeTokens()` (`quantity − committed`); `commit(n)` (lanza `InsufficientTokensException` si
+`n > freeTokens()`); `releaseCommitted(n)`; `buy(n, paid)`; `sell(n, received)` → realizada (baja `quantity` y
+`committed`). `Holding.empty(ownerId, playerId)` para el primer cruce.
+
+### 2.6 `Trade`
+
+Una operación ejecutada. **Inmutable** (`record`): no tiene métodos de cambio.
+
+| Campo | Regla |
+|---|---|
+| `id` | nulo hasta guardarse |
+| `executedAt` | el instante del pedido |
+| `playerId` | |
+| `buyOrderId`, `sellOrderId` | las órdenes de cada parte (FR-028) |
+| `buyerId`, `sellerId` | |
+| `sellerType` | `OwnerType` del vendedor (la contraparte de una compra al superusuario es `ADMIN`) |
+| `quantity` | ≥ 1 |
+| `tokenPrice` | 1,0000 contra la inicial; si no, el de la cotización vigente |
+| `total` | `MarketMath.total(quantity, tokenPrice)` |
+| `quoteId` | la cotización vigente en ese momento, también contra la inicial (FR-028) |
+| `buyerBalanceBefore/After`, `sellerBalanceBefore/After` | saldo **total** de cada parte |
+| `buyerTokensBefore/After`, `sellerTokensBefore/After` | tenencia de ese jugador (del superusuario: el pendiente de su inicial) |
+| `realizedProfit` | ganancia o pérdida del vendedor (FR-029); nula si vende el superusuario |
+
+Derivados para el historial: `sideFor(userId)` y `counterpartyFor(userId)` (`ADMIN` o `USER`).
+
+Una lectura del historial (`TradeView`) suma lo que se muestra: el jugador (nombre, equipo, liga) y la cotización
+(vigencia, score, estrategia y versión). Es un modelo de lectura, no se guarda.
+
+### 2.7 `PartyState` y `PartyChange`
+
+`PartyState(userId, freeBalance, reservedBalance, tokens)` es una foto de una parte; `PartyChange(before, after)`
+son las dos fotos de un hecho. Las arma `PlayerBook` con `AppUser.availableBalance()`, `AppUser.getReserved()` y
+la tenencia (o el pendiente de la inicial).
+
+### 2.8 `AuditEntry`
+
+Un registro de auditoría. **Inmutable** (`record`). Las fábricas arman el `detail` en español.
+
+| Campo | Regla |
+|---|---|
+| `id`, `occurredAt` | |
+| `eventType` | `AuditEventType` |
+| `actorType`, `actorId` | `actorId` nulo solo con `SYSTEM` |
+| `playerId`, `orderId` | siempre |
+| `tradeId` | solo en `TRADE_EXECUTED` |
+| `side`, `quantity` | de la orden o de la operación |
+| `tokenPrice`, `total`, `quoteId` | solo en `TRADE_EXECUTED` |
+| `cancelReason` | solo en `ORDER_CANCELLED` |
+| `primary` | `PartyChange` del dueño (o del comprador en una operación) |
+| `secondary` | `PartyChange` del vendedor en una operación; nulo en el resto |
+| `detail` | frase en español, hasta 500 caracteres |
+
+Fábricas: `orderCreated(order, actor, change, at)`, `tradeExecuted(trade, actor, buyer, seller)`,
+`orderCancelled(order, actor, reason, change, at)`.
+
+Implementación (T017): las tres fábricas reciben también el `Player`, porque el detalle lleva su nombre, y el autor
+es un `AuditActor(type, id)` (con `AuditActor.user`, `superuser` y `system`), que aplica la regla del `actorId`.
+`orderCancelled(order, player, actor, change, at)` toma el motivo y la cantidad de la orden ya cancelada, en vez de
+recibirlos aparte. En `tradeExecuted`, la orden y el lado del registro son los de quien hizo el pedido (comprador o
+vendedor). Los detalles son, por ejemplo, "Orden inicial de venta de 100 tokens de Harry Kane a 1,0000", "Orden de
+compra de 10 tokens de Harry Kane con 10,30 créditos reservados", "Compra de 5 tokens de Harry Kane a 1,0300 por
+5,15 entre usuarios" y "Cancelación de 7 tokens de la orden de venta de Harry Kane a pedido del usuario".
+
+### 2.9 `OrderMatcher`, `MatchPlan` y `Fill`
+
+`OrderMatcher` es puro y sin estado (D10). `match(incoming, initialOrder, opposite, price)`:
+
+- `incoming`: lado, dueño y cantidad del pedido.
+- `initialOrder`: la inicial del jugador (para compras; puede estar agotada).
+- `opposite`: las pendientes del otro lado, en cualquier orden; el matcher las ordena por `createdAt` y `id`.
+- `price`: el precio por token vigente.
+- Para las ventas, cada compra pendiente llega con su **disponible** (reserva + libre de su dueño, D11).
+
+Devuelve `MatchPlan(fills, remainder, shortfalls)`:
+
+- `Fill(counterpart, quantity, tokenPrice, total)`: un cruce.
+- `remainder`: lo que queda pendiente de la orden entrante.
+- `shortfalls`: compras pendientes a cancelar (entera o en parte) por saldo insuficiente, con la cantidad.
+
+Implementación (T043): el lado de compra es `OrderMatcher.matchBuy(ownerId, quantity, initialOrder, opposite,
+tokenPrice)`, con el pedido como dueño y cantidad (la orden todavía no existe: su reserva sale del plan). De las
+órdenes abiertas toma solo las ventas de usuarios que no son del dueño. `MatchPlan` es por ahora `(fills, remainder)`
+con `executedQuantity()` y `executedTotal()`; T078 suma el lado de venta y los `shortfalls`. `Fill.of(counterpart,
+quantity, tokenPrice)` calcula el total con `MarketMath.total`.
+
+Implementación (T078): el lado de venta es `OrderMatcher.matchSell(ownerId, quantity, opposite, freeBalances,
+tokenPrice)`. En vez de recibir cada compra con su disponible ya calculado, recibe el libre de cada dueño
+(`freeBalances`) y calcula el disponible de cada compra como su reserva más el libre de su dueño que no tomaron sus
+compras anteriores en el mismo cruce: así un dueño con dos compras pendientes no cuenta dos veces el mismo libre.
+`MatchPlan` suma `shortfalls` (`Shortfall(order, quantity)`; vacío en las compras, con un constructor de dos
+argumentos para ese lado).
+
+Casos que fija `OrderMatcherTest` (los del spec): compra de 10 contra la inicial con 100 → un `Fill` de 10 a 1,0000;
+inicial con 3 y compra de 10 → `Fill` de 3 a 1,0000 y remanente 7; compra de 10 contra una venta de 5 → `Fill` de 5 y
+remanente 5; dos ventas, la de B antes que la de D → primero B; venta de 8 contra una compra de 5 → `Fill` de 5 y
+remanente 3; dos compras, la de A antes que la de C → completa A y sigue con C; compra con disponible 10,30 a 1,1000
+contra una venta de 10 → `Fill` de 9 y `shortfall` de 1; compra con disponible menor que un token → `shortfall`
+entero y la venta sigue con la próxima; las del mismo dueño se saltean; el resultado no depende del orden de entrada.
+
+### 2.10 `PlayerBook` y `BookOutcome`
+
+Agregado que el servicio arma por pedido con lo que cargó **después de bloquear** (D13):
+
+| Parte | Qué es |
+|---|---|
+| `player` | `Player` (activo o no) |
+| `quote` | `Optional<Quote>` vigente al instante del pedido |
+| `initialOrder` | `Optional<MarketOrder>` |
+| `opposite` | pendientes del otro lado (las del lado del pedido también, para FR-017) |
+| `accounts` | `Map<Long, AppUser>` de las cuentas bloqueadas |
+| `holdings` | `Map<Long, Holding>` del jugador, por titular |
+| `superuserId` | para reconocer la contraparte `ADMIN` |
+
+Métodos:
+
+| Método | Validaciones (en orden) | Resultado |
+|---|---|---|
+| `placeBuy(ownerId, quantity, at)` | `requireCanTrade`; operable; sin ventas propias pendientes (FR-017); libre ≥ lo necesario (FR-015) | la orden, sus `Trade`, la auditoría y lo que cambió |
+| `placeSell(ownerId, quantity, at)` | `requireCanTrade`; operable; inicial sin pendiente (FR-011); sin compras propias pendientes; tokens libres ≥ cantidad (FR-016) | ídem, más las compras canceladas por saldo |
+| `cancel(order, requesterId, at)` | `requireOwnedBy`; abierta | la orden cancelada, la cuenta o tenencia liberada y la auditoría |
+
+`BookOutcome(order, trades, changedOrders, changedAccounts, changedHoldings, auditEntries)`. El orden de
+`auditEntries` es el de los hechos: `ORDER_CREATED`, cada `TRADE_EXECUTED` y cada `ORDER_CANCELLED`.
+
+`isTradable()` es `player.active() && quote.isPresent() && initialOrder.isPresent()` (D15).
+
+Implementación (T044 a T046):
+
+- **Ids de lo guardado.** La orden del pedido no tiene id hasta guardarse, y las operaciones y la auditoría lo
+  necesitan. `BookOutcome` guarda, junto a cada `Trade`, la posición de su compra y de su venta en `orders()`, y
+  junto a cada `AuditEntry`, la posición de su orden y de su operación. El servicio guarda las órdenes y llama a
+  `withSavedOrders(guardadas)`, que devuelve un resultado nuevo con los ids de las órdenes en las operaciones y la
+  auditoría; después guarda las operaciones y llama a `withSavedTrades(guardadas)`, que pone el id de cada
+  operación en su registro. `Trade` y `AuditEntry` siguen inmutables: se copian con `Trade.withOrderIds` y
+  `AuditEntry.withReferences`. `orders()` lleva la orden del pedido primero; `order()` la devuelve.
+- `BookOutcome` también expone `account()` (la cuenta del pedido, con sus saldos después), `executedQuantity()` y
+  `executedTotal()`, para `OrderExecutionResponse`. Cada cuenta, tenencia y orden que cambia figura una sola vez.
+- El constructor es `PlayerBook(player, quote, initialOrder, openOrders, accounts, holdings)`; el superusuario se
+  reconoce como el dueño de la orden inicial (no hace falta `superuserId`). Qué cuentas bloquear lo decide
+  `PlayerBook.accountsToLock(requesterId, side, initialOrder, openOrders)`, así el cargador no tiene `if` de negocio.
+- `PartyState.of(account, tokens)` arma la foto de una cuenta.
+- **Orden de lectura del cargador.** `PlayerBookLoader` lee las órdenes abiertas apenas toma el candado del libro
+  (las serializa ese candado) porque sus dueños son parte de las cuentas a bloquear; después bloquea las cuentas y
+  recién entonces lee el jugador, la cotización y las tenencias.
+- El 404 del servicio usa `PlayerRepository.existsById` (nuevo), que no carga el jugador.
+- `InitialOrderService` busca el superusuario con `AppUserRepository.findSuperuserId()` (nuevo: el id sin cargar
+  la cuenta, JPQL `min(id)` por rol) y lo bloquea con `lockById`; así su cuenta no se lee antes del bloqueo (D13).
+  Los jugadores salen de `PlayerRepository.findAllByIds` (nuevo, con el equipo). Las cuatro entradas son
+  `@Transactional`: `onStartup` y `afterSync` llaman a las otras dos dentro del mismo bean.
+
+Implementación de la venta (T079):
+
+- `placeBuy` y `placeSell` comparten la ejecución de un cruce. Antes de pagar, si la operación cuesta más que la
+  reserva de la compra (el precio subió), el comprador reserva la diferencia desde su libre y se suma a la reserva
+  de la orden con `MarketOrder.addToReservation` (nuevo); el plan ya verificó que le alcanza.
+- `placeSell` aplica en este orden: crea la venta y compromete sus tokens (`ORDER_CREATED`); ejecuta cada `Fill`
+  (`TRADE_EXECUTED`, autor el vendedor); cancela cada faltante con `cancelRemainder(INSUFFICIENT_CREDITS)` después
+  de ejecutar lo que sí se paga, que libera la reserva que le queda (`ORDER_CANCELLED`, autor `SYSTEM`); y recién al
+  final ajusta con `adjustReservation` la reserva de cada compra cruzada. Ajustar al final, y no después de cada
+  cruce, evita que el ajuste de una compra tome del libre lo que el plan contaba para otra del mismo dueño. Con
+  `cancelRemainder` después de ejecutar no hace falta `cancelBeyond`, que queda en el modelo sin uso en el cruce.
+- Un faltante cuya compra no tenía cambios todavía entra a las órdenes del resultado con su registro
+  (`BookOutcome.Builder.orderCancelled`).
+
+### 2.11 `Portfolio`, `PortfolioPosition` y `PortfolioTotals`
+
+Se calculan, no se guardan. La posición se llama `PortfolioPosition` porque `Position` ya es el enum de la posición
+del jugador (`modelo/position/Position`), que estas mismas clases usan (D3).
+
+`PortfolioPosition`:
+
+| Campo | Regla |
+|---|---|
+| `player` | `Player` (nombre, posición, equipo, liga, activo) |
+| `tokens` | > 0 |
+| `sharePercent` | = `tokens` (cada token es el 1 %) |
+| `committed` | tokens en ventas pendientes; solo en el actual |
+| `averagePrice`, `invested` | `CostBasis`; nulos en el del superusuario |
+| `quote` | la cotización usada (precio por token, score, vigencia) |
+| `value` | `total(tokens, quote.tokenPrice())` |
+| `profit` | `value − invested`; nulo sin `invested` |
+| `profitPercent` | `percent(profit, invested)`; nulo si `invested` es 0 o nulo |
+
+`PortfolioTotals`:
+
+| Campo | Actual | A una fecha |
+|---|---|---|
+| `availableBalance`, `reservedBalance` | sí | no (FR-040) |
+| `balance` (total) | sí | sí |
+| `invested`, `value`, `profit` | Σ de las posiciones | ídem |
+| `realizedProfit` | Σ de las ventas | Σ de las ventas hasta la fecha |
+| `equity` | `balance + value` (= libre + reservado + valor) | `balance + value` |
+
+Fábricas: `Portfolio.current(account, holdings, quotesByPlayer, realized)`, `Portfolio.currentOfSuperuser(account,
+initialOrders, quotesByPlayer)` y `Portfolio.at(day, balance, replay, quotesByPlayer)`.
+
+Implementación (T061 y T064):
+
+- `PortfolioPosition.held(player, basis, committed, quote)` (la de un usuario) y `PortfolioPosition.unsold(player,
+  tokens, quote)` (la del superusuario: sus comprometidos son todos sus tokens, que están a la venta en la orden
+  inicial). `sharePercent()` devuelve `tokens`.
+- Los totales del superusuario suman 0,00 de invertido y de ganancia (sus posiciones no tienen costo) y la realizada
+  es nula.
+- Una orden inicial de un jugador **sin cotización** no figura en el portfolio del superusuario: no se puede valuar y
+  el contrato exige `quote` y `value` en cada posición. Una **tenencia** de usuario sin cotización es un error de los
+  datos (`MarketInvariantException`): para comprar hace falta una cotización y no se borran.
+- `PortfolioService` decide el portfolio del superusuario por el rol `ADMIN` de la cuenta pedida (un administrador no
+  tiene tenencias). El que pide sin cuenta (credencial de una cuenta borrada) recibe `InvalidCredentialsException`
+  (401), como en `AccountService`.
+
+Ejemplos que fija `PortfolioTest`: 10 tokens a 1,0000 con cotización 103,00 → 10 %, invertido 10,00, precio 1,0300,
+valor 10,30, ganancia +0,30, rentabilidad +3,00 %; libre 990,00, reservado 6,18 y posiciones por 20,60 →
+patrimonio 1016,78; sin tenencias → posiciones vacías y patrimonio = saldo; 10 tokens con cotizaciones 100,00,
+120,00 y 90,00 → valor 10,00, 12,00 y 9,00.
+
+### 2.12 `TradeReplay`
+
+Dominio puro que reconstruye las posiciones a una fecha (D20).
+
+- `TradeReplay.ofUser(userId, trades)`: las operaciones ya filtradas hasta el final del día, en orden
+  (`executedAt`, `id`); compra → `CostBasis.acquire`, venta → `CostBasis.dispose`; acumula la realizada.
+- `TradeReplay.ofSuperuser(initialOrders, trades)`: 100 tokens por cada inicial creada antes del final del día,
+  menos lo vendido; sin costo ni realizada.
+- Devuelve, por jugador, `CostBasis` (o solo la cantidad) y la realizada total. Los jugadores que quedaron en 0 no
+  figuran.
+
+### 2.13 Filtros
+
+| Clase | Campos | Reglas |
+|---|---|---|
+| `MarketOrderFilter` | `side`, `league`, `team`, `ownerType`, `playerId` | `team` se normaliza como en `PlayerFilter` (vacío → `CatalogInvariantException`, 400) |
+| `TradeFilter` | `playerId`, `side`, `from`, `to` | fechas con `QuoteDay.parse`; `QuoteDay.requireOrdered` si vienen las dos; los extremos son `startOf(from)` y `endOf(to)` |
+| `AuditFilter` | `eventType`, `userId`, `playerId`, `from`, `to` | ídem |
+
+Las hojas se devuelven como `QuotePage<T>` (genérica, D17).
+
+Implementación (T088 a T091): `MarketOrderFilter` normaliza el equipo con `new PlayerFilter(league, team, null)` y
+suma `MarketOrderFilter.none()`. `MarketOrderSQLDAO.findMarket` recibe el tipo de usuario dueño como un `Boolean
+initial` (nulo: todos; verdadero: las iniciales; falso: las de usuarios), así el método queda en siete parámetros. En
+`OrderController`, el tag "Órdenes" y los requisitos de credencial pasaron de la clase a `buy` y `sell`, para que
+`GET /orders` tenga solo el tag "Mercado" y figure sin credencial en Swagger.
+
+## 3. Modelo: cambios en otros contextos
+
+### 3.1 `user`: `AppUser`
+
+Campos nuevos: `reserved` (`BigDecimal`, 2 decimales, ≥ 0) y `registeredAt` (`Instant`, nulo en las cuentas
+anteriores a la 008).
+
+| Método nuevo | Regla |
+|---|---|
+| `availableBalance()` | `balance − reserved` |
+| `reserve(amount)` | `InsufficientCreditsException` si `amount > availableBalance()` |
+| `release(amount)` | `MarketInvariantException` si `amount > reserved` |
+| `payFromReserve(amount)` | resta de `balance` y de `reserved`; `MarketInvariantException` si `amount > reserved` |
+| `receive(amount)` | suma a `balance` |
+| `requireCanTrade()` | `TradingNotAllowedException` si el rol no es `USER` |
+| `requireCanAccessAccountOf(userId)` | `AccountAccessDeniedException` si no es el dueño ni `ADMIN` |
+| `requireRegisteredBy(day)` | `DateBeforeRegistrationException` si `day` es anterior al día de `registeredAt` en hora de Argentina; sin `registeredAt` no se aplica |
+
+Fábricas: se suman `register(username, email, rawPassword, initialBalance, hasher, registeredAt)`,
+`createAdmin(username, email, rawPassword, hasher, registeredAt)` y
+`reconstitute(id, username, email, passwordHash, apiKeyHash, role, balance, reserved, registeredAt)`. Las actuales
+se conservan y delegan con `reserved = 0` y `registeredAt = null` (D5 y D6).
+
+Ejemplo (US4.3 y US4.4): 1000,00 de total; reserva de 10,30 → libre 989,70. Una venta de 4 a 1,0500 se paga con la
+reserva (4,20; quedan 6,10 reservados) y la reserva del remanente se ajusta a `6 × 1,0300 = 6,18`, tomando 0,08 del
+libre → total 995,80, reservado 6,18, libre 989,62.
+
+### 3.2 `quote`
+
+`Quote` no cambia. `QuoteRepository` suma `findInForceAt(playerId, instant)` y `findAtOf(playerIds, exclusiveEnd)`
+(sección 6.6). `QuoteResponse` y `PlayerQuoteResponse` suman `score` (D25).
+
+### 3.3 `sync`
+
+`SyncWriteService.applyLeague` llama a `InitialOrderService.openFor(ids de los jugadores guardados)` antes de
+devolver, en la misma transacción (D8). No hay cambios en `modelo/sync/`.
+
+## 4. Excepciones de dominio
+
+Todas con nombre; extienden las bases de `shared/` y el advice único las traduce (Principio III).
+
+| Excepción | Paquete | Base | Status | Mensaje (ejemplo) |
+|---|---|---|---|---|
+| `InsufficientCreditsException` | `modelo/market/exception` | `ConflictException` | 409 | "Saldo insuficiente: se necesitan 10,30 créditos y el saldo libre es 5,00." |
+| `InsufficientTokensException` | ídem | `ConflictException` | 409 | "Tokens insuficientes: tiene 4 tokens libres de este jugador." |
+| `PlayerNotTradableException` | ídem | `ConflictException` | 409 | "El jugador no se puede operar: está inactivo." / "...todavía no tiene cotización." / "...todavía no tiene su orden inicial." |
+| `SaleBlockedByInitialOrderException` | ídem | `ConflictException` | 409 | "Todavía no se puede vender: al administrador le quedan 3 tokens de este jugador." |
+| `OppositeOrderPendingException` | ídem | `ConflictException` | 409 | "Ya tiene una orden de compra pendiente de este jugador." |
+| `OrderNotCancellableException` | ídem | `ConflictException` | 409 | "La orden ya está ejecutada." / "...ya está cancelada." |
+| `MarketBusyException` | ídem | `ConflictException` | 409 | "El mercado está ocupado. Vuelva a intentar en unos segundos." |
+| `OrderNotFoundException` | ídem | `NotFoundException` | 404 | "No se encontró la orden con id 77." |
+| `OrderNotOwnedException` | ídem | `ForbiddenException` | 403 | "La orden no pertenece al usuario." |
+| `TradingNotAllowedException` | ídem | `ForbiddenException` | 403 | "El administrador no opera en el mercado." |
+| `MarketInvariantException` | ídem | `RuntimeException` | 500 | invariante interna; si salta es un error de programación (como `QuoteInvariantException`) |
+| `UserNotFoundException` | `modelo/user/exception` | `NotFoundException` | 404 | "No se encontró el usuario con id 999." |
+| `AccountAccessDeniedException` | ídem | `ForbiddenException` | 403 | "No tiene permiso para ver la cuenta de otro usuario." |
+| `DateBeforeRegistrationException` | ídem | `BadRequestException` | 400 | "La fecha 2026-08-01 es anterior al registro del usuario (2026-08-17)." |
+
+Se reutilizan `PlayerNotFoundException` (404), `InvalidQuoteDateException`, `FutureQuoteDateException`,
+`InvalidDateRangeException` (400) y `CatalogInvariantException` (400, filtro de equipo vacío).
+
+`shared/ForbiddenException` es nueva: base sin tipos de Spring, como las otras cuatro; `GlobalExceptionHandler` la
+traduce a 403 con `ApiError`.
+
+## 5. Transiciones de estado
+
+### 5.1 Una orden
+
+```text
+              fill(n < pending)            fill(n = pending)
+  PENDING ───────────────────► PARTIAL ───────────────────► EXECUTED
+     │  └──────────── fill(n = pending) ─────────────────────▲
+     │                           │
+     │ cancelRemainder           │ cancelRemainder / cancelBeyond
+     ▼                           ▼
+ CANCELLED (executed = 0)    CANCELLED (executed > 0)
+```
+
+- Solo `PENDING` y `PARTIAL` se cancelan; `EXECUTED` y `CANCELLED` son finales (FR-035).
+- La inicial nunca se cancela (FR-010).
+- No vencen (FR-021).
+
+### 5.2 Una tenencia
+
+`quantity` sube al comprar y baja al vender; `committed` sube al crear una venta y baja al ejecutarla o cancelarla.
+Al llegar `quantity` a 0, `CostBasis` se reinicia (US2.4). La fila se conserva.
+
+### 5.3 Una cuenta
+
+| Hecho | `balance` (total) | `reserved` | libre |
+|---|---|---|---|
+| crear una compra (lo necesario `N`) | = | + `N` | − `N` |
+| ejecutar `n` de esa compra por `T` | − `T` | − `T`, y se ajusta al remanente (D10, D11) | según el ajuste |
+| cobrar una venta por `T` | + `T` | = | + `T` |
+| cancelar una compra con reserva `R` | = | − `R` | + `R` |
+
+## 6. Persistencia
+
+Nombres de tabla con `@Table(name = ...)`, índices con nombre, sin SQL nativo (Principio VI). Las cantidades son
+`INTEGER`; los créditos `NUMERIC(19,2)` (como `app_user.balance`); los precios por token `NUMERIC(10,4)`; los
+enums `VARCHAR` traducidos por el mapper (D17).
+
+### 6.1 `market_orders` (`MarketOrderSQL`)
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | `BIGINT` identidad | |
+| `side` | `VARCHAR(4)` | `BUY`, `SELL` |
+| `owner_id` | `BIGINT` FK `app_user` | `@ManyToOne(LAZY)`, no actualizable |
+| `player_id` | `BIGINT` FK `players` | ídem |
+| `requested_quantity` | `INTEGER` | no actualizable |
+| `executed_quantity` | `INTEGER` | |
+| `cancelled_quantity` | `INTEGER` | |
+| `status` | `VARCHAR(10)` | copia del derivado, para filtrar |
+| `reserved_credits` | `NUMERIC(19,2)` | 0 en ventas |
+| `reservation_price` | `NUMERIC(10,4)` nullable | |
+| `created_at` | `TIMESTAMP` | no actualizable |
+| `initial_player_id` | `BIGINT` nullable | igual a `player_id` en la inicial; nulo en el resto |
+| `cancel_reason` | `VARCHAR(20)` nullable | |
+
+Índices: `ix_market_orders_book (player_id, side, status, created_at)`, `ix_market_orders_status_created (status,
+created_at)`, `ix_market_orders_owner_created (owner_id, created_at DESC)`, `ux_market_orders_initial_player
+(initial_player_id)` único.
+
+### 6.2 `holdings` (`HoldingSQL`)
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | `BIGINT` identidad | |
+| `owner_id` | `BIGINT` FK `app_user` | |
+| `player_id` | `BIGINT` FK `players` | |
+| `quantity` | `INTEGER` | |
+| `committed_quantity` | `INTEGER` | |
+| `acquired_quantity` | `INTEGER` | `CostBasis` |
+| `acquired_cost` | `NUMERIC(19,2)` | `CostBasis` |
+
+Índice: `ux_holdings_owner_player (owner_id, player_id)` único.
+
+### 6.3 `market_trades` (`TradeSQL`, `@Immutable`, sin setters, columnas `updatable = false`)
+
+| Columna | Tipo |
+|---|---|
+| `id` | `BIGINT` identidad |
+| `executed_at` | `TIMESTAMP` |
+| `player_id` | `BIGINT` FK `players` |
+| `buy_order_id`, `sell_order_id` | `BIGINT` FK `market_orders` |
+| `buyer_id`, `seller_id` | `BIGINT` FK `app_user` |
+| `seller_type` | `VARCHAR(5)` |
+| `quantity` | `INTEGER` |
+| `token_price` | `NUMERIC(10,4)` |
+| `total` | `NUMERIC(19,2)` |
+| `quote_id` | `BIGINT` FK `quotes` |
+| `buyer_balance_before`, `buyer_balance_after`, `seller_balance_before`, `seller_balance_after` | `NUMERIC(19,2)` |
+| `buyer_tokens_before`, `buyer_tokens_after`, `seller_tokens_before`, `seller_tokens_after` | `INTEGER` |
+| `realized_profit` | `NUMERIC(19,2)` nullable |
+
+Índices: `ix_market_trades_buyer_executed (buyer_id, executed_at DESC)`, `ix_market_trades_seller_executed
+(seller_id, executed_at DESC)`.
+
+### 6.4 `audit_entries` (`AuditEntrySQL`, `@Immutable`, sin setters, columnas `updatable = false`)
+
+| Columna | Tipo |
+|---|---|
+| `id` | `BIGINT` identidad |
+| `occurred_at` | `TIMESTAMP` |
+| `event_type` | `VARCHAR(20)` |
+| `actor_type` | `VARCHAR(10)` |
+| `actor_id` | `BIGINT` nullable (sin FK: el autor puede ser el sistema) |
+| `player_id` | `BIGINT` |
+| `order_id` | `BIGINT` |
+| `trade_id` | `BIGINT` nullable |
+| `side` | `VARCHAR(4)` |
+| `quantity` | `INTEGER` |
+| `token_price` | `NUMERIC(10,4)` nullable |
+| `total` | `NUMERIC(19,2)` nullable |
+| `quote_id` | `BIGINT` nullable |
+| `cancel_reason` | `VARCHAR(20)` nullable |
+| `detail` | `VARCHAR(500)` |
+| `primary_user_id`, `primary_free_before`, `primary_free_after`, `primary_reserved_before`, `primary_reserved_after`, `primary_tokens_before`, `primary_tokens_after` | `@Embedded AuditPartySQL` con `@AttributeOverrides` |
+| `secondary_user_id`, `secondary_...` (las mismas siete) | ídem, nullable |
+
+Índices: `ix_audit_entries_occurred (occurred_at DESC)`, `ix_audit_entries_primary_user (primary_user_id,
+occurred_at)`, `ix_audit_entries_secondary_user (secondary_user_id, occurred_at)`, `ix_audit_entries_player
+(player_id, occurred_at)`.
+
+Los ids de la auditoría (`player_id`, `order_id`, `trade_id`, `quote_id`, usuarios) son columnas simples, sin FK: un
+registro de auditoría describe un hecho y no tiene que impedir nada en las demás tablas.
+
+### 6.5 `app_user` (`AppUserSQL`, cambia)
+
+| Columna nueva | Tipo | Notas |
+|---|---|---|
+| `reserved_balance` | `NUMERIC(19,2) DEFAULT 0 NOT NULL` | `@ColumnDefault("0.00")`, para `ddl-auto: update` sobre una base existente |
+| `registered_at` | `TIMESTAMP` nullable | no actualizable |
+
+### 6.6 Consultas (derived o JPQL, sin `nativeQuery`)
+
+| DAO | Método | Qué hace |
+|---|---|---|
+| `MarketOrderSQLDAO` | `findByInitialPlayerId(playerId)` con `@Lock(PESSIMISTIC_WRITE)` | el candado del libro (D13) |
+| | `findPlayerIdById(orderId)` (JPQL escalar) | el jugador de una orden sin cargarla |
+| | `findById` (sin bloqueo propio: el candado del libro ya serializa sus cambios) | la orden a cancelar, leída después de bloquear el libro |
+| | `findOpenOfPlayer(playerId)` (JPQL: `initialPlayerId is null`, `status in (PENDING, PARTIAL)`, `order by createdAt, id`) | el libro de usuarios |
+| | `findPlayerIdsWithoutInitialOrder()` y `...In(ids)` (JPQL con `not exists`) | órdenes iniciales a crear (D8) |
+| | `findMarket(filtros, Pageable)` (JPQL con `join fetch` de jugador y equipo, filtros nulos que no filtran, `order by createdAt, id`) + conteo | el listado (D22) |
+| | `findByOwnerId(ownerId, Pageable)` (`order by createdAt desc, id desc`, con jugador) | órdenes propias |
+| | `findInitialOrdersOf(ownerId)` (JPQL, `initialPlayerId is not null`, con jugador y equipo) | las iniciales del superusuario para su portfolio |
+| `HoldingSQLDAO` | `findByPlayerIdAndOwnerIdIn(playerId, ownerIds)` | las tenencias del libro |
+| | `findPositions(ownerId)` (JPQL con `join fetch` de jugador y equipo, `quantity > 0`) | el portfolio actual |
+| `TradeSQLDAO` | `findHistory(userId, playerId, side, from, to, Pageable)` (JPQL, `buyer.id = :u or seller.id = :u`, `join fetch` de jugador, equipo, cotización y estrategia, `order by executedAt desc, id desc`) + conteo | el historial (D21) |
+| | `findOfUserBefore(userId, end)` (`order by executedAt, id`) | la reconstrucción a una fecha |
+| | `sumRealizedProfitOfSeller(userId)` | la realizada del portfolio actual |
+| | `findLastOfUserBefore(userId, end)` y `findFirstOfUserAtOrAfter(userId, end)` (JPQL con una hoja de tamaño 1) | el saldo a una fecha (D20) |
+| `AuditEntrySQLDAO` | `findAudit(filtros, Pageable)` (JPQL, `order by occurredAt desc, id desc`) + conteo | la consulta de auditoría |
+| `AppUserSQLDAO` (cambia) | `findWithLockById(id)` con `@Lock(PESSIMISTIC_WRITE)` | las cuentas, de a una y en orden ascendente |
+| | `findFirstByRoleOrderByIdAsc(role)` | el superusuario |
+| `QuoteSQLDAO` (cambia) | `findInForceAt(playerId, instant)` (JPQL, `max(validFrom) where validFrom <= :instant`) | el precio de una operación (D14) |
+| | `findLastBeforeOf(playerIds, end)` (JPQL, por jugador la de mayor vigencia anterior a `end`) | la valuación a una fecha (D20) |
+
+Las consultas con `@Lock` son de una sola tabla y sin `join fetch`. Las de lectura con `join fetch` son
+`readOnly`.
+
+### 6.7 Repositories
+
+En `persistence/repository/market/`: `MarketOrderRepository`, `HoldingRepository`, `TradeRepository` (solo
+`saveAll` y lecturas) y `AuditRepository` (solo `saveAll` y lecturas). Envuelven al DAO, invocan al mapper,
+reciben y devuelven modelo, y traducen `PessimisticLockingFailureException` a `MarketBusyException` (D13).
+`AppUserRepository` suma `lockById(id)`, `lockAllInOrder(ids)` (ordena y bloquea de a una) y `findSuperuser()`.
+`QuoteRepository` suma `findInForceAt` y `findAtOf`.
+
+## 7. Invariantes y dónde se verifican
+
+| Invariante | Dónde se decide | Dónde se prueba |
+|---|---|---|
+| 1 ≤ cantidad ≤ 100, entera | DTO (forma) y `MarketOrder` (invariante) | `OrderControllerIT`, `MarketOrderTest` |
+| pendiente de la inicial + Σ tenencias = 100 | `PlayerBook` (mueve los tokens de a pares) | `MarketOrderServiceIT`, `MarketConcurrencyIT` |
+| libre ≥ 0, reservado ≥ 0 | `AppUser` | `AppUserMarketTest`, IT |
+| Σ saldos = Σ saldos iniciales | `PlayerBook` (cada `Trade` paga y cobra el mismo total) | IT |
+| `reserved` = Σ `reservedCredits` de sus compras abiertas | `PlayerBook` | IT |
+| `committed` = Σ pendientes de sus ventas abiertas | `Holding` y `PlayerBook` | IT |
+| una sola inicial por jugador | índice único y bloqueo del superusuario | `InitialOrderIT` |
+| el libro no tiene pendientes de los dos lados | `PlayerBook` | `PlayerBookTest` |
+| una operación y la auditoría no se modifican | `@Immutable`, sin setters, repositories sin update ni delete | `TradeRepositoryIT`, `AuditRepositoryIT` |
+
+## 8. Trazabilidad: dónde se decide cada regla
+
+| Requisito | Clase |
+|---|---|
+| FR-001, FR-002 | `MarketMath.TOKENS_PER_PLAYER`, `Quote.tokenPrice()`, `OrderMatcher` (1,0000 contra la inicial) |
+| FR-003, FR-004 | `MarketMath.total`; `Trade` (un total para las dos partes); sin comisión |
+| FR-005, FR-006 | `AppUser` (saldo inicial de la 001, `reserve`, `payFromReserve`, `receive`, invariantes) |
+| FR-007 a FR-009 | `MarketOrder.initialFor`, `InitialOrderService`, `InitialOrderStartup`, `SyncWriteService` |
+| FR-010 | `SecurityConfig` (`POST /orders/**` solo `USER`), `AppUser.requireCanTrade`, `MarketOrder.requireOwnedBy` |
+| FR-011 | `PlayerBook.placeSell` → `SaleBlockedByInitialOrderException` |
+| FR-012 | `InitialOrderService` (sin superusuario, advierte y no crea) y `PlayerBook.isTradable` |
+| FR-013 | controllers (`@AuthenticationPrincipal`) |
+| FR-014 | `OrderRequest` y `MarketOrder` |
+| FR-015, FR-016 | `PlayerBook` con `AppUser.reserve` y `Holding.commit` |
+| FR-017 | `PlayerBook` → `OppositeOrderPendingException`; `OrderMatcher` saltea las propias |
+| FR-018, FR-031 a FR-033 | `MarketOrderService` (404) y `PlayerBook.isTradable` (409) |
+| FR-019 a FR-021 | `MarketOrder` |
+| FR-022 a FR-024 | `OrderMatcher` |
+| FR-025 | `MarketOrderService` (`@Transactional`) y el bloqueo de D13 |
+| FR-026 | `PlayerBook` |
+| FR-027 | `MarketMath.maxAffordable`, `OrderMatcher` (`shortfalls`), `PlayerBook` (D11) |
+| FR-028, FR-029 | `Trade`, `Holding.sell`, `CostBasis.dispose` |
+| FR-030 | `QuoteRepository.findInForceAt`; el mercado no usa adapters |
+| FR-034, FR-035 | `PlayerBook.cancel`, `MarketOrder.cancelRemainder`, `MarketOrder.requireOwnedBy` |
+| FR-036 a FR-039 | `Portfolio`, `PortfolioPosition`, `CostBasis` |
+| FR-040, FR-041 | `TradeReplay`, `Portfolio.at`, `QuoteDay`, `AppUser.requireRegisteredBy` |
+| FR-042, FR-046 | `AppUser.requireCanAccessAccountOf` |
+| FR-043 a FR-045 | `TradeFilter`, `TradeView`, `MarketQueryService` |
+| FR-047 a FR-049 | `MarketOrderFilter`, `MarketQueryService`, `MarketOrderResponse` (sin el dueño) |
+| FR-050 a FR-053 | `AuditEntry`, `AuditRepository`, `AuditQueryService`, `SecurityConfig` |
+| FR-054 a FR-056 | controllers, DTO, `SecurityConfig`, `GlobalExceptionHandler` |
+| FR-057 | `ProfileResponse` (puerta G3, cumplida) |
+| FR-058 | `QuoteResponse`, `PlayerQuoteResponse` |
+| FR-059, FR-060 | tests de D28 |
+| FR-061 a FR-072 | frontend (sección 10) |
+
+## 9. Respuestas HTTP (resumen; el contrato completo está en `contracts/`)
+
+En `controller/market/dto/`, con los nombres de los esquemas del contrato:
+
+| DTO | Esquema | Forma |
+|---|---|---|
+| `OrderRequest` | `OrderRequest` | `playerId`, `quantity` (D23) |
+| `PlayerRefResponse` | `PlayerRef` | `id`, `name`, `team`, `league` |
+| `MarketOrderResponse` / `MarketOrderPageResponse` | `MarketOrder` / `MarketOrderPage` | listado: `id`, `player`, `side`, `ownerType`, cantidades pedida, ejecutada y pendiente, `status`, `createdAt`; sin dueño |
+| `UserOrderResponse` / `UserOrderPageResponse` | `UserOrder` / `UserOrderPage` | `MarketOrder` más `cancelledQuantity` y `reservedCredits`; la usan las órdenes propias, la ejecución y la cancelación |
+| `QuoteUsedResponse` | `QuoteUsed` | `validFrom`, `value`, `tokenPrice`, `score`, `strategy` (`StrategyRefResponse` de la 007) |
+| `TradeSummaryResponse` | `TradeSummary` | `id`, `executedAt`, `quantity`, `tokenPrice`, `total`, `counterparty`, `quote` |
+| `OrderExecutionResponse` | `OrderExecution` | `order`, `trades`, `executedQuantity`, `executedTotal`, `balance`, `availableBalance`, `reservedBalance` |
+| `OrderCancellationResponse` | `OrderCancellation` | `order`, `balance`, `availableBalance`, `reservedBalance` |
+| `PortfolioResponse`, `PortfolioPositionResponse`, `PortfolioTotalsResponse` | `Portfolio`, `PortfolioPosition`, `PortfolioTotals` | D19 y D20 |
+| `TransactionResponse` / `TransactionPageResponse` | `Transaction` / `TransactionPage` | historial (D21) |
+| `AuditEntryResponse`, `AuditPartyResponse` / `AuditPageResponse` | `AuditEntry`, `AuditParty` / `AuditPage` | auditoría (D18) |
+
+Cambian: `ProfileResponse` (+ `availableBalance`, `reservedBalance`; puerta G3, cumplida), `QuoteResponse` y
+`PlayerQuoteResponse` (+ `score`).
+
+## 10. Tipos del frontend (`frontend/src/types/market.ts`)
+
+Escritos a mano desde `contracts/market-api.yaml`; los enums tal cual el backend.
+
+```ts
+export const ORDER_SIDES = ['BUY', 'SELL'] as const;
+export const ORDER_STATUSES = ['PENDING', 'PARTIAL', 'EXECUTED', 'CANCELLED'] as const;
+export const OWNER_TYPES = ['USER', 'ADMIN'] as const;
+
+interface PlayerRef { id: number; name: string; team: string; league: League }
+
+interface MarketOrder {            // listado público
+  id: number; player: PlayerRef; side: OrderSide; ownerType: OwnerType; status: OrderStatus;
+  requestedQuantity: number; executedQuantity: number; pendingQuantity: number; createdAt: string;
+}
+interface UserOrder extends MarketOrder { cancelledQuantity: number; reservedCredits: number }
+interface QuoteUsed { validFrom: string; value: number; tokenPrice: number; score: number; strategy: StrategyRef }
+interface TradeSummary { id: number; executedAt: string; quantity: number; tokenPrice: number; total: number;
+                         counterparty: OwnerType; quote: QuoteUsed }
+interface OrderExecution { order: UserOrder; trades: TradeSummary[]; executedQuantity: number;
+                           executedTotal: number; availableBalance: number; reservedBalance: number; balance: number }
+// PortfolioPosition y no Position, que ya es la posición del jugador en types/api.ts
+interface PortfolioPosition { player: PlayerRef & { position: Position; active: boolean }; tokens: number;
+                     sharePercent: number; committed?: number; averagePrice: number | null; invested: number | null;
+                     quote: QuoteUsed; value: number; profit: number | null; profitPercent: number | null }
+interface PortfolioTotals { balance: number; availableBalance?: number; reservedBalance?: number; invested: number;
+                            value: number; profit: number; realizedProfit: number | null; equity: number }
+interface Portfolio { userId: number; date: string | null; positions: PortfolioPosition[]; totals: PortfolioTotals }
+interface Transaction { id: number; executedAt: string; player: PlayerRef; side: OrderSide; quantity: number;
+                        tokenPrice: number; total: number; counterparty: OwnerType; orderId: number;
+                        quote: QuoteUsed; realizedProfit?: number | null }
+// Páginas con PageInfo de types/quotes.ts; queries con los mismos nombres que la dirección (D27)
+```
+
+Cambian: `Profile` (`types/api.ts`) suma `availableBalance` y `reservedBalance`; `Quote` (`types/quotes.ts`) suma
+`score?: number` (opcional a propósito, D27) y el comentario del encabezado.
+
+Tipos propios de la interfaz: `MarketFilters` (`side`, `league`, `team`, `ownerType`, `page`), `TransactionFilters`
+(`player`, `side`, `from`, `to`, `page`), `TradeEstimate` (cantidad a 1,0000, cantidad al precio vigente, total
+estimado) y `TradeBlock` (`'not-tradable' | 'sale-blocked' | null`, con el motivo).
+
+Implementación (T034 a T042):
+
+- La hoja de `MarketFilters` y `TransactionFilters` es desde 1, como `BoardFilters` (sección 12.4). `TradeBlock` es
+  `{ kind: 'not-tradable', reason }`, `{ kind: 'sale-blocked', remainingTokens }` o `null`. Las consultas a la API
+  son `MarketOrderQuery`, `TransactionQuery` y `PageQuery`.
+- `utils/market.ts` calcula los totales en enteros (centavos y diezmilésimos) y formatea con `Intl` de es-AR, como
+  `utils/quotes.ts`: el signo menos es el guion común ("-0,30"), igual que en `formatSignedCredits`. `formatScore`
+  muestra al menos dos decimales y hasta seis ("0,30", "0,123456").
+- `RequireRole` ya tenía la prop `role` con `ADMIN` por defecto (de la 007). Lo que cambió es el aviso de falta de
+  permiso, que depende del rol que pide la ruta; el de la administración no cambia.
+- `useOrderCommands` expone `trade` (comprar y vender comparten el estado) y `cancellation`, cada uno con `status`,
+  `data`, `error` y `reset`, y `buy`, `sell` y `cancel`. Si el perfil no se puede volver a pedir después de una
+  operación, la operación igual se informa como hecha.
+- Mocks: `createMarketHandlers` recibe de `handlers.ts` las cuentas simuladas, así comprar y cancelar cambian los
+  saldos de `GET /auth/me`. Simplifican el cruce: una compra solo se cruza con la orden inicial y una venta queda
+  pendiente.
+
+## 11. Configuración
+
+| Clave | `application.yaml` | `application-test.yml` | Para qué |
+|---|---|---|---|
+| `futbolmarket.market.initial-orders.automatic` | `true` | `false` | generar las órdenes iniciales al arrancar y al sincronizar (D8) |
+
+`config/MarketProperties` (`record` con `@ConfigurationProperties("futbolmarket.market")`) se registra en
+`ApplicationConfig`. La URL de H2 de `application-local.yml` suma `;LOCK_TIMEOUT=10000` (D13); los IT del mercado lo
+ponen en la URL de su base propia (sección 12.3). No se agrega ninguna otra clave.
+
+## 12. Contraste con el código (T002, 2026-10-28)
+
+Antes de implementar se contrastaron con el código de la rama (con `develop` y `cf0a0dd` ya integrados) los nombres
+que usa este diseño. Lo que coincide no cambia nada; lo que difiere, o lo que el diseño no precisaba, queda anotado
+acá. Donde dice "a decidir", el punto queda abierto para el equipo.
+
+### 12.1 Coinciden
+
+- `Quote.tokenPrice()` (valor / 100, con 4 decimales exactos), `Quote.score()` (6 decimales, de −1 a +1) y
+  `Quote.validFrom()`.
+- `QuotePage<T>` (`modelo/quote/`), con el constructor `(content, page, size, totalElements)` que calcula el resto.
+- `PlayerNotFoundException(Long playerId)` (`modelo/player/exception/`, 404): "No se encontró el jugador con id N."
+- `CatalogInvariantException` (`modelo/player/exception/`, extiende `BadRequestException`): "El equipo del filtro no
+  puede estar vacío."
+- El bean `Clock` de `ApplicationConfig` (`Clock.systemUTC()`). La misma clase ya tiene `@EnableAsync` y la lista de
+  `@EnableConfigurationProperties` a la que se suma `MarketProperties`.
+- `QuoteStartupRecalculation` (`@Async` y `@EventListener(ApplicationReadyEvent.class)`), el patrón de
+  `InitialOrderStartup`.
+- En el frontend existen con esos nombres `useMutation`, `useAsync`, `refreshProfile`, `request()`,
+  `useBoardFilters`, `Pager`, `DateRangePicker`, `TeamSelect`, `VariationBadge` y `RequoteChoice` (sus formas, en
+  12.4).
+
+### 12.2 Backend: modelo, persistencia y `shared/`
+
+| Diseño | Código | Consecuencia |
+|---|---|---|
+| "La estrategia y su versión" de `Quote` | Un solo campo: `Quote.strategy()`, `StrategyVersionRef(versionId, strategyId, name, version)`. `StrategyRefResponse.from(ref)` de la 007 expone `id` = `strategyId` (no el de la versión), `name` y `version` | `TradeView` y `QuoteUsedResponse` leen `quote.strategy()`; `QuoteUsedResponse.strategy` usa `StrategyRefResponse.from` |
+| `MarketMath.PRICE_SCALE = 4`, `PERCENT_SCALE = 2` y `TOKENS_PER_PLAYER = 100` (2.2) | `Quote` ya tiene públicas `TOKEN_PRICE_SCALE = 4` y `PERCENT_SCALE = 2`, y privada `TOKENS_PER_PLAYER` | Propuesta: `MarketMath` toma las dos escalas de `Quote` en vez de repetir el literal; `TOKENS_PER_PLAYER` queda en `MarketMath` porque la de `Quote` es privada |
+| `QuoteDay.parse`, `requireNotFuture`, `requireOrdered`, `startOf` y `endOf` (2.13) | `requireNotFuture(LocalDate day, LocalDate today)` recibe el día de hoy y devuelve `day`; `QuoteDay.today(Instant)` da ese día en hora de Argentina. `endOf(day)` es el 00:00 del día siguiente, **excluido**. `parse(null)` lanza `InvalidQuoteDateException` | El día de hoy sale de `QuoteDay.today(clock.instant())`. Los rangos se consultan con `>= startOf(from)` y `< endOf(to)`, y el portfolio a una fecha corta en `< endOf(day)`. Los filtros parsean solo las fechas que vienen |
+| `team` normalizado "como en `PlayerFilter`" (2.13) | La regla es un `private static normalizeTeam` del constructor compacto de `PlayerFilter`: no se puede llamar desde afuera | Propuesta: `MarketOrderFilter` normaliza con `new PlayerFilter(league, team, null).team()`, sin duplicar la regla ni el mensaje |
+| `QuoteRepository.findCurrentOf` (D19) | `List<Quote> findCurrentOf(Collection<Long> playerIds)`: una consulta, sin tope; los jugadores sin cotización no figuran; sin ids no consulta la base. Ya existen `findCurrent(playerId)` y `findAt(playerId, exclusiveEnd)`, la última con vigencia **anterior** al instante | `PortfolioService` indexa la lista por `playerId`. `findInForceAt(playerId, instant)` hace falta porque incluye el instante (`<=`), a diferencia de `findAt`; `findAtOf(playerIds, exclusiveEnd)` es `findAt` para varios jugadores y conserva su semántica |
+| `AppUserRepository.translate` (patrón para `MarketBusyException`) | `private RuntimeException translate(DataIntegrityViolationException)`: devuelve (no lanza) la excepción de modelo según el nombre del índice. El repository no tiene `@Transactional` | No se reutiliza: la traducción de `PessimisticLockingFailureException` va en un método privado nuevo con la misma forma (`catch` y `throw` de lo que devuelve). `lockById` y `lockAllInOrder` corren en la transacción de quien llama: `MarketOrderService`, `InitialOrderService.openMissing` y `openFor` tienen que ser `@Transactional`, porque un `@Lock` sin transacción falla |
+| Bases de `shared/`; `ForbiddenException` "abstracta, como `ConflictException`" (T005) y "como las otras cuatro" (sección 4) | Las bases son **cinco** (`BadRequestException` 400, `UnauthorizedException` 401, `NotFoundException` 404, `ConflictException` 409 y `ServiceUnavailableException` 503), todas `public class` **concretas** con un constructor `(String message)`. El advice tiene un `@ExceptionHandler` por base | Propuesta: `ForbiddenException` igual que las demás (concreta, con `(String message)`) y un `handleForbiddenException` con el mismo cuerpo que los otros handlers |
+| Sobrecarga `AppUser.register(..., registeredAt)` (3.1) | `register` devuelve `RegisteredUser` (la cuenta y su clave de API), no `AppUser`. `createAdmin` deja el saldo en 0 | La sobrecarga también devuelve `RegisteredUser`. El superusuario arranca con saldo 0 y solo cobra |
+
+### 12.3 Backend: apoyo de tests y configuración de los IT
+
+| Diseño | Código | Consecuencia |
+|---|---|---|
+| `service/quote/QuoteDatabase` (T033) | No es un bean: se arma con `new QuoteDatabase(ApplicationContext)`. `clean()` borra cotizaciones, estadísticas, partidos, temporadas, jugadores y equipos; **no borra `app_user`** ni las estrategias. **No guarda cotizaciones**: los IT las guardan con `QuoteRepository.saveAll` sobre `strategyRepository.findCatalog().activeVersion().ref()` (como `QuoteControllerIT`) | `MarketDatabase` se arma igual, borra las cuatro tablas y delega en `clean()`. Como las cuentas no se borran, las invariantes de saldo se verifican sobre las cuentas del escenario |
+| Cotización "con valor, score y vigencia" (`MarketFixtures`, T032) | El constructor de `Quote` ata la vigencia al tipo: `INITIAL` rige desde el inicio de su semana y sin valor base; `CALCULATED`, desde el cierre de su semana; `REQUOTED`, desde cualquier instante, con valor base | Para una vigencia arbitraria, `REQUOTED` con valor base; si no, la vigencia es el inicio o el cierre de la semana |
+| `service/quote/MutableClock` | `new MutableClock(Instant)`, `set(Instant)`, zona UTC. Los IT lo publican con una `@TestConfiguration` anidada con `@Bean @Primary MutableClock testClock()` | Los IT del mercado lo publican igual |
+| Administrador y base propia de los IT "en `@TestPropertySource`" (T033 y T056) | Hay dos patrones (corregido en T019 a T033: la primera versión de esta fila decía que no se usaba `@TestPropertySource`). Sin administrador, `@TestPropertySource` con una base fija, `spring.datasource.url=jdbc:h2:mem:<nombre>;DB_CLOSE_DELAY=-1` (24 IT, como `QuoteRepositoryIT`). Con administrador, `@DynamicPropertySource` con `futbolmarket.auth.admin.username`, `.email` y `.password` (con un sufijo al azar de 8 caracteres) y la base `jdbc:h2:mem:<nombre>-<sufijo>;DB_CLOSE_DELAY=-1` (11 IT) | Los IT del mercado siguen el mismo criterio, con `;LOCK_TIMEOUT=10000` al final de la URL. `InitialOrderIT`, que configura el administrador, pone `futbolmarket.market.initial-orders.automatic=true` por el mismo registro |
+| `AdminAccountInitializer` suma el `Clock` "con `@RequiredArgsConstructor`; ningún test lo construye a mano" (research D6, T030) | `AdminAccountInitializerTest` sí lo construye a mano, con tres argumentos (línea 157) | Como `AuthService`: un constructor de tres argumentos que delega con `Clock.systemUTC()`, para que ese test no cambie, y el de cuatro con `@Autowired` para Spring (relevado en T030) |
+| El superusuario al arrancar (T047 y T056) | `AdminAccountInitializer` es un `ApplicationRunner`: corre **antes** de que se publique `ApplicationReadyEvent` | Cuando arranca `InitialOrderStartup`, la cuenta del administrador ya existe si está configurada |
+| Esperar al `@Async` del arranque "con el mecanismo de los IT existentes" (T056) | Ningún IT espera un proceso de arranque: el perfil test apaga los dos (`sync.on-startup` y `quotes.recalculation.on-startup` en `false`), y `StartupSync` y `QuoteStartupRecalculation` solo tienen tests unitarios. Awaitility 4.3.0 ya está en el classpath de test (llega con `spring-boot-starter-test` 4.1.1), pero ningún test lo usa | Decidido en T056: Awaitility (no es una dependencia nueva). Como el catálogo está vacío al levantar el contexto, `InitialOrderIT` carga los jugadores y vuelve a publicar `ApplicationReadyEvent`; espera el `@Async` con `await().untilAsserted`. El caso sin administrador es una clase `@Nested` con `@NestedTestConfiguration(OVERRIDE)` y su propio contexto |
+| `MarketDatabase` (T033) | — | Suma, para los IT de la US1 (T056 a T059): `clean()` borra también las cuentas `USER` (su reserva rompería las invariantes del escenario siguiente; el administrador queda), `user(saldo)`, `quote(jugador, valor, score, vigencia)` con la estrategia activa de la base, `superuser()`, `account(id)`, lecturas como modelo (`orders()`, `initialOrderOf`, `ordersOf`, `holdingOf`, `trades()`, `auditEntries()`) y `totalBalance(ids)` |
+
+### 12.4 Frontend
+
+| Diseño | Código | Consecuencia |
+|---|---|---|
+| `useMutation` | `useMutation<A, T>(command)` devuelve `{ status, data, error, isConflict, run, reset }`; `run` devuelve `T \| undefined` y no lanza los `ApiRequestError`, que quedan en `error` | `useOrderCommands` llama a `refreshProfile` solo cuando `run` devolvió un resultado |
+| `useAsync` | `useAsync(task: (signal) => Promise<T>, deps)` devuelve el `AsyncState<T>` y `retry` | Sin cambios |
+| `refreshProfile` de `context/SessionContext.tsx` | Es parte de `SessionContextValue`; los hooks lo toman con `useSession()` (`hooks/useSession.ts`), no del contexto directo | `useOrderCommands` usa `useSession().refreshProfile` |
+| `request()` de `services/httpClient.ts` | `request<T>(method, path, { query, body, signal })`; antepone `/api` y **ya omite** de `query` los valores `undefined`, `null` y `''` | `marketService` y `portfolioService` pasan los filtros tal cual: no hace falta quitar los vacíos (T037) |
+| `useBoardFilters` | La hoja (`page`) de la dirección es **desde 1**: si falta vale 1, no se escribe si es 1, y `utils/filters.ts` la pasa a la API restando 1. Al cambiar un filtro vuelve a 1. Al cambiar de liga descarta el equipo que no es de esa liga (con `useCatalog`) | `useMarketFilters` sigue la misma convención: "la hoja vuelve a la primera" es `page` = 1 en la dirección y 0 en la API (el "vuelve a 0" de los casos del plan es la hoja de la API) |
+| `Pager` | Props `sheet`, `totalSheets`, `hasPrevious`, `hasNext`, `onPrevious` y `onNext`; su `aria-label` es fijo: "paginación de la pizarra" | Reutilizado sin cambios en Mercado y Operaciones, un lector de pantalla anuncia "pizarra". A decidir: aceptarlo o sumarle una prop opcional de etiqueta, que toca un componente existente |
+| `DateRangePicker` | Props `value: QuoteRange` (`from?` y `to?`, `AAAA-MM-DD`), `onChange` y `today?`. Rechaza por su cuenta el rango invertido (`La fecha "desde" no puede ser posterior a la fecha "hasta".`) y trae los rangos rápidos "Últimas 8 semanas", "Últimas 26 semanas" y "Todo el historial" | Sirve sin cambios para `from` y `to` de Operaciones, con el rechazo del rango invertido incluido (T108). No sirve para la fecha única del portfolio, que va con `input type="date"` (T121) |
+| `TeamSelect` | Props `teams`, `value`, `status`, `onOpen`, `onSelect` y `onRetry`: la lista de equipos la carga quien lo usa | `MarketFilters` recibe los equipos y su estado desde la página, que los carga con `useCatalog` como la pizarra |
+| `VariationBadge` | Props `variation?` y `tone?` (`'chalk'` o `'ink'`); triángulo, monto y porcentaje con signo y el texto "sube" o "baja" | `ProfitBadge` sigue esa forma con "gana", "pierde" y "sin cambios" |
+| `RequoteChoice` como patrón de `ConfirmDialog` (D27, T039) | **No es un diálogo**: es un grupo de opciones en línea con los botones "Confirmar" y "Cancelar" opcionales. No tiene `role="dialog"`, foco inicial, Enter ni Escape | De `RequoteChoice` se toma solo que nada se envía hasta confirmar y el par de botones; `role="dialog"`, `aria-labelledby`, el foco inicial y el manejo de Enter y Escape de `ConfirmDialog` son nuevos |
+| `PlayerPage` y la tabla de cotizaciones (T076) | `PlayerQuotes.test.tsx` de la 007 busca **la única** `table` de la ficha (`getByRole('table')`) | Las órdenes pendientes de la ficha van con `OrderList` en la variante `market` y `layout="list"` (nuevo): tarjetas en una lista con los mismos datos, sin tabla. Van sobre el pizarrón, debajo de la hoja, junto con `TradePanel`, porque sus estilos son de tiza |
+| `Player.active` | La API lo envía en `GET /players/{id}`, pero el tipo `Player` del frontend no lo tenía y los jugadores de prueba de la 002 a la 007 no lo traen | `active?: boolean` opcional en `types/api.ts`; sin el campo el jugador se toma como activo. La ficha lo usa para el aviso de no operable (T073) |

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { ChartPoint, Quote } from '../types/quotes';
 import { axisTicks, polylinePoints, scalePoints, toChartPoints, valueDomain } from '../utils/chart';
 import { formatBalance } from '../utils/format';
+import { formatScore } from '../utils/market';
 import { formatCredits, formatDay, quoteTypeLabel, weekLabel } from '../utils/quotes';
 import styles from './QuoteChart.module.css';
 
@@ -20,11 +21,13 @@ export function pointLabel(point: ChartPoint): string {
   return `Cotización de la ${weekLabel(point.week)}`;
 }
 
+// El score va al final, cuando la cotización lo trae (FR-058 de la 008)
 function pointDetail(point: ChartPoint): string {
   const { quote } = point;
+  const score = quote.score === undefined ? '' : `, score ${formatScore(quote.score)}`;
   return (
     `${pointLabel(point)}: ${formatCredits(point.value)}, ${quoteTypeLabel(quote.type)}, ` +
-    `estrategia ${quote.strategy.name}, versión ${quote.strategy.version}`
+    `estrategia ${quote.strategy.name}, versión ${quote.strategy.version}${score}`
   );
 }
 

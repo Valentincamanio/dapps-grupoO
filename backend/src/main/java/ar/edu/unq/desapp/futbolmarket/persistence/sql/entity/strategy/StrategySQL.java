@@ -20,6 +20,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 
 /**
@@ -31,6 +32,12 @@ import org.hibernate.annotations.CreationTimestamp;
  * {@code active}, que tiene exactamente una fila de toda la tabla en {@code true} (lo garantiza
  * {@code StrategyCatalog} dentro de una transacción). {@code created_at} lo asigna Hibernate al
  * insertar.</p>
+ *
+ * <p>La baja de una estrategia no borra filas, porque las cotizaciones apuntan a sus versiones: se
+ * marca en {@code deleted} y {@code original_name} de su versión 1, y {@code name} cambia en todas sus
+ * versiones para que el nombre quede libre (es lo único, además de las marcas, que cambia en una fila
+ * guardada). El valor por defecto deja en {@code false} las filas de una base anterior cuando
+ * {@code ddl-auto: update} agrega la columna.</p>
  */
 @Entity
 @Table(name = "strategies",
@@ -51,7 +58,7 @@ public class StrategySQL {
     @JoinColumn(name = "root_id", updatable = false)
     private StrategySQL root;
 
-    @Column(nullable = false, length = NAME_LENGTH, updatable = false)
+    @Column(nullable = false, length = NAME_LENGTH)
     private String name;
 
     @Column(name = "version_number", nullable = false, updatable = false)
@@ -67,6 +74,13 @@ public class StrategySQL {
 
     @Column(nullable = false)
     private boolean active;
+
+    @ColumnDefault("false")
+    @Column(nullable = false)
+    private boolean deleted;
+
+    @Column(name = "original_name", length = NAME_LENGTH)
+    private String originalName;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -103,5 +117,17 @@ public class StrategySQL {
 
     public void deactivate() {
         active = false;
+    }
+
+    /**
+     * La baja va en la versión 1, que guarda el nombre que tenía la estrategia.
+     */
+    public void markDeleted(String formerName) {
+        deleted = true;
+        originalName = formerName;
+    }
+
+    public void rename(String newName) {
+        name = newName;
     }
 }

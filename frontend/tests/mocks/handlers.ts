@@ -2,8 +2,13 @@
 import { http, HttpResponse } from 'msw';
 import type { ApiError, League, Player, PlayerPage, Position, Profile, Role } from '../../src/types/api';
 import { LEAGUES, POSITIONS } from '../../src/types/api';
+import { auditHandlers } from './auditHandlers';
+import { boostHandlers, resetBoostMock } from './boostHandlers';
+import { SEED_RESERVED_BALANCE } from './market';
+import { createMarketHandlers, resetMarketMock } from './marketHandlers';
 import { PLAYERS } from './players';
 import { quoteHandlers } from './quoteHandlers';
+import { syncHandlers } from './syncHandlers';
 
 interface MockUser {
   id: number;
@@ -12,6 +17,8 @@ interface MockUser {
   password: string;
   role: Role;
   balance: number;
+  // Créditos reservados para compras pendientes del mercado (008)
+  reservedBalance: number;
   apiKey: string;
 }
 
@@ -47,10 +54,13 @@ export function resetMockDb(): void {
       ...SEED_USER,
       role: 'USER',
       balance: 1000,
+      reservedBalance: SEED_RESERVED_BALANCE,
       apiKey: newApiKey(),
     },
   ];
   tokens = new Map([[SEED_TOKEN, 1]]);
+  resetMarketMock();
+  resetBoostMock();
 }
 
 resetMockDb();
@@ -106,6 +116,8 @@ function toProfile(user: MockUser): Profile {
     email: user.email,
     role: user.role,
     balance: user.balance,
+    availableBalance: Math.round((user.balance - user.reservedBalance) * 100) / 100,
+    reservedBalance: user.reservedBalance,
   };
 }
 
@@ -205,6 +217,7 @@ const authHandlers = [
       password,
       role: 'USER',
       balance: 1000,
+      reservedBalance: 0,
       apiKey: newApiKey(),
     };
     users.push(user);
@@ -262,4 +275,10 @@ const authHandlers = [
   }),
 ];
 
-export const handlers = [...quoteHandlers, ...playerHandlers, ...authHandlers];
+// El mercado opera sobre las mismas cuentas, así GET /auth/me informa los saldos que cambió
+const marketHandlers = createMarketHandlers({
+  authenticate,
+  exists: (userId) => users.some((user) => user.id === userId),
+});
+
+export const handlers = [...boostHandlers, ...syncHandlers, ...auditHandlers, ...quoteHandlers, ...marketHandlers, ...playerHandlers, ...authHandlers];

@@ -3,16 +3,14 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  border: 2px dashed var(--chalk-faint);
-  border-radius: 6px;
-  padding: 10px 14px 14px;
+  padding: 0;
+  border: 0;
 }
 
 .legend {
-  padding: 0 6px;
-  font-family: var(--font-script);
-  font-size: 26px;
-  color: var(--yellow);
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 /* Radio y etiqueta en una línea, la explicación debajo */
@@ -21,29 +19,36 @@
   grid-template-columns: auto 1fr;
   align-items: baseline;
   gap: 2px 10px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .radio {
-  width: 20px;
-  height: 20px;
-  accent-color: var(--yellow);
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
 }
 
 .label {
-  font-family: var(--font-script);
-  font-size: 24px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .explanation {
   grid-column: 2;
-  color: var(--chalk-dim);
+  color: var(--muted);
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }

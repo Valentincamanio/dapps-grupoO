@@ -3,16 +3,15 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  border: 2px dashed var(--chalk-faint);
-  border-radius: 6px;
-  padding: 10px 14px 14px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
 .legend {
   padding: 0 6px;
-  font-family: var(--font-script);
-  font-size: 26px;
-  color: var(--yellow);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .action {
@@ -23,28 +22,31 @@
 /* Tantas columnas como entren; a 360 px queda una sola */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
-  gap: 10px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+  gap: 10px 14px;
 }
 
 .sum {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px 14px;
-  font-family: var(--font-script);
-  font-size: 24px;
+  gap: 4px 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .complete {
-  color: var(--green);
+  color: var(--up);
 }
 
-.incomplete {
-  color: var(--pink);
+.incomplete,
+.notice {
+  color: var(--down);
 }
 
 .notice {
-  color: var(--pink);
-  font-size: 20px;
+  font-weight: 500;
 }

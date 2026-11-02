@@ -1,9 +1,10 @@
 // Simulación de una estrategia (POST /quotes/simulate): el pedido (una estrategia guardada o
-// parámetros) más los filtros y la hoja del catálogo. Cambiar un filtro vuelve a la primera hoja
-// y vuelve a simular con el mismo pedido; cada hoja recalcula todo en el backend.
+// parámetros) más los filtros, un jugador buscado y la hoja del catálogo. Cambiar un filtro o el
+// jugador vuelve a la primera hoja y vuelve a simular con el mismo pedido; cada hoja recalcula todo
+// en el backend.
 import { useCallback, useState } from 'react';
 import { simulate as simulateRequest } from '../services/recalculationService';
-import type { ApiError, League, Position } from '../types/api';
+import type { ApiError, League, Player, Position } from '../types/api';
 import type { BoardFilters } from '../types/board';
 import type { PendingWeek, SimulationPage, SimulationRequest, SimulationRow, StrategyRef } from '../types/quotes';
 import { useMutation, type MutationStatus } from './useMutation';
@@ -32,12 +33,15 @@ export interface SimulationSheet {
 interface SimulationArgs {
   request: SimulationRequest;
   filters: BoardFilters;
+  player: Player | null;
 }
 
 interface UseSimulationResult {
   // El último pedido simulado; null antes de simular
   request: SimulationRequest | null;
   filters: BoardFilters;
+  // El jugador buscado; null muestra a todos los que cumplen los filtros
+  player: Player | null;
   status: MutationStatus;
   sheet: SimulationSheet | undefined;
   error: ApiError | undefined;
@@ -46,16 +50,18 @@ interface UseSimulationResult {
   setPosition: (position: Position | null) => void;
   setLeague: (league: League | null) => void;
   setTeam: (team: string | null) => void;
+  setPlayer: (player: Player | null) => void;
   setPage: (page: number) => void;
   // Repite la última simulación
   retry: () => void;
 }
 
-async function runSimulation({ request, filters }: SimulationArgs): Promise<SimulationSheet> {
+async function runSimulation({ request, filters, player }: SimulationArgs): Promise<SimulationSheet> {
   const result: SimulationPage = await simulateRequest(request, {
     league: filters.league ?? undefined,
     team: filters.team ?? undefined,
     position: filters.position ?? undefined,
+    playerId: player?.id,
     page: filters.page - 1,
     size: SIMULATION_SIZE,
   });
@@ -76,15 +82,17 @@ async function runSimulation({ request, filters }: SimulationArgs): Promise<Simu
 export function useSimulation(): UseSimulationResult {
   const [request, setRequest] = useState<SimulationRequest | null>(null);
   const [filters, setFilters] = useState<BoardFilters>(NO_FILTERS);
+  const [player, setPlayerState] = useState<Player | null>(null);
   const { status, data, error, run } = useMutation<SimulationArgs, SimulationSheet>(runSimulation);
 
-  // Guarda los filtros y, si ya hay un pedido, vuelve a simular con ellos
+  // Guarda los filtros y el jugador y, si ya hay un pedido, vuelve a simular con ellos
   const apply = useCallback(
-    (next: BoardFilters) => {
+    (next: BoardFilters, nextPlayer: Player | null = player) => {
       setFilters(next);
-      if (request) void run({ request, filters: next });
+      setPlayerState(nextPlayer);
+      if (request) void run({ request, filters: next, player: nextPlayer });
     },
-    [request, run],
+    [request, run, player],
   );
 
   const simulate = useCallback(
@@ -92,20 +100,22 @@ export function useSimulation(): UseSimulationResult {
       const firstSheet = { ...filters, page: 1 };
       setRequest(next);
       setFilters(firstSheet);
-      await run({ request: next, filters: firstSheet });
+      await run({ request: next, filters: firstSheet, player });
     },
-    [filters, run],
+    [filters, player, run],
   );
 
   const setPosition = useCallback((position: Position | null) => apply({ ...filters, position, page: 1 }), [apply, filters]);
   const setLeague = useCallback((league: League | null) => apply({ ...filters, league, page: 1 }), [apply, filters]);
   const setTeam = useCallback((team: string | null) => apply({ ...filters, team, page: 1 }), [apply, filters]);
+  const setPlayer = useCallback((next: Player | null) => apply({ ...filters, page: 1 }, next), [apply, filters]);
   const setPage = useCallback((page: number) => apply({ ...filters, page }), [apply, filters]);
   const retry = useCallback(() => apply(filters), [apply, filters]);
 
   return {
     request,
     filters,
+    player,
     status,
     sheet: data,
     error,
@@ -113,6 +123,7 @@ export function useSimulation(): UseSimulationResult {
     setPosition,
     setLeague,
     setTeam,
+    setPlayer,
     setPage,
     retry,
   };

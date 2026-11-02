@@ -17,6 +17,7 @@ import ar.edu.unq.desapp.futbolmarket.persistence.repository.match.MatchReposito
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.season.SeasonRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.team.TeamRepository;
+import ar.edu.unq.desapp.futbolmarket.service.market.InitialOrderService;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -36,23 +37,28 @@ public class SyncWriteService {
     private final PlayerRepository playerRepository;
     private final SeasonRepository seasonRepository;
     private final MatchRepository matchRepository;
+    private final InitialOrderService initialOrderService;
 
     /**
      * Escribe una liga ya descargada. Los equipos que referencian los partidos se cargan después de
      * guardar los de la liga, así un partido entre dos equipos de la liga los encuentra.
+     *
+     * <p>Los jugadores guardados reciben su orden inicial en la misma transacción (research D8 de la
+     * 008): un jugador nuevo y su orden se confirman juntos.</p>
      */
     @Transactional
     public LeagueSyncResult applyLeague(LeagueSnapshot snapshot, SquadAssignment assignment) {
         LeagueSync sync = new LeagueSync(snapshot, assignment);
         List<Team> savedTeams = teamRepository.saveAll(
                 sync.teamsToSave(teamRepository.findAllByExternalIds(snapshot.teamExternalIds())));
-        playerRepository.saveAll(
+        List<Player> savedPlayers = playerRepository.saveAll(
                 sync.playersToSave(playerRepository.findAllByExternalIds(snapshot.playerExternalIds()), savedTeams));
         Season savedSeason = seasonRepository.save(
                 sync.seasonToSave(seasonRepository.findByExternalId(snapshot.season().externalId())));
         List<Team> catalogTeams = teamRepository.findAllByExternalIds(snapshot.matchTeamExternalIds());
         matchRepository.saveAll(sync.matchesToSave(
                 matchRepository.findAllByExternalIds(snapshot.matchExternalIds()), savedSeason, catalogTeams));
+        initialOrderService.afterSync(savedPlayers.stream().map(Player::id).toList());
         return sync.result();
     }
 

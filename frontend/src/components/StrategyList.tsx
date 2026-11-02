@@ -1,5 +1,5 @@
 // Las estrategias guardadas, cada una con todas sus versiones y cuál es la activa, y los botones
-// "Editar" (versión nueva) y "Activar" (solo en las que no son la activa).
+// "Editar" (versión nueva), "Activar" y "Eliminar" (estos dos, solo en las que no son la activa).
 import { POSITIONS } from '../types/api';
 import { METRICS, type StrategyDto, type StrategyVersionDto, type WeightMap } from '../types/quotes';
 import { formatBalance } from '../utils/format';
@@ -14,6 +14,8 @@ interface StrategyListProps {
   strategies: StrategyDto[];
   onEdit: (strategy: StrategyDto) => void;
   onActivate: (strategy: StrategyDto) => void;
+  // Sin callback no se ofrece eliminar
+  onDelete?: (strategy: StrategyDto) => void;
   // Mientras se guarda un cambio no se ofrece otro
   disabled?: boolean;
 }
@@ -58,7 +60,7 @@ function VersionItem({ version }: { version: StrategyVersionDto }) {
   );
 }
 
-export function StrategyList({ strategies, onEdit, onActivate, disabled = false }: StrategyListProps) {
+export function StrategyList({ strategies, onEdit, onActivate, onDelete, disabled = false }: StrategyListProps) {
   return (
     <ul className={styles.list} aria-label="estrategias">
       {strategies.map((strategy) => {
@@ -86,6 +88,17 @@ export function StrategyList({ strategies, onEdit, onActivate, disabled = false 
                       onClick={() => onActivate(strategy)}
                     >
                       Activar
+                    </ChalkButton>
+                  )}
+                  {/* La activa no se elimina: primero hay que activar otra */}
+                  {strategy.active || !onDelete ? null : (
+                    <ChalkButton
+                      aria-label={`Eliminar ${strategy.name}`}
+                      className={styles.delete}
+                      disabled={disabled}
+                      onClick={() => onDelete(strategy)}
+                    >
+                      Eliminar
                     </ChalkButton>
                   )}
                 </div>

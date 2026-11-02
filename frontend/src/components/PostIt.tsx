@@ -1,8 +1,12 @@
-// Post-it de un jugador: un único link a su ficha, sin ninguna otra acción.
-import type { ElementType, ReactNode } from 'react';
-import type { Player, Position } from '../types/api';
+// Tarjeta de un jugador: un único link a su ficha, sin ninguna otra acción. Un potenciado se ve
+// dorado, con la cinta del multiplicador y la barra de volatilidad que rige en el cierre.
+import type { CSSProperties, ElementType, ReactNode } from 'react';
+import type { Player } from '../types/api';
 import type { QuoteBadge } from '../types/quotes';
+import { boostMeterWidth, formatBoostPercent, formatMultiplier } from '../utils/boosts';
+import { hueOf, initialsOf } from '../utils/format';
 import { leagueLabel, positionLabel } from '../utils/positions';
+import { BoltIcon } from './BoltIcon';
 import { QuoteTag } from './QuoteTag';
 import styles from './PostIt.module.css';
 
@@ -22,14 +26,9 @@ interface PostItProps {
   LinkComponent?: ElementType;
   // Cotización actual; sin ella el post-it queda igual que antes de las cotizaciones
   quote?: QuoteBadge;
+  // El porcentaje de un potenciado de la semana (300 es ×3)
+  boostPercent?: number;
 }
-
-const COLOR_CLASS: Record<Position, string> = {
-  GOALKEEPER: styles.yellow,
-  DEFENDER: styles.blue,
-  MIDFIELDER: styles.green,
-  FORWARD: styles.pink,
-};
 
 function DefaultLink({ to, className, draggable, children }: LinkProps) {
   return (
@@ -45,21 +44,43 @@ export function PostIt({
   linkState,
   LinkComponent = DefaultLink,
   quote,
+  boostPercent,
 }: PostItProps) {
   return (
     <LinkComponent
       to={href}
       state={linkState}
-      className={`${styles.postIt} ${COLOR_CLASS[player.position]}`}
+      className={boostPercent ? `${styles.postIt} ${styles.boosted}` : styles.postIt}
       draggable={false}
     >
-      <span className={styles.pin} aria-hidden="true" />
-      <span className={styles.position}>{positionLabel(player.position)}</span>
+      {boostPercent ? (
+        <span className={styles.ribbon}>
+          <BoltIcon size={13} />
+          {formatMultiplier(boostPercent)}
+        </span>
+      ) : null}
+      {/* Las iniciales van por CSS: son decoración y no son parte del texto del enlace */}
+      <span
+        className={styles.avatar}
+        style={{ '--hue': hueOf(player.team) } as CSSProperties}
+        data-initials={initialsOf(player.name)}
+        aria-hidden="true"
+      />
       <span className={styles.name}>{player.name}</span>
+      <span className={styles.position}>{positionLabel(player.position)}</span>
       <span className={styles.meta}>
         {player.team} · {leagueLabel(player.league)}
       </span>
-      {quote ? <QuoteTag badge={quote} /> : null}
+      {quote ? <QuoteTag badge={quote} label={boostPercent ? 'cotización actual' : undefined} /> : null}
+      {boostPercent ? (
+        <span className={styles.boost}>
+          volatilidad al cierre
+          <span className={styles.meter} aria-hidden="true">
+            <span style={{ width: `${boostMeterWidth(boostPercent)}%` }} />
+          </span>
+          <b>{formatBoostPercent(boostPercent)}</b>
+        </span>
+      ) : null}
     </LinkComponent>
   );
 }

@@ -1,35 +1,60 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  min-width: 0;
 }
 
 .label {
-  font-family: var(--font-script);
-  font-size: 22px;
-  color: var(--chalk);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.label::first-letter {
+  text-transform: uppercase;
 }
 
 .input {
-  background: transparent;
-  border: 0;
-  border-bottom: 2px dashed var(--chalk-dim);
-  padding: 4px 2px;
-  font-family: var(--font-hand);
-  font-size: 20px;
-  color: var(--chalk);
+  width: 100%;
+  padding: 11px 12px;
 }
 
-.input::placeholder {
-  color: var(--chalk-faint);
+/* La contraseña deja lugar a la derecha para el ojo */
+.control {
+  position: relative;
+}
+
+.withToggle {
+  padding-right: 44px;
+}
+
+.toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+
+.toggle:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .invalid {
-  border-bottom-color: var(--pink);
+  border-color: var(--down);
 }
 
 .error {
-  font-family: var(--font-script);
-  font-size: 20px;
-  color: var(--pink);
+  color: var(--down);
+  font-size: 13px;
 }

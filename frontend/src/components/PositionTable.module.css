@@ -1,0 +1,84 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.toggle {
+  align-self: flex-end;
+  padding: 5px 11px;
+  font-size: 13px;
+}
+
+.caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.player {
+  min-width: 0;
+}
+
+.name {
+  display: block;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+a.name:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.detail {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Las tarjetas de 720 px dan display a cada celda: acá hace falta !important para ocultarlas */
+.table:not(.detailed) .extra {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  .player {
+    display: block !important;
+  }
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.empty {
+  padding: 40px 20px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty::first-letter {
+  text-transform: uppercase;
+}
+
+.table {
+  font-variant-numeric: tabular-nums;
+}

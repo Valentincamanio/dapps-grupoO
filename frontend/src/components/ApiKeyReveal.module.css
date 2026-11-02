@@ -1,26 +1,23 @@
 .reveal {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .title {
-  margin: 0;
+  font-size: 20px;
 }
 
 .key {
   width: 100%;
-  padding: 10px 12px;
-  font-family: monospace;
-  font-size: 1rem;
-  color: var(--chalk);
-  background: rgba(0, 0, 0, 0.25);
-  border: 2px dashed var(--chalk-dim);
-  border-radius: 6px;
+  background: var(--surface-2);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }

@@ -1,0 +1,45 @@
+.badge {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.chalk,
+.ink {
+  color: inherit;
+}
+
+.up {
+  background: var(--up-soft);
+  color: var(--up);
+}
+
+.down {
+  background: var(--down-soft);
+  color: var(--down);
+}
+
+.flat {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.triangle {
+  font-size: 0.75em;
+}
+
+/* El signo y el triángulo ya lo dicen: el texto queda para los lectores de pantalla */
+.text,
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

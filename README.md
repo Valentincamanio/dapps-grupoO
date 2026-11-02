@@ -110,8 +110,9 @@ Endpoints de administrador (JWT o API key de un usuario con rol `ADMIN`):
 | `POST /strategies` | Registra una estrategia (nombre, factor de escala, mínimo y pesos por posición) |
 | `POST /strategies/{id}/versions` | Edita una estrategia: crea su versión siguiente, sin tocar las anteriores |
 | `POST /strategies/{id}/activate` | La activa; con `{"requote": "AHORA"}` recotiza la última semana cerrada, y con `PROXIMA_SEMANA` (o sin cuerpo) rige desde la semana siguiente |
+| `DELETE /strategies/{id}` | La elimina (baja lógica): deja de listarse y de poder usarse, pero se conserva para las cotizaciones que calculó, renombrada a "X (eliminada el dd/mm/aaaa hh:mm)", así el nombre queda libre. Una de arranque eliminada no vuelve al reiniciar. La activa no se elimina (409) |
 | `POST /quotes/recalculate` | Cotiza todas las semanas cerradas que falten y devuelve el informe |
-| `POST /quotes/simulate?league=&team=&position=&page=&size=` | Simula una estrategia guardada o unos parámetros sin guardar nada |
+| `POST /quotes/simulate?league=&team=&position=&playerId=&page=&size=` | Simula una estrategia guardada o unos parámetros sin guardar nada; con `playerId`, la hoja trae solo a ese jugador |
 
 - **El recálculo automático**: corre los lunes a las 06:00 de Argentina, después de la cadena de
   sincronización, y al arrancar si hay semanas cerradas sin cotizar. Una semana con partidos sin
@@ -139,6 +140,77 @@ En PowerShell: `$env:QUOTES_BENCHMARK = 'true'; ./gradlew test --tests '*QuoteVo
 
 Los contratos están en [contracts/](specs/007-cotizacion-estrategias/contracts/), y la validación de
 punta a punta, en [quickstart.md](specs/007-cotizacion-estrategias/quickstart.md).
+
+### Jugadores potenciados
+
+El administrador elige 4 jugadores por semana (de lunes a domingo, en hora de Argentina) y cuánto se
+potencia cada uno, de 200 % a 400 % de a 25 %. Todos los ven destacados arriba de la pizarra durante
+esa semana. En el cierre, cuando se calcula la cotización de la semana, el factor de escala de cada
+potenciado se multiplica por su porcentaje, así su cotización sube o baja más que la del resto. La
+cotización vigente no cambia al elegirlos. Mientras la semana está en curso, también rigen en cualquier
+recotización (editar o activar la estrategia con `AHORA` recotiza la última semana cerrada con los
+potenciados que se ven en el inicio); al cerrar la semana se les aplica una vez más, y después rigen
+los de la semana siguiente. La simulación usa los de cada semana que reproduce.
+
+| Método y ruta | Acceso | Qué hace |
+|---|---|---|
+| `GET /players/boosts/current` | Público | Los potenciados de la semana en curso, con su porcentaje y el instante del cierre; vacía si no hay |
+| `GET /quotes/boosts?week=AAAA-MM-DD` | `ADMIN` | Los de cualquier semana (cualquier día indica la semana que lo contiene) y si está cerrada, en curso o es próxima |
+| `PUT /quotes/boosts/{AAAA-MM-DD}` | `ADMIN` | Reemplaza los de la semana: exactamente 4 jugadores distintos, o una lista vacía para dejarla sin potenciados. La semana en curso se puede cambiar; una cerrada responde 409 |
+
+La pantalla es `/admin/potenciados`. Cambiar los de la semana en curso pide confirmación, porque
+todos ya los ven en el inicio.
+
+### Mercado de tokens y portfolio
+
+Cada jugador tiene 100 tokens. Los usuarios comunes los compran y los venden con sus créditos, al
+precio por token de la cotización vigente (el 1 % de su valor), y siguen su portfolio.
+
+- **El superusuario es el administrador de la 001**: la cuenta que se crea con las tres variables
+  `FUTBOLMARKET_AUTH_ADMIN_*`. Es el dueño de los 100 tokens iniciales de cada jugador y los vende
+  a 1,0000 en una orden inicial. **Sin su contraseña no se crea, y el mercado no inicia**: no se
+  generan órdenes iniciales (el registro lo advierte) y se generan en el próximo arranque con la
+  cuenta configurada. El administrador consulta y audita, pero no compra ni vende.
+- **Las órdenes iniciales**: al arrancar se crean en segundo plano las que falten, una por jugador
+  del catálogo (unas 2.600 con el catálogo completo), y cada sincronización de una liga crea las de
+  sus jugadores nuevos. Reiniciar o sincronizar nunca las duplica. La propiedad
+  `futbolmarket.market.initial-orders.automatic` (por defecto `true`; `false` en el perfil `test`)
+  apaga las dos cosas. Como las demás, se pisa con una variable de entorno:
+  `FUTBOLMARKET_MARKET_INITIALORDERS_AUTOMATIC=false`.
+- **Concurrencia**: cada pedido bloquea el libro del jugador y las cuentas que toca. En el perfil
+  `local`, la URL de H2 lleva `;LOCK_TIMEOUT=10000` para que un pedido espere hasta 10 segundos a
+  otro en vez de 1; si igual no consigue el bloqueo, responde 409 ("El mercado está ocupado") sin
+  cambiar nada.
+
+Endpoints y la pantalla de la web que usa cada uno:
+
+| Método y ruta | Acceso | Qué hace | Pantalla |
+|---|---|---|---|
+| `POST /orders/buy` | `USER` | Compra tokens de un jugador (`{"playerId": 12, "quantity": 10}`, de 1 a 100) | La ficha del jugador (`/jugadores/{id}`), botón "Comprar" |
+| `POST /orders/sell` | `USER` | Vende tokens propios; bloqueada mientras al superusuario le queden tokens del jugador | La ficha del jugador, botón "Vender" |
+| `POST /orders/{id}/cancel` | `USER` (dueño) | Cancela el remanente de una orden propia | `/ordenes` (Mis órdenes) |
+| `GET /orders?side=&league=&team=&ownerType=&playerId=&page=&size=` | Público | Las órdenes pendientes, de la más vieja a la más nueva, sin datos del dueño | `/mercado`, y las pendientes de la ficha |
+| `GET /users/{id}/portfolio[?date=AAAA-MM-DD]` | Dueño o `ADMIN` | El portfolio actual, o reconstruido a una fecha | `/portfolio` |
+| `GET /users/{id}/transactions?playerId=&side=&from=&to=&page=&size=` | Dueño o `ADMIN` | El historial de operaciones, de la más nueva a la más vieja | `/operaciones` |
+| `GET /users/{id}/orders?status=&page=&size=` | Dueño o `ADMIN` | Las órdenes del usuario; sin `status`, en cualquier estado, y con uno o varios (`status=PENDING,PARTIAL`), solo esas | `/ordenes` (Mis órdenes) |
+| `GET /audit?eventType=&userId=&playerId=&from=&to=&page=&size=` | `ADMIN` | La auditoría: cada orden creada, operación y cancelación, con el antes y el después de cada parte | `/admin/auditoria` (Administración → Auditoría) |
+
+Sin credencial, los endpoints que la piden responden 401; el administrador en `POST /orders/**` y
+un usuario común en `/audit` reciben 403 antes del controller, y un usuario común que pide la
+cuenta de otro, 403. Los saldos libre y reservado se ven en `GET /auth/me` y en la barra de la web,
+y cada cotización informa su score.
+
+**La medición de volumen del mercado**: un test aparte carga 2.600 jugadores con su cotización en
+una H2 en archivo, crea sus órdenes iniciales (registra cuánto tarda) y verifica que una compra, el
+portfolio actual y a una fecha, una hoja del historial y una del listado tarden menos de 2 s cada
+uno. No corre en el build normal. Desde `backend/`:
+
+    MARKET_BENCHMARK=true ./gradlew test --tests '*MarketVolumeIT' -i
+
+En PowerShell: `$env:MARKET_BENCHMARK = 'true'; ./gradlew test --tests '*MarketVolumeIT' -i`.
+
+El contrato está en [contracts/](specs/008-mercado-tokens-portfolio/contracts/), y la validación de
+punta a punta, en [quickstart.md](specs/008-mercado-tokens-portfolio/quickstart.md).
 
 ### Base local con el dataset ficticio
 
@@ -177,8 +249,9 @@ ni consulta WhoScored.
 
 El backend es un monolito organizado primero por capa y, dentro de cada capa, por contexto
 (`auth`, `user`, `player`, `team`, `league`, `position`, `season`, `match`, `performance`,
-`sync`, `strategy`, `quote`). `performance` tiene las estadísticas de cada jugador en cada
-partido; `strategy`, las estrategias de valuación, y `quote`, las cotizaciones semanales. Las fuentes
+`sync`, `strategy`, `quote`, `market`). `performance` tiene las estadísticas de cada jugador en cada
+partido; `strategy`, las estrategias de valuación; `quote`, las cotizaciones semanales, y `market`,
+las órdenes, las operaciones, las tenencias, el portfolio y la auditoría. Las fuentes
 externas van en la capa `adapter`, organizada por proveedor: `footballdata` (la API de
 Football-Data.org) y `whoscored` (las páginas de WhoScored). El árbol lo fija el Principio I de
 [la constitución](.specify/memory/constitution.md):

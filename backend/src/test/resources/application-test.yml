@@ -6,7 +6,9 @@ spring:
     password: ""
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      # create y no create-drop: varios contextos de test comparten testdb, y cerrar uno (Spring
+      # desaloja los viejos de su caché) no tiene que borrar las tablas que otro todavía usa
+      ddl-auto: create
   h2:
     console:
       enabled: false
@@ -29,3 +31,6 @@ futbolmarket:
     recalculation:
       cron: "-"
       on-startup: false
+  market:
+    initial-orders:
+      automatic: false
