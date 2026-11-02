@@ -1,0 +1,137 @@
+.transactions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: none;
+}
+
+.paper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.field select {
+  max-width: 240px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.cardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+
+.player {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.player:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.buy,
+.sell {
+  padding: 1px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.buy::first-letter,
+.sell::first-letter {
+  text-transform: uppercase;
+}
+
+.buy {
+  background: var(--up-soft);
+  color: var(--up);
+}
+
+.sell {
+  background: var(--down-soft);
+  color: var(--down);
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.fields div {
+  min-width: 0;
+}
+
+.fields dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fields dd {
+  overflow-wrap: anywhere;
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+}
+
+.more {
+  margin-top: 6px;
+}
+
+.more summary {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}

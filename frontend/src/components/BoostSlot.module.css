@@ -1,0 +1,230 @@
+.slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: var(--radius);
+}
+
+.empty {
+  min-height: 208px;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--line);
+  color: var(--faint);
+  font-size: 14px;
+  text-align: center;
+}
+
+.next {
+  border-color: color-mix(in srgb, var(--gold-2) 55%, var(--line));
+  color: var(--muted);
+}
+
+.number {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.gold {
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--gold-soft) 55%, var(--surface)), var(--surface) 55%)
+      padding-box,
+    linear-gradient(135deg, var(--gold-1), var(--gold-2) 30%, var(--gold-1) 50%, var(--gold-3) 75%, var(--gold-1))
+      border-box;
+  box-shadow:
+    0 0 0 1px var(--gold-glow),
+    0 6px 22px var(--gold-glow);
+}
+
+.mult {
+  position: absolute;
+  top: -11px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold-1), var(--gold-2));
+  box-shadow: 0 2px 8px var(--gold-glow);
+  color: var(--gold-ink);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.who {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1px 12px;
+  align-items: center;
+}
+
+.avatar {
+  display: grid;
+  grid-row: span 2;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: hsl(var(--hue) 45% 42%);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--gold-2);
+}
+
+.avatar::before {
+  content: attr(data-initials);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.name {
+  padding-right: 50px;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--gold-2) 35%, var(--line));
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.now b {
+  color: var(--text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.range label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.range label b {
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* El deslizador se dibuja a mano: el círculo toca los dos extremos del riel (en el mínimo y en el
+   máximo) y la parte dorada llega justo hasta su centro */
+.range input {
+  --thumb: 18px;
+  display: block;
+  width: 100%;
+  height: var(--thumb);
+  margin: 6px 0 2px;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+}
+
+.range input::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, var(--gold-2), var(--gold-1)) 0 0 / calc(var(--thumb) / 2 + var(--progress) * (100% - var(--thumb))) 100%
+      no-repeat,
+    var(--surface-3);
+}
+
+.range input::-webkit-slider-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: calc((6px - var(--thumb)) / 2);
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  background: var(--gold-2);
+  box-shadow: 0 0 0 1px var(--gold-2);
+  appearance: none;
+}
+
+.range input::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.range input::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold-2), var(--gold-1));
+}
+
+.range input::-moz-range-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  box-sizing: border-box;
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  background: var(--gold-2);
+  box-shadow: 0 0 0 1px var(--gold-2);
+}
+
+.range input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 999px;
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.remove {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--down);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.remove:hover {
+  text-decoration: underline;
+}
+
+.readOnly {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.readOnly b {
+  color: var(--gold);
+}

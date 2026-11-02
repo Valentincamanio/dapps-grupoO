@@ -1,0 +1,19 @@
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* Los grupos se desplazan de costado en vez de ocupar varios renglones */
+.group {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px;
+}
+
+.team {
+  display: flex;
+}

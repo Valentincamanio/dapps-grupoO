@@ -57,7 +57,9 @@ public class SecurityConfig {
                 pathPattern("/v3/api-docs/**"),
                 pathPattern(HttpMethod.GET, "/actuator/health"),
                 // TEMPORAL: la protección de estos endpoints se activa en un PR posterior, una vez mergeadas las dos features
-                pathPattern(HttpMethod.GET, "/players"), pathPattern(HttpMethod.GET, "/players/**"));
+                pathPattern(HttpMethod.GET, "/players"), pathPattern(HttpMethod.GET, "/players/**"),
+                // Solo el listado del mercado, no /orders/**: comprar, vender y cancelar piden credencial
+                pathPattern(HttpMethod.GET, "/orders"));
     }
 
     /**
@@ -74,6 +76,15 @@ public class SecurityConfig {
      * y la simulación ({@code POST /quotes/**}) y todas las operaciones de estrategias, también las
      * lecturas ({@code /strategies/**}), son de {@code ADMIN}. Las consultas de cotizaciones viven
      * bajo {@code GET /players/**} y quedan públicas por la regla de {@link #publicEndpoints()}.</p>
+     *
+     * <p>Los potenciados: ver los de la semana en curso ({@code GET /players/boosts/current}) es
+     * público; consultar cualquier semana y elegirlos ({@code /quotes/boosts/**}) es de
+     * {@code ADMIN}.</p>
+     *
+     * <p>En el mercado (research D24 de la 008), comprar, vender y cancelar
+     * ({@code POST /orders/**}) son de {@code USER}: el administrador recibe 403 antes del controller
+     * y un visitante, 401. La auditoría ({@code /audit/**}) es de {@code ADMIN}. Las cuentas
+     * ({@code /users/**}) piden credencial, y quién ve cuál lo decide el modelo.</p>
      */
     @Bean
     public SecurityFilterChain apiFilterChain(HttpSecurity http, RequestMatcher publicEndpoints,
@@ -93,7 +104,10 @@ public class SecurityConfig {
                         .requestMatchers(pathPattern(HttpMethod.POST, "/players/sync")).hasRole(Role.ADMIN.name())
                         .requestMatchers(pathPattern(HttpMethod.POST, "/matches/stats/sync")).hasRole(Role.ADMIN.name())
                         .requestMatchers(pathPattern(HttpMethod.POST, "/quotes/**")).hasRole(Role.ADMIN.name())
+                        .requestMatchers(pathPattern("/quotes/boosts/**")).hasRole(Role.ADMIN.name())
                         .requestMatchers(pathPattern("/strategies/**")).hasRole(Role.ADMIN.name())
+                        .requestMatchers(pathPattern(HttpMethod.POST, "/orders/**")).hasRole(Role.USER.name())
+                        .requestMatchers(pathPattern("/audit/**")).hasRole(Role.ADMIN.name())
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(jsonAuthenticationEntryPoint)

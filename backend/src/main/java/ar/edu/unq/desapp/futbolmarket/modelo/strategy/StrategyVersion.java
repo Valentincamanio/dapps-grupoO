@@ -76,12 +76,28 @@ public record StrategyVersion(Long id, Long strategyId, String name, int version
      * {@code max(mínimo, base + score × factor)}, redondeado una sola vez a 2 decimales (FR-024).
      */
     public BigDecimal valueFor(BigDecimal baseValue, BigDecimal score) {
-        var raw = baseValue.add(score.multiply(scaleFactor));
+        return valueFor(baseValue, score, BigDecimal.ONE);
+    }
+
+    /**
+     * {@code max(mínimo, base + score × factor × multiplicador)}, redondeado una sola vez a 2
+     * decimales. El multiplicador es el de un jugador potenciado en la semana; sin potenciar, 1.
+     */
+    public BigDecimal valueFor(BigDecimal baseValue, BigDecimal score, BigDecimal boostMultiplier) {
+        var raw = baseValue.add(score.multiply(scaleFactor).multiply(boostMultiplier));
         return raw.max(minimumValue).setScale(VALUE_SCALE, RoundingMode.HALF_UP);
     }
 
     public StrategyVersionRef ref() {
         return new StrategyVersionRef(id, strategyId, name, version);
+    }
+
+    /**
+     * La misma versión con el nombre de la estrategia cambiado: al eliminarla se renombra.
+     */
+    StrategyVersion renamed(String newName) {
+        return new StrategyVersion(id, strategyId, newName, version, scaleFactor, minimumValue, defaultWeights,
+                positionWeights, createdAt);
     }
 
     private static BigDecimal requireValidScaleFactor(BigDecimal scaleFactor) {

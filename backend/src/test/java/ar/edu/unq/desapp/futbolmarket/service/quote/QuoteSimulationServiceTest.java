@@ -39,11 +39,13 @@ import ar.edu.unq.desapp.futbolmarket.modelo.player.PlayerFilter;
 import ar.edu.unq.desapp.futbolmarket.modelo.position.Position;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.PendingReason;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.PendingWeek;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.PlayerBoost;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.Quote;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteFixtures;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.QuoteWeek;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.SimulatedQuote;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.SimulationResult;
+import ar.edu.unq.desapp.futbolmarket.modelo.quote.WeekBoosts;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.exception.InvalidSimulationRequestException;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.Strategy;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyCatalog;
@@ -56,6 +58,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.strategy.exception.StrategyNotFound
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.match.MatchRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.performance.PlayerMatchStatsRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.player.PlayerRepository;
+import ar.edu.unq.desapp.futbolmarket.persistence.repository.quote.BoostRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.quote.QuoteRepository;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.strategy.StrategyRepository;
 
@@ -85,12 +88,15 @@ class QuoteSimulationServiceTest {
     @Mock
     private QuoteRepository quoteRepository;
 
+    @Mock
+    private BoostRepository boostRepository;
+
     private QuoteSimulationService service;
 
     @BeforeEach
     void createService() {
         service = new QuoteSimulationService(strategyRepository, playerRepository, matchRepository, statsRepository,
-                quoteRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+                quoteRepository, boostRepository, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -377,6 +383,48 @@ class QuoteSimulationServiceTest {
         verify(quoteRepository).findLatestByPlayer();
         verifyNoMoreInteractions(strategyRepository, playerRepository, matchRepository, statsRepository,
                 quoteRepository);
+    }
+
+    @Test
+    void conUnJugadorLaHojaTraeSoloAEseJugadorConLaMismaSimulada() {
+        givenCatalog();
+        givenSeason();
+        SimulationResult all = service.simulate(STRATEGY_A.strategyId(), null, NO_FILTER, 0, 10);
+
+        SimulationResult ndiaye = service.simulate(STRATEGY_A.strategyId(), null, NO_FILTER, NDIAYE.id(), 0, 10);
+
+        assertThat(ndiaye.page().content()).extracting(SimulatedQuote::player).containsExactly(NDIAYE);
+        assertThat(ndiaye.page().totalElements()).isOne();
+        assertThat(simulatedOf(ndiaye, NDIAYE)).isEqualTo(simulatedOf(all, NDIAYE));
+    }
+
+    @Test
+    void unJugadorQueNoCumpleLosFiltrosOInexistenteDaUnaHojaVacia() {
+        givenCatalog();
+        givenSeason();
+
+        SimulationResult otherLeague = service.simulate(STRATEGY_A.strategyId(), null,
+                new PlayerFilter(League.BUNDESLIGA, null, null), NDIAYE.id(), 0, 10);
+        SimulationResult missing = service.simulate(STRATEGY_A.strategyId(), null, NO_FILTER, 999L, 0, 10);
+
+        assertThat(otherLeague.page().content()).isEmpty();
+        assertThat(missing.page().content()).isEmpty();
+    }
+
+    @Test
+    void losPotenciadosDeUnaSemanaRigenEnLaSimulacionComoAlCotizarla() {
+        givenCatalog();
+        givenSeason();
+        SimulationResult plain = service.simulate(STRATEGY_A.strategyId(), null, NO_FILTER, 0, 10);
+        when(boostRepository.findAllByWeek()).thenReturn(Map.of(WEEK, new WeekBoosts(WEEK, List.of(
+                new PlayerBoost(NDIAYE.id(), 300), new PlayerBoost(BETO.id(), 200),
+                new PlayerBoost(ZIRKZEE.id(), 200), new PlayerBoost(KANE.id(), 200)))));
+
+        SimulationResult boosted = service.simulate(STRATEGY_A.strategyId(), null, NO_FILTER, 0, 10);
+
+        assertThat(simulatedOf(boosted, NDIAYE)).isGreaterThan(simulatedOf(plain, NDIAYE));
+        assertThat(simulatedOf(boosted, BETO)).isLessThan(simulatedOf(plain, BETO));
+        assertThat(simulatedOf(boosted, GREALISH)).isEqualTo(simulatedOf(plain, GREALISH));
     }
 
     private void givenCatalog() {

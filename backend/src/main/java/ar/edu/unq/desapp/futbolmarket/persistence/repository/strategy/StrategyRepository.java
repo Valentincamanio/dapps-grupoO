@@ -1,5 +1,6 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.repository.strategy;
 
+import ar.edu.unq.desapp.futbolmarket.modelo.strategy.Strategy;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyCatalog;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyChange;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyVersion;
@@ -12,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Lee y guarda el catálogo de estrategias. No actualiza ni borra versiones: lo único que cambia
- * en una fila guardada es la marca {@code active} (research D13).
+ * en una fila guardada son las marcas {@code active} (research D13) y {@code deleted}.
  */
 @Repository
 @RequiredArgsConstructor
@@ -42,6 +43,21 @@ public class StrategyRepository {
                 .filter(version -> version.id() != null)
                 .ifPresent(version -> strategyDAO.getReferenceById(version.id()).activate());
         return strategyMapper.toCatalog(strategyDAO.findAll());
+    }
+
+    /**
+     * Guarda la baja: el nombre nuevo en todas las versiones, y la marca y el nombre que tenía en la
+     * versión 1. No borra ninguna fila.
+     */
+    @Transactional
+    public void saveDeletion(Strategy strategy) {
+        if (!strategy.deleted()) {
+            return;
+        }
+        strategyDAO.findAll().stream()
+                .filter(row -> strategy.id().equals(row.strategyId()))
+                .forEach(row -> row.rename(strategy.name()));
+        strategyDAO.getReferenceById(strategy.id()).markDeleted(strategy.originalName());
     }
 
     private StrategySQL rootOf(StrategyVersion version) {

@@ -1,7 +1,8 @@
 // Alternativa en texto del gráfico de evolución: los mismos puntos (una cotización por semana),
-// en una tabla dentro de un <details>.
+// en una tabla dentro de un <details>, con el score en la última columna (FR-058 de la 008).
 import type { Quote } from '../types/quotes';
 import { toChartPoints } from '../utils/chart';
+import { formatScore } from '../utils/market';
 import { formatCredits, formatDay, formatVariation, quoteTypeLabel } from '../utils/quotes';
 import styles from './QuoteTable.module.css';
 
@@ -27,6 +28,7 @@ export function QuoteTable({ quotes }: QuoteTableProps) {
               <th scope="col">Variación</th>
               <th scope="col">Tipo</th>
               <th scope="col">Estrategia</th>
+              <th scope="col">Score</th>
             </tr>
           </thead>
           <tbody>
@@ -39,6 +41,7 @@ export function QuoteTable({ quotes }: QuoteTableProps) {
                 <td>
                   {quote.strategy.name}, versión {quote.strategy.version}
                 </td>
+                <td>{quote.score === undefined ? '—' : formatScore(quote.score)}</td>
               </tr>
             ))}
           </tbody>

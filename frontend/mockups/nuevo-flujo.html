@@ -1,0 +1,1284 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La Pizarra · nuevo flujo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6f4; --surface:#ffffff; --surface-2:#eef2ef; --surface-3:#e4eae6;
+  --text:#0f1a14; --muted:#5d6b63; --faint:#8a978f; --line:#e1e7e3;
+  --accent:#12804a; --accent-hover:#0e6b3d; --accent-ink:#ffffff; --accent-soft:#e1f3e8;
+  --up:#12804a; --up-soft:#e1f3e8; --down:#c9372c; --down-soft:#fce9e7;
+  --warn:#9a6700; --warn-soft:#fff4d6;
+  --shadow:0 1px 2px rgba(15,26,20,.05),0 4px 16px rgba(15,26,20,.06);
+  --shadow-lg:0 20px 60px rgba(15,26,20,.22);
+  --radius:16px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c1210; --surface:#141c18; --surface-2:#1b2520; --surface-3:#24302a;
+    --text:#e9f0ec; --muted:#9aa9a1; --faint:#6d7c74; --line:#24302a;
+    --accent:#3cc983; --accent-hover:#5bd897; --accent-ink:#06130c; --accent-soft:#173426;
+    --up:#45d48c; --up-soft:#163024; --down:#ff7a6e; --down-soft:#3a1c19;
+    --warn:#f2c14e; --warn-soft:#352b12;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
+    --shadow-lg:0 20px 60px rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c1210; --surface:#141c18; --surface-2:#1b2520; --surface-3:#24302a;
+  --text:#e9f0ec; --muted:#9aa9a1; --faint:#6d7c74; --line:#24302a;
+  --accent:#3cc983; --accent-hover:#5bd897; --accent-ink:#06130c; --accent-soft:#173426;
+  --up:#45d48c; --up-soft:#163024; --down:#ff7a6e; --down-soft:#3a1c19;
+  --warn:#f2c14e; --warn-soft:#352b12;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
+  --shadow-lg:0 20px 60px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.45;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+h1,h2,h3{font-family:"Bricolage Grotesque",Inter,sans-serif;letter-spacing:-.01em;margin:0}
+
+/* ---------- barra superior ---------- */
+.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1120px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:20px}
+.brand{display:flex;align-items:center;gap:9px;font-family:"Bricolage Grotesque";font-weight:800;font-size:20px;background:none;border:0;padding:0}
+.brand svg{width:28px;height:28px}
+.nav{display:flex;gap:4px}
+.nav button{border:0;background:none;padding:8px 14px;border-radius:999px;font-weight:600;color:var(--muted)}
+.nav button:hover{color:var(--text);background:var(--surface-2)}
+.nav button[aria-current="page"]{color:var(--text);background:var(--surface-3)}
+.spacer{flex:1}
+.balance{display:flex;flex-direction:column;align-items:flex-end;border:0;background:none;padding:2px 6px;border-radius:10px}
+.balance small{font-size:11px;color:var(--muted);font-weight:500}
+.balance b{font-size:15px}
+.avatar-btn{width:36px;height:36px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700}
+
+.tabbar{display:none}
+@media (max-width:720px){
+  .nav{display:none}
+  .topbar-in{padding:10px 16px;gap:12px}
+  .tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+  .tabbar button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:12px;font-weight:600;color:var(--faint)}
+  .tabbar button svg{width:22px;height:22px}
+  .tabbar button[aria-current="page"]{color:var(--accent)}
+}
+
+/* ---------- página ---------- */
+main{max-width:1120px;margin:0 auto;padding:24px 20px 120px}
+@media (max-width:720px){main{padding:18px 16px 140px}}
+.page-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.page-head h1{font-size:28px}
+
+/* controles */
+.seg{display:inline-flex;background:var(--surface-2);border-radius:999px;padding:3px;gap:2px}
+.seg button{border:0;background:none;padding:7px 14px;border-radius:999px;font-weight:600;font-size:14px;color:var(--muted);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg.full{display:flex;width:100%}
+.seg.full button{flex:1;padding:9px}
+.seg .count{display:inline-block;min-width:18px;padding:0 5px;margin-left:4px;border-radius:999px;background:var(--surface-3);font-size:11px;line-height:18px}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.search{flex:1 1 240px;position:relative}
+.toolbar .select{flex:1 1 140px;min-width:0;width:0}
+@media (min-width:721px){.toolbar .select{flex:0 1 auto;width:auto}}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--faint)}
+.search input{width:100%;padding:10px 12px 10px 38px;border-radius:12px;border:1px solid var(--line);background:var(--surface)}
+.select{appearance:none;padding:10px 32px 10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a978f' stroke-width='3'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;font-weight:500}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+.chip{border:1px solid var(--line);background:var(--surface);padding:6px 13px;border-radius:999px;font-size:14px;font-weight:500;color:var(--muted)}
+.chip:hover{color:var(--text)}
+.chip[aria-pressed="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+.btn{border:0;border-radius:12px;padding:10px 16px;font-weight:600;background:var(--surface-2);display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{background:var(--surface-3)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.danger{background:var(--down);color:#fff}
+.btn.ghost{background:none;color:var(--muted)}
+.btn.ghost:hover{color:var(--text);background:var(--surface-2)}
+.btn.big{width:100%;padding:14px;font-size:16px;border-radius:14px}
+.btn.sm{padding:6px 11px;font-size:13px;border-radius:10px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.link{border:0;background:none;padding:0;color:var(--accent);font-weight:600}
+
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:13px;font-weight:600;color:var(--muted)}
+.field input{padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface)}
+.field .err{font-size:13px;color:var(--down)}
+
+/* tarjetas de jugadores */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.pcard{position:relative;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center;transition:transform .12s,box-shadow .12s}
+.pcard:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.rank{font-size:12px;font-weight:700;color:var(--faint);margin-right:4px}
+.av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;color:#fff;background:hsl(var(--h) 45% 42%);flex:none}
+.av.lg{width:56px;height:56px;font-size:18px}
+.pc-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-sub{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-right{text-align:right}
+.pc-price{font-weight:700;font-size:16px}
+.pc-price small{font-weight:500;color:var(--faint);font-size:11px;margin-left:2px}
+.pcard .spark{grid-column:1/-1;height:30px;margin-top:6px}
+.chg{display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:600;padding:1px 7px;border-radius:999px;white-space:nowrap}
+.chg.up{color:var(--up);background:var(--up-soft)}
+.chg.down{color:var(--down);background:var(--down-soft)}
+.chg.flat{color:var(--muted);background:var(--surface-2)}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;letter-spacing:.02em;text-transform:uppercase}
+.tag.buy{background:var(--up-soft);color:var(--up)}
+.tag.sell{background:var(--down-soft);color:var(--down)}
+.tag.neutral{background:var(--surface-2);color:var(--muted)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.more{display:flex;justify-content:center;margin-top:18px}
+
+/* listas */
+.list{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line);width:100%;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0}
+.row:first-child{border-top:0}
+button.row:hover{background:var(--surface-2)}
+.row .grow{flex:1;min-width:0}
+.row .title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .sub{font-size:13px;color:var(--muted)}
+.row .end{text-align:right;flex:none}
+.list-head{font-size:12px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;padding:16px 4px 6px}
+
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty .icon{font-size:34px;margin-bottom:6px}
+.empty b{display:block;color:var(--text);font-size:16px;margin-bottom:4px}
+
+/* hero de mi equipo */
+.hero{background:linear-gradient(135deg,#0f5a35,#12804a 60%,#1d9a5c);color:#fff;border-radius:22px;padding:22px;margin-bottom:18px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;border:2px solid rgba(255,255,255,.12)}
+.hero::before{content:"";position:absolute;right:50px;top:-140px;width:2px;height:400px;background:rgba(255,255,255,.08)}
+.hero .label{font-size:13px;opacity:.85;font-weight:500}
+.hero .big{font-family:"Bricolage Grotesque";font-size:40px;font-weight:800;line-height:1.1;margin:4px 0 6px}
+.hero .chg{background:rgba(255,255,255,.18);color:#fff}
+.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px;position:relative;z-index:1}
+.hero-stats div{background:rgba(255,255,255,.12);border-radius:12px;padding:10px 12px}
+.hero-stats small{display:block;font-size:12px;opacity:.8}
+.hero-stats b{font-size:16px}
+.hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;position:relative;z-index:1}
+.date-pill{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.16);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px;font-weight:600}
+.date-pill input{border:0;background:transparent;color:#fff;font-size:13px;color-scheme:dark;width:128px}
+.date-pill button{border:0;background:rgba(255,255,255,.2);color:#fff;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600}
+.hero-note{margin-top:10px;font-size:13px;background:rgba(0,0,0,.18);padding:8px 12px;border-radius:10px;position:relative;z-index:1}
+@media (max-width:520px){.hero .big{font-size:32px}.hero-stats b{font-size:14px}}
+
+/* ---------- panel lateral del jugador ---------- */
+.scrim{position:fixed;inset:0;background:rgba(8,16,12,.4);z-index:40;opacity:0;transition:opacity .2s}
+.scrim.open{opacity:1}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--surface);z-index:41;transform:translateX(102%);transition:transform .25s cubic-bezier(.2,.8,.2,1);overflow-y:auto;box-shadow:var(--shadow-lg)}
+.drawer.open{transform:none}
+@media (max-width:720px){
+  .drawer{top:auto;left:0;width:100%;max-height:94vh;border-radius:22px 22px 0 0;transform:translateY(102%)}
+  .drawer::before{content:"";display:block;width:40px;height:4px;border-radius:4px;background:var(--surface-3);margin:8px auto 0}
+}
+.d-head{display:flex;gap:12px;align-items:center;padding:18px 20px 6px}
+.d-head .grow{flex:1;min-width:0}
+.d-head h2{font-size:22px;line-height:1.15}
+.icon-btn{border:0;background:var(--surface-2);width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:none}
+.icon-btn svg{width:18px;height:18px}
+.d-body{padding:6px 20px 28px}
+.price-row{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:10px 0 2px}
+.price-row .big{font-family:"Bricolage Grotesque";font-size:38px;font-weight:800;line-height:1}
+.price-row .unit{color:var(--muted);font-size:14px}
+.chart-wrap{position:relative;margin:10px 0 6px}
+.chart{width:100%;height:150px;display:block;touch-action:none}
+.chart-tip{position:absolute;top:-4px;transform:translateX(-50%);background:var(--text);color:var(--bg);font-size:12px;font-weight:600;padding:3px 8px;border-radius:8px;pointer-events:none;white-space:nowrap;opacity:0}
+.chart-foot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--faint)}
+.mine{display:flex;align-items:center;gap:10px;background:var(--accent-soft);border-radius:14px;padding:12px 14px;margin:14px 0}
+.mine .grow{flex:1}
+.mine b{font-size:15px}
+.mine small{display:block;font-size:13px;color:var(--muted)}
+.card{background:var(--surface-2);border-radius:18px;padding:14px;margin-top:14px}
+.qty{display:flex;align-items:center;gap:8px;margin:14px 0 8px}
+.qty button{width:44px;height:44px;border-radius:12px;border:0;background:var(--surface);font-size:22px;font-weight:600;flex:none}
+.qty input{flex:1;min-width:0;text-align:center;font-size:26px;font-weight:700;border:0;background:var(--surface);border-radius:12px;height:44px;font-family:"Bricolage Grotesque"}
+.qty input::-webkit-inner-spin-button{display:none}
+.quick{display:flex;gap:6px;margin-bottom:12px}
+.quick button{flex:1;border:0;background:var(--surface);border-radius:10px;padding:6px 0;font-size:13px;font-weight:600;color:var(--muted)}
+.quick button:hover{color:var(--text)}
+.total{display:flex;justify-content:space-between;align-items:baseline;margin:4px 2px 12px}
+.total b{font-size:20px}
+.hint{font-size:13px;color:var(--muted);margin:-6px 2px 12px}
+.notice{display:flex;gap:8px;font-size:13px;background:var(--warn-soft);color:var(--warn);padding:9px 12px;border-radius:12px;margin-bottom:10px}
+.err-box{font-size:14px;background:var(--down-soft);color:var(--down);padding:10px 12px;border-radius:12px;margin-top:10px}
+.ok-box{font-size:14px;background:var(--up-soft);color:var(--up);padding:10px 12px;border-radius:12px;margin-top:10px}
+.confirm-box{background:var(--surface);border-radius:14px;padding:12px}
+.confirm-box p{margin:0 0 12px;font-size:15px}
+.confirm-box .actions{display:flex;gap:8px}
+.confirm-box .actions .btn{flex:1}
+details.more-info{border-top:1px solid var(--line);margin-top:16px}
+details.more-info summary{list-style:none;cursor:pointer;padding:14px 2px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+details.more-info summary::-webkit-details-marker{display:none}
+details.more-info summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--faint);border-bottom:2px solid var(--faint);transform:rotate(45deg);margin-right:4px;transition:transform .15s}
+details.more-info[open] summary::after{transform:rotate(-135deg)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:8px 12px;font-size:14px;padding-bottom:10px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;text-align:right;font-weight:600}
+.mini-row{display:flex;align-items:center;gap:10px;padding:8px 2px;font-size:14px;border-top:1px solid var(--line)}
+.mini-row:first-child{border-top:0}
+
+/* ---------- modal ---------- */
+.modal-scrim{position:fixed;inset:0;background:rgba(8,16,12,.45);z-index:60;display:grid;place-items:center;padding:16px;opacity:0;transition:opacity .15s}
+.modal-scrim.open{opacity:1}
+.modal{background:var(--surface);border-radius:22px;width:min(440px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:22px;box-shadow:var(--shadow-lg)}
+.modal.wide{width:min(600px,100%)}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.modal-head h2{font-size:22px}
+.keybox{font-family:ui-monospace,Consolas,monospace;font-size:13px;background:var(--surface-2);border-radius:12px;padding:12px;word-break:break-all;margin:10px 0}
+
+/* ---------- toast ---------- */
+.toasts{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+@media (max-width:720px){.toasts{bottom:88px}}
+.toast{background:var(--text);color:var(--bg);padding:11px 16px;border-radius:14px;font-weight:500;font-size:14px;box-shadow:var(--shadow-lg);animation:pop .25s ease;max-width:min(420px,calc(100vw - 32px))}
+@keyframes pop{from{transform:translateY(10px);opacity:0}}
+
+/* ---------- admin ---------- */
+.strat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.strat.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.strat-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.strat-head h3{font-size:18px}
+.strat-head .spacer{flex:1}
+.bars{display:grid;gap:6px;margin:14px 0 4px}
+.bar{display:grid;grid-template-columns:140px 1fr 40px;gap:10px;align-items:center;font-size:13px}
+.bar .track{height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden}
+.bar .fill{height:100%;background:var(--accent);border-radius:8px}
+.bar span:last-child{text-align:right;color:var(--muted)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.stat small{display:block;color:var(--muted);font-size:13px}
+.stat b{font-family:"Bricolage Grotesque";font-size:26px}
+.wrow{display:grid;grid-template-columns:1fr 90px 32px;gap:8px;align-items:center;margin-bottom:6px}
+.wrow input{padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);text-align:right;width:100%}
+.sum{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;padding:10px 12px;border-radius:12px;margin:10px 0}
+.sum.good{background:var(--up-soft);color:var(--up)}
+.sum.bad{background:var(--down-soft);color:var(--down)}
+.choice{display:flex;gap:8px}
+.choice label{flex:1;border:1px solid var(--line);border-radius:14px;padding:12px;cursor:pointer;font-size:14px}
+.choice label b{display:block}
+.choice label small{color:var(--muted)}
+.choice input{position:absolute;opacity:0}
+.choice label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.spinner{width:18px;height:18px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- barra de demo ---------- */
+.demo{position:fixed;left:16px;bottom:16px;z-index:30;background:var(--surface);border:1px dashed var(--faint);border-radius:14px;padding:8px 10px;box-shadow:var(--shadow);font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.demo b{color:var(--muted);font-weight:600}
+.demo .seg button{padding:4px 10px;font-size:12px}
+@media (max-width:720px){.demo{bottom:78px;left:8px;right:8px;justify-content:center}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-in" id="topbar"></div></header>
+<main id="main"></main>
+<nav class="tabbar" id="tabbar" aria-label="Secciones"></nav>
+<div id="drawer-root"></div>
+<div id="modal-root"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="demo" id="demo"></div>
+
+<script>
+// =====================================================================
+//  Prototipo navegable con datos simulados. No llama a la API.
+// =====================================================================
+
+// ---------- utilidades ----------
+const nf1 = new Intl.NumberFormat('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1});
+const nf2 = new Intl.NumberFormat('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const nf4 = new Intl.NumberFormat('es-AR',{minimumFractionDigits:4,maximumFractionDigits:4});
+const nf0 = new Intl.NumberFormat('es-AR');
+const cr = n => nf2.format(n) + ' cr';
+const signedCr = n => (n > 0.004 ? '+' : n < -0.004 ? '−' : '') + nf2.format(Math.abs(n)) + ' cr';
+const pctTxt = n => (n > 0.04 ? '+' : n < -0.04 ? '−' : '') + nf1.format(Math.abs(n)) + '%';
+const r2 = n => Math.round(n * 100) / 100;
+const r4 = n => Math.round(n * 10000) / 10000;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const initials = n => n.split(' ').filter(Boolean).slice(0,2).map(w => w[0]).join('').toUpperCase();
+const hueOf = s => [...s].reduce((h,c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+function chg(pct, extra=''){
+  const cls = pct > 0.04 ? 'up' : pct < -0.04 ? 'down' : 'flat';
+  const arrow = cls === 'up' ? '▲' : cls === 'down' ? '▼' : '';
+  return `<span class="chg ${cls}">${arrow} ${pctTxt(pct)}${extra}</span>`;
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rng = mulberry32(2026);
+
+// ---------- fechas ----------
+const DAY = 864e5, WEEKS = 26;
+const now = new Date();
+const thisMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7), 4, 10);
+const weekStart = i => new Date(thisMonday.getTime() - (WEEKS - 1 - i) * 7 * DAY);
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const fmtDay = d => d.toLocaleDateString('es-AR',{day:'numeric',month:'short'});
+const fmtDayLong = d => d.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'});
+const fmtTime = d => d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+function weekIndexOf(d){ return Math.max(0, Math.min(WEEKS - 1, Math.floor((d - weekStart(0)) / (7 * DAY)))); }
+function relDay(d){
+  const days = Math.round((new Date(now.getFullYear(),now.getMonth(),now.getDate()) - new Date(d.getFullYear(),d.getMonth(),d.getDate())) / DAY);
+  return days === 0 ? 'Hoy' : days === 1 ? 'Ayer' : fmtDayLong(d);
+}
+
+// ---------- catálogo ----------
+const LEAGUES = {PREMIER:'Premier League', LA_LIGA:'La Liga', SERIE_A:'Serie A', BUNDESLIGA:'Bundesliga', LIGUE_1:'Ligue 1'};
+const POS = {
+  GOALKEEPER:{one:'Arquero', many:'Arqueros', short:'ARQ'},
+  DEFENDER:{one:'Defensor', many:'Defensores', short:'DEF'},
+  MIDFIELDER:{one:'Mediocampista', many:'Medios', short:'MED'},
+  FORWARD:{one:'Delantero', many:'Delanteros', short:'DEL'},
+};
+const RAW = [
+  ['Erling Haaland','Manchester City','PREMIER','FORWARD'],['Mohamed Salah','Liverpool','PREMIER','FORWARD'],
+  ['Bukayo Saka','Arsenal','PREMIER','FORWARD'],['Declan Rice','Arsenal','PREMIER','MIDFIELDER'],
+  ['Virgil van Dijk','Liverpool','PREMIER','DEFENDER'],['Alisson Becker','Liverpool','PREMIER','GOALKEEPER'],
+  ['Cole Palmer','Chelsea','PREMIER','MIDFIELDER'],['William Saliba','Arsenal','PREMIER','DEFENDER'],
+  ['Kylian Mbappé','Real Madrid','LA_LIGA','FORWARD'],['Vinícius Júnior','Real Madrid','LA_LIGA','FORWARD'],
+  ['Jude Bellingham','Real Madrid','LA_LIGA','MIDFIELDER'],['Pedri','FC Barcelona','LA_LIGA','MIDFIELDER'],
+  ['Lamine Yamal','FC Barcelona','LA_LIGA','FORWARD'],['Robert Lewandowski','FC Barcelona','LA_LIGA','FORWARD'],
+  ['Jan Oblak','Atlético de Madrid','LA_LIGA','GOALKEEPER'],['Julián Álvarez','Atlético de Madrid','LA_LIGA','FORWARD'],
+  ['Lautaro Martínez','Inter','SERIE_A','FORWARD'],['Nicolò Barella','Inter','SERIE_A','MIDFIELDER'],
+  ['Alessandro Bastoni','Inter','SERIE_A','DEFENDER'],['Rafael Leão','AC Milan','SERIE_A','FORWARD'],
+  ['Mike Maignan','AC Milan','SERIE_A','GOALKEEPER'],['Paulo Dybala','Roma','SERIE_A','FORWARD'],
+  ['Ousmane Dembélé','Paris Saint-Germain','LIGUE_1','FORWARD'],['Khvicha Kvaratskhelia','Paris Saint-Germain','LIGUE_1','FORWARD'],
+  ['Vitinha','Paris Saint-Germain','LIGUE_1','MIDFIELDER'],['Achraf Hakimi','Paris Saint-Germain','LIGUE_1','DEFENDER'],
+  ['Gerónimo Rulli','Olympique de Marseille','LIGUE_1','GOALKEEPER'],['Mason Greenwood','Olympique de Marseille','LIGUE_1','FORWARD'],
+  ['Harry Kane','Bayern München','BUNDESLIGA','FORWARD'],['Jamal Musiala','Bayern München','BUNDESLIGA','MIDFIELDER'],
+  ['Joshua Kimmich','Bayern München','BUNDESLIGA','MIDFIELDER'],['Manuel Neuer','Bayern München','BUNDESLIGA','GOALKEEPER'],
+  ['Serhou Guirassy','Borussia Dortmund','BUNDESLIGA','FORWARD'],['Nico Schlotterbeck','Borussia Dortmund','BUNDESLIGA','DEFENDER'],
+  ['Exequiel Palacios','Bayer Leverkusen','BUNDESLIGA','MIDFIELDER'],['Alejandro Grimaldo','Bayer Leverkusen','BUNDESLIGA','DEFENDER'],
+];
+const players = RAW.map(([name, team, league, position], i) => {
+  const drift = (rng() - 0.3) * 0.05;
+  const hist = [100];
+  for (let w = 1; w < WEEKS; w++) hist.push(Math.max(10, r2(hist[w - 1] * (1 + drift + (rng() - 0.5) * 0.09))));
+  const pick = rng();
+  const adminPending = pick < 0.62 ? 0 : pick < 0.8 ? 10 + Math.floor(rng() * 30) : pick < 0.92 ? 40 + Math.floor(rng() * 50) : 100;
+  return { id: i + 1, name, team, league, position, hist, adminPending, active: true };
+});
+const byName = n => players.find(p => p.name === n);
+byName('Paulo Dybala').active = false;
+['Erling Haaland','Lautaro Martínez','Jamal Musiala','Cole Palmer','Pedri'].forEach(n => byName(n).adminPending = 0);
+byName('Lamine Yamal').adminPending = 35;
+
+const value = p => p.hist[WEEKS - 1];
+const tokenPrice = p => r4(value(p) / 100);
+const weekChange = p => (p.hist[WEEKS - 1] / p.hist[WEEKS - 2] - 1) * 100;
+const scoreOf = p => Math.max(-1, Math.min(1, (p.hist[WEEKS - 1] / p.hist[WEEKS - 2] - 1) * 9));
+
+// ---------- mercado ----------
+let nextId = 1000;
+const orders = [];   // owner: ADMIN (orden inicial), USER (otros usuarios), ME
+const txs = [];
+const START_BALANCE = 1000;
+const REGISTERED_AT = weekStart(14);
+
+players.forEach(p => {
+  if (p.adminPending > 0) orders.push({ id: nextId++, pid: p.id, side: 'SELL', owner: 'ADMIN', requested: 100, executed: 100 - p.adminPending, cancelled: 0, pending: p.adminPending, reserved: 0, at: weekStart(0).getTime() });
+  else {
+    const n = Math.floor(rng() * 3);
+    for (let k = 0; k < n; k++) orders.push({ id: nextId++, pid: p.id, side: rng() < 0.5 ? 'BUY' : 'SELL', owner: 'USER', requested: 0, executed: 0, cancelled: 0, pending: 1 + Math.floor(rng() * 14), reserved: 0, at: now - Math.floor(rng() * 20) * DAY });
+  }
+});
+orders.push({ id: nextId++, pid: byName('Erling Haaland').id, side: 'BUY', owner: 'USER', requested: 8, executed: 0, cancelled: 0, pending: 8, reserved: 0, at: now - 3 * DAY });
+orders.push({ id: nextId++, pid: byName('Cole Palmer').id, side: 'SELL', owner: 'USER', requested: 12, executed: 0, cancelled: 0, pending: 12, reserved: 0, at: now - 2 * DAY });
+orders.forEach(o => { if (!o.requested) o.requested = o.pending; });
+
+// Historial sembrado del usuario de la demo
+function seedTrade(name, side, qty, week, dayOffset, fromAdmin){
+  const p = byName(name);
+  const at = weekStart(week).getTime() + dayOffset * DAY + 6 * 3600e3;
+  const price = fromAdmin ? 1 : r4(p.hist[week] / 100);
+  const order = { id: nextId++, pid: p.id, side, owner: 'ME', requested: qty, executed: qty, cancelled: 0, pending: 0, reserved: 0, at };
+  orders.push(order);
+  txs.push({ id: nextId++, at, pid: p.id, side, q: qty, price, total: r2(qty * price), cp: fromAdmin ? 'ADMIN' : 'USER', orderId: order.id });
+}
+seedTrade('Erling Haaland','BUY',20,15,1,true);
+seedTrade('Lamine Yamal','BUY',15,16,2,true);
+seedTrade('Lautaro Martínez','BUY',10,18,0,false);
+seedTrade('Jamal Musiala','BUY',8,20,3,false);
+seedTrade('Erling Haaland','SELL',5,22,1,false);
+seedTrade('Cole Palmer','BUY',6,24,2,false);
+txs.sort((a,b) => a.at - b.at);
+// Ganancia realizada de las ventas sembradas
+(function(){ const pos = {}; txs.forEach(t => { const p = pos[t.pid] ||= {tokens:0, invested:0}; if (t.side === 'BUY'){ p.tokens += t.q; p.invested += t.total; } else { const cost = p.invested / p.tokens * t.q; t.realized = r2(t.total - cost); p.tokens -= t.q; p.invested -= cost; } }); })();
+// Órdenes pendientes del usuario
+{
+  const pedri = byName('Pedri');
+  orders.push({ id: nextId++, pid: pedri.id, side: 'BUY', owner: 'ME', requested: 4, executed: 0, cancelled: 0, pending: 4, reserved: r2(4 * tokenPrice(pedri)), at: now - 1 * DAY });
+  orders.push({ id: nextId++, pid: byName('Lautaro Martínez').id, side: 'SELL', owner: 'ME', requested: 3, executed: 0, cancelled: 0, pending: 3, reserved: 0, at: now - 2 * DAY });
+}
+
+function statusOf(o){
+  if (o.pending > 0) return o.executed > 0 ? 'PARTIAL' : 'PENDING';
+  if (o.cancelled > 0) return 'CANCELLED';
+  return 'EXECUTED';
+}
+const STATUS = { PENDING:['Pendiente','warn'], PARTIAL:['Parcial','warn'], EXECUTED:['Ejecutada','neutral'], CANCELLED:['Cancelada','neutral'] };
+
+// Cartera reconstruida a partir de las operaciones (actual o a una fecha)
+function snapshot(dateIso){
+  const end = dateIso ? new Date(dateIso + 'T23:59:59').getTime() : Infinity;
+  const wi = dateIso ? weekIndexOf(new Date(dateIso + 'T12:00')) : WEEKS - 1;
+  let balance = START_BALANCE, realized = 0;
+  const pos = new Map();
+  txs.filter(t => t.at <= end).forEach(t => {
+    const p = pos.get(t.pid) || { tokens: 0, invested: 0 };
+    if (t.side === 'BUY'){ p.tokens += t.q; p.invested += t.total; balance -= t.total; }
+    else { const cost = p.invested / p.tokens * t.q; p.invested -= cost; p.tokens -= t.q; balance += t.total; realized += t.total - cost; }
+    pos.set(t.pid, p);
+  });
+  const rows = [...pos].filter(([, p]) => p.tokens > 0).map(([pid, p]) => {
+    const pl = players.find(x => x.id === pid);
+    const val = r2(p.tokens * pl.hist[wi] / 100);
+    const committed = dateIso ? 0 : orders.filter(o => o.owner === 'ME' && o.pid === pid && o.side === 'SELL').reduce((s, o) => s + o.pending, 0);
+    return { player: pl, tokens: p.tokens, invested: r2(p.invested), value: val, profit: r2(val - p.invested), profitPct: (val / p.invested - 1) * 100, committed };
+  }).sort((a, b) => b.value - a.value);
+  const reserved = dateIso ? 0 : r2(orders.filter(o => o.owner === 'ME' && o.side === 'BUY').reduce((s, o) => s + o.reserved, 0));
+  const invested = r2(rows.reduce((s, r) => s + r.invested, 0));
+  const val = r2(rows.reduce((s, r) => s + r.value, 0));
+  return { rows, balance: r2(balance), reserved, available: r2(balance - reserved), invested, value: val, profit: r2(val - invested), realized: r2(realized), equity: r2(balance + val) };
+}
+const ownedOf = pid => snapshot().rows.find(r => r.player.id === pid);
+
+// Ejecutar una orden del usuario contra el libro
+function execute(side, pid, qty){
+  const p = players.find(x => x.id === pid);
+  const tp = tokenPrice(p);
+  const me = snapshot();
+  if (side === 'BUY'){
+    const est = estimate('BUY', p, qty);
+    if (est.total > me.available + 0.001) return { error: `No te alcanza el saldo libre (${cr(me.available)}).` };
+  } else {
+    if (p.adminPending > 0) return { error: 'Todavía no se puede vender este jugador.' };
+    const own = ownedOf(pid);
+    const free = own ? own.tokens - own.committed : 0;
+    if (qty > free) return { error: free ? `Solo podés vender ${free} token${free === 1 ? '' : 's'}.` : 'No tenés tokens libres de este jugador.' };
+  }
+  const order = { id: nextId++, pid, side, owner: 'ME', requested: qty, executed: 0, cancelled: 0, pending: qty, reserved: 0, at: Date.now() };
+  const trades = [];
+  const take = (o, price, cp) => {
+    const q = Math.min(order.pending, o.pending);
+    if (!q) return;
+    o.pending -= q; o.executed += q; order.pending -= q; order.executed += q;
+    if (o.owner === 'ADMIN') p.adminPending -= q;
+    trades.push({ q, price, cp });
+  };
+  if (side === 'BUY'){
+    orders.filter(o => o.pid === pid && o.owner === 'ADMIN' && o.pending > 0).forEach(o => take(o, 1, 'ADMIN'));
+    orders.filter(o => o.pid === pid && o.owner === 'USER' && o.side === 'SELL' && o.pending > 0).forEach(o => take(o, tp, 'USER'));
+    order.reserved = r2(order.pending * tp);
+  } else {
+    orders.filter(o => o.pid === pid && o.owner === 'USER' && o.side === 'BUY' && o.pending > 0).forEach(o => take(o, tp, 'USER'));
+  }
+  orders.push(order);
+  trades.forEach(t => {
+    const tx = { id: nextId++, at: Date.now(), pid, side, q: t.q, price: t.price, total: r2(t.q * t.price), cp: t.cp, orderId: order.id };
+    if (side === 'SELL'){ const own = ownedOf(pid); tx.realized = r2(tx.total - own.invested / own.tokens * t.q); }
+    txs.push(tx);
+  });
+  const executedTotal = r2(trades.reduce((s, t) => s + t.q * t.price, 0));
+  return { order, trades, executed: order.executed, executedTotal };
+}
+function estimate(side, p, qty){
+  const tp = tokenPrice(p);
+  const atInitial = side === 'BUY' ? Math.min(qty, p.adminPending) : 0;
+  const atQuote = qty - atInitial;
+  return { atInitial, atQuote, total: r2(atInitial * 1 + atQuote * tp) };
+}
+function cancelOrder(id){
+  const o = orders.find(x => x.id === id);
+  o.cancelled += o.pending; o.pending = 0; o.reserved = 0;
+  return o;
+}
+
+// ---------- administración ----------
+const METRICS = [
+  ['GOALS','Goles'],['ASSISTS','Asistencias'],['SHOTS','Remates'],['SHOTS_ON_TARGET','Remates al arco'],
+  ['KEY_PASSES','Pases clave'],['SUCCESSFUL_DRIBBLES','Gambetas'],['TACKLES','Quites'],['INTERCEPTIONS','Intercepciones'],
+  ['CLEARANCES','Despejes'],['AERIALS_WON','Duelos aéreos'],['PASSES','Pases'],['MINUTES_PLAYED','Minutos'],
+  ['RATING','Rating'],['PASS_ACCURACY','Precisión de pase'],['TEAM_RESULT','Resultado del equipo'],['CLEAN_SHEETS','Vallas invictas'],
+  ['FOULS_COMMITTED','Faltas (menos es mejor)'],['YELLOW_CARDS','Amarillas (menos es mejor)'],['RED_CARDS','Rojas (menos es mejor)'],
+];
+const metricLabel = k => METRICS.find(m => m[0] === k)[1];
+const strategies = [
+  { id: 1, name: 'Equilibrada', versions: [
+    { v: 1, factor: 10, min: 10, w: { GOALS: .25, ASSISTS: .15, RATING: .3, TEAM_RESULT: .3 }, pos: {}, at: weekStart(0) },
+    { v: 2, factor: 10, min: 10, w: { GOALS: .2, ASSISTS: .15, KEY_PASSES: .1, RATING: .2, PASS_ACCURACY: .1, TACKLES: .1, TEAM_RESULT: .1, MINUTES_PLAYED: .05 }, pos: {}, at: weekStart(12) },
+  ]},
+  { id: 2, name: 'Ofensiva', versions: [
+    { v: 1, factor: 12, min: 10, w: { GOALS: .35, ASSISTS: .2, SHOTS_ON_TARGET: .15, SUCCESSFUL_DRIBBLES: .1, KEY_PASSES: .1, RATING: .1 }, pos: {}, at: weekStart(8) },
+  ]},
+  { id: 3, name: 'Defensiva', versions: [
+    { v: 1, factor: 8, min: 15, w: { TACKLES: .2, INTERCEPTIONS: .2, CLEARANCES: .15, AERIALS_WON: .1, CLEAN_SHEETS: .15, RATING: .1, TEAM_RESULT: .1 }, pos: { GOALKEEPER: { CLEAN_SHEETS: .5, RATING: .3, TEAM_RESULT: .2 } }, at: weekStart(10) },
+  ]},
+];
+let activeStrategy = { id: 1, v: 2 };
+const latest = s => s.versions[s.versions.length - 1];
+const activeName = () => { const s = strategies.find(x => x.id === activeStrategy.id); return `${s.name} v${activeStrategy.v}`; };
+let lastReport = {
+  origin: 'Semanal', at: thisMonday, strategy: 'Equilibrada v2',
+  quoted: [{ week: weekStart(WEEKS - 2), players: 2614 }],
+  pending: [{ week: weekStart(WEEKS - 1), reason: 'Faltan estadísticas' }],
+};
+
+// ---------- estado de la interfaz ----------
+const state = {
+  role: 'USER', // GUEST | USER | ADMIN
+  user: { username: 'valen', email: 'valen@ejemplo.com' },
+  view: 'players',
+  ex: { mode: 'players', q: '', league: '', team: '', pos: '', sort: 'value', limit: 12, side: '' },
+  pf: { tab: 'players', date: '', dateError: '', txSide: '' },
+  admin: { tab: 'strategies', running: false, simStrategy: 1, simResult: null, simLeague: '' },
+  drawer: null, // { pid, range, side, qty, confirming, result, error }
+  modal: null,
+};
+
+// ---------- íconos ----------
+const I = {
+  ball: '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="var(--accent)"/><path d="M16 9l5 3.6-1.9 5.9h-6.2L11 12.6z" fill="var(--accent-ink)"/><path d="M16 9V3.5M21 12.6l5-1.7M19.1 18.5l3.2 4.4M12.9 18.5l-3.2 4.4M11 12.6l-5-1.7" stroke="var(--accent-ink)" stroke-width="1.6" fill="none"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  players: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14c2.4 0 4 1.5 4.6 4.5"/></svg>',
+  team: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7h18v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg>',
+  admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>',
+};
+
+// ---------- gráficos ----------
+function sparkSVG(values){
+  const w = 200, h = 30, min = Math.min(...values), max = Math.max(...values), span = max - min || 1;
+  const pts = values.map((v, i) => [i / (values.length - 1) * w, h - 2 - (v - min) / span * (h - 4)]);
+  const up = values[values.length - 1] >= values[0];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="var(${up ? '--up' : '--down'})" stroke-width="1.8" vector-effect="non-scaling-stroke" points="${pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ')}"/></svg>`;
+}
+function chartSVG(values){
+  const w = 420, h = 150, pad = 8, min = Math.min(...values), max = Math.max(...values), span = max - min || 1;
+  const pts = values.map((v, i) => [pad + i / (values.length - 1) * (w - 2 * pad), pad + (1 - (v - min) / span) * (h - 2 * pad - 10)]);
+  const up = values[values.length - 1] >= values[0];
+  const col = up ? 'var(--up)' : 'var(--down)';
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const last = pts[pts.length - 1];
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Evolución de la cotización">
+    <defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${line} L${last[0]} ${h} L${pts[0][0]} ${h} Z" fill="url(#g)"/>
+    <path d="${line}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <line class="cx" x1="0" x2="0" y1="0" y2="${h}" stroke="var(--faint)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" opacity="0"/>
+    <circle class="cd" cx="${last[0]}" cy="${last[1]}" r="4.5" fill="${col}" stroke="var(--surface)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+function wireChart(root, values, dates){
+  const svg = root.querySelector('.chart'); if (!svg) return;
+  const tip = root.querySelector('.chart-tip');
+  const w = 420, h = 150, pad = 8, min = Math.min(...values), max = Math.max(...values), span = max - min || 1;
+  const move = e => {
+    const rect = svg.getBoundingClientRect();
+    const x = ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) / rect.width;
+    const i = Math.max(0, Math.min(values.length - 1, Math.round((x * w - pad) / (w - 2 * pad) * (values.length - 1))));
+    const px = pad + i / (values.length - 1) * (w - 2 * pad), py = pad + (1 - (values[i] - min) / span) * (h - 2 * pad - 10);
+    svg.querySelector('.cd').setAttribute('cx', px); svg.querySelector('.cd').setAttribute('cy', py);
+    const cx = svg.querySelector('.cx'); cx.setAttribute('x1', px); cx.setAttribute('x2', px); cx.setAttribute('opacity', 1);
+    tip.textContent = `${nf4.format(values[i] / 100)} cr · ${fmtDay(dates[i])}`;
+    tip.style.left = (px / w * 100) + '%'; tip.style.opacity = 1;
+  };
+  const leave = () => { tip.style.opacity = 0; svg.querySelector('.cx').setAttribute('opacity', 0); };
+  svg.addEventListener('pointermove', move); svg.addEventListener('pointerleave', leave);
+}
+
+// ---------- barra superior y pestañas ----------
+function navItems(){
+  const items = [['players', 'Jugadores', I.players]];
+  if (state.role === 'USER') items.push(['portfolio', 'Mi equipo', I.team]);
+  if (state.role === 'ADMIN') items.push(['admin', 'Administración', I.admin]);
+  return items;
+}
+function renderTop(){
+  const snap = state.role === 'USER' ? snapshot() : null;
+  document.getElementById('topbar').innerHTML = `
+    <button class="brand" data-act="go" data-view="players" aria-label="La Pizarra, ir al inicio">${I.ball}<span>La Pizarra</span></button>
+    <nav class="nav" aria-label="Secciones">${navItems().map(([v, l]) => `<button data-act="go" data-view="${v}" ${state.view === v ? 'aria-current="page"' : ''}>${l}</button>`).join('')}</nav>
+    <div class="spacer"></div>
+    ${snap ? `<button class="balance" data-act="go" data-view="portfolio" title="Saldo libre para operar"><small>Saldo libre</small><b class="num">${cr(snap.available)}</b></button>` : ''}
+    ${state.role === 'GUEST'
+      ? `<button class="btn primary sm" data-act="login">Entrar</button>`
+      : `<button class="avatar-btn" data-act="account" aria-label="Mi cuenta">${initials(state.user.username)}</button>`}
+  `;
+  const tabs = navItems();
+  tabs.push(state.role === 'GUEST' ? ['login', 'Entrar', I.user] : ['account', 'Cuenta', I.user]);
+  document.getElementById('tabbar').innerHTML = tabs.map(([v, l, ic]) =>
+    ['login', 'account'].includes(v)
+      ? `<button data-act="${v}">${ic}${l}</button>`
+      : `<button data-act="go" data-view="${v}" ${state.view === v ? 'aria-current="page"' : ''}>${ic}${l}</button>`).join('');
+}
+
+// ---------- vista: jugadores ----------
+function filteredPlayers(){
+  const { q, league, team, pos, sort } = state.ex;
+  const list = players.filter(p => (!league || p.league === league) && (!team || p.team === team) && (!pos || p.position === pos) && (!q || norm(p.name + ' ' + p.team).includes(norm(q))));
+  const sorts = { value: (a, b) => value(b) - value(a), up: (a, b) => weekChange(b) - weekChange(a), down: (a, b) => weekChange(a) - weekChange(b), name: (a, b) => a.name.localeCompare(b.name, 'es') };
+  return list.sort(sorts[sort]);
+}
+function teamsFor(league){ return [...new Set(players.filter(p => !league || p.league === league).map(p => p.team))].sort((a, b) => a.localeCompare(b, 'es')); }
+function leagueSelect(value, act){
+  return `<select class="select" data-act="${act}" aria-label="Liga"><option value="">Todas las ligas</option>${Object.entries(LEAGUES).map(([k, l]) => `<option value="${k}" ${value === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+}
+function renderPlayersView(){
+  const e = state.ex;
+  return `
+    <div class="page-head">
+      <h1>Jugadores</h1>
+      <div class="seg" role="group" aria-label="Qué ver">
+        <button data-act="exmode" data-mode="players" aria-pressed="${e.mode === 'players'}">Cotizaciones</button>
+        <button data-act="exmode" data-mode="offers" aria-pressed="${e.mode === 'offers'}">Ofertas abiertas</button>
+      </div>
+    </div>
+    ${e.mode === 'players' ? `
+      <div class="toolbar">
+        <label class="search"><span class="sr">Buscar jugador o equipo</span>${I.search}<input id="q" type="search" placeholder="Buscar jugador o equipo" value="${esc(e.q)}" autocomplete="off"></label>
+        ${leagueSelect(e.league, 'league')}
+        ${e.league ? `<select class="select" data-act="team" aria-label="Equipo"><option value="">Todos los equipos</option>${teamsFor(e.league).map(t => `<option ${e.team === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}
+        <select class="select" data-act="sort" aria-label="Ordenar">
+          ${[['value','Mejor cotizados'],['up','Los que más suben'],['down','Los que más bajan'],['name','A – Z']].map(([k, l]) => `<option value="${k}" ${e.sort === k ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="chips" role="group" aria-label="Posición">
+        <button class="chip" data-act="pos" data-pos="" aria-pressed="${!e.pos}">Todos</button>
+        ${Object.entries(POS).map(([k, v]) => `<button class="chip" data-act="pos" data-pos="${k}" aria-pressed="${e.pos === k}">${v.many}</button>`).join('')}
+      </div>
+      <div id="grid">${renderGrid()}</div>
+    ` : renderOffers()}
+  `;
+}
+function renderGrid(){
+  const list = filteredPlayers();
+  if (!list.length) return `<div class="empty"><div class="icon">🔍</div><b>No encontramos jugadores</b>Probá con otro nombre o sacá algún filtro.<br><br><button class="btn" data-act="clear">Limpiar filtros</button></div>`;
+  const shown = list.slice(0, state.ex.limit);
+  return `<div class="grid">${shown.map((p, i) => `
+    <button class="pcard" data-act="open" data-id="${p.id}">
+      <div class="av" style="--h:${hueOf(p.team)}">${initials(p.name)}</div>
+      <div style="min-width:0"><div class="pc-name">${state.ex.sort === 'value' ? `<span class="rank">${i + 1}</span>` : ''}${esc(p.name)}</div><div class="pc-sub">${esc(p.team)} · ${POS[p.position].short}</div></div>
+      <div class="pc-right"><div class="pc-price num">${nf2.format(tokenPrice(p))}<small>cr</small></div>${chg(weekChange(p))}</div>
+      ${sparkSVG(p.hist.slice(-10))}
+    </button>`).join('')}</div>
+    ${list.length > shown.length ? `<div class="more"><button class="btn" data-act="more">Ver más (${list.length - shown.length})</button></div>` : ''}`;
+}
+function renderOffers(){
+  const e = state.ex;
+  let list = orders.filter(o => o.pending > 0);
+  if (e.league) list = list.filter(o => players.find(p => p.id === o.pid).league === e.league);
+  if (e.side === 'BUY' || e.side === 'SELL') list = list.filter(o => o.side === e.side);
+  if (e.side === 'ADMIN') list = list.filter(o => o.owner === 'ADMIN');
+  list.sort((a, b) => b.at - a.at);
+  return `
+    <div class="toolbar">${leagueSelect(e.league, 'league')}</div>
+    <div class="chips" role="group" aria-label="Tipo de oferta">
+      ${[['', 'Todas'], ['SELL', 'Venden'], ['BUY', 'Compran'], ['ADMIN', 'Tokens iniciales']].map(([k, l]) => `<button class="chip" data-act="side" data-side="${k}" aria-pressed="${e.side === k}">${l}</button>`).join('')}
+    </div>
+    ${list.length ? `<div class="list">${list.slice(0, 40).map(o => offerRow(o, true)).join('')}</div>` : `<div class="empty"><div class="icon">📭</div><b>No hay ofertas con esos filtros</b></div>`}
+  `;
+}
+function offerRow(o, withPlayer){
+  const p = players.find(x => x.id === o.pid);
+  const tag = o.side === 'BUY' ? '<span class="tag buy">Compra</span>' : '<span class="tag sell">Venta</span>';
+  const who = o.owner === 'ADMIN' ? 'Tokens iniciales a 1,00 cr' : o.owner === 'ME' ? 'Tu orden' : 'Otro usuario';
+  return `<${withPlayer ? 'button' : 'div'} class="${withPlayer ? 'row' : 'mini-row'}" ${withPlayer ? `data-act="open" data-id="${p.id}"` : ''}>
+    ${withPlayer ? `<div class="av" style="--h:${hueOf(p.team)};width:36px;height:36px;font-size:12px">${initials(p.name)}</div>` : ''}
+    <div class="grow">${withPlayer ? `<div class="title">${esc(p.name)}</div>` : ''}<div class="sub">${tag} ${who}</div></div>
+    <div class="end"><b class="num">${o.pending}</b> <span class="muted">token${o.pending === 1 ? '' : 's'}</span>${withPlayer ? `<div class="sub">${relDay(new Date(o.at))}</div>` : ''}</div>
+  </${withPlayer ? 'button' : 'div'}>`;
+}
+
+// ---------- vista: mi equipo ----------
+function renderPortfolioView(){
+  const pf = state.pf;
+  const snap = snapshot(pf.date || undefined);
+  const myOrders = orders.filter(o => o.owner === 'ME').sort((a, b) => b.at - a.at);
+  const pendingCount = myOrders.filter(o => o.pending > 0).length;
+  const totalPct = snap.invested ? snap.profit / snap.invested * 100 : 0;
+  return `
+    <div class="hero">
+      <div class="hero-top">
+        <div class="label">${pf.date ? `Tu patrimonio al ${fmtDay(new Date(pf.date + 'T12:00'))}` : 'Tu patrimonio'}</div>
+        <label class="date-pill"><span class="sr">Ver otra fecha</span>📅
+          <input type="date" id="pfdate" value="${pf.date}" max="${isoDay(now)}" aria-label="Ver tu equipo en otra fecha">
+          ${pf.date ? `<button data-act="pftoday">Hoy</button>` : ''}
+        </label>
+      </div>
+      <div class="big num">${cr(snap.equity)}</div>
+      ${snap.invested ? `${chg(totalPct, ` · ${signedCr(snap.profit)}`)}` : ''}
+      <div class="hero-stats">
+        ${pf.date
+          ? `<div><small>Saldo</small><b class="num">${cr(snap.balance)}</b></div>`
+          : `<div><small>Saldo libre</small><b class="num">${cr(snap.available)}</b></div>`}
+        <div><small>En jugadores</small><b class="num">${cr(snap.value)}</b></div>
+        <div><small>Ganancia cobrada</small><b class="num">${signedCr(snap.realized)}</b></div>
+      </div>
+      ${pf.dateError ? `<div class="hero-note">⚠️ ${pf.dateError}</div>` : ''}
+      ${!pf.date && snap.reserved ? `<div class="hero-note">${cr(snap.reserved)} reservados para compras pendientes</div>` : ''}
+    </div>
+    ${pf.date ? '' : `
+    <div class="seg full" role="group" aria-label="Sección" style="margin-bottom:14px">
+      <button data-act="pftab" data-tab="players" aria-pressed="${pf.tab === 'players'}">Jugadores</button>
+      <button data-act="pftab" data-tab="orders" aria-pressed="${pf.tab === 'orders'}">Órdenes${pendingCount ? `<span class="count">${pendingCount}</span>` : ''}</button>
+      <button data-act="pftab" data-tab="moves" aria-pressed="${pf.tab === 'moves'}">Movimientos</button>
+    </div>`}
+    ${pf.date || pf.tab === 'players' ? renderPositions(snap) : pf.tab === 'orders' ? renderMyOrders(myOrders) : renderMoves()}
+  `;
+}
+function renderPositions(snap){
+  if (!snap.rows.length) return `<div class="empty"><div class="icon">⚽</div><b>Todavía no tenés jugadores</b>Buscá uno y comprá tus primeros tokens.<br><br><button class="btn primary" data-act="go" data-view="players">Ver jugadores</button></div>`;
+  return `<div class="list">${snap.rows.map(r => `
+    <button class="row" data-act="open" data-id="${r.player.id}">
+      <div class="av" style="--h:${hueOf(r.player.team)}">${initials(r.player.name)}</div>
+      <div class="grow"><div class="title">${esc(r.player.name)}</div>
+        <div class="sub">${r.tokens} tokens · ${r.tokens}%${r.committed ? ` · <span class="tag warn">${r.committed} en venta</span>` : ''}</div></div>
+      <div class="end"><b class="num">${cr(r.value)}</b><div>${chg(r.profitPct)}</div></div>
+    </button>`).join('')}</div>`;
+}
+function renderMyOrders(list){
+  if (!list.length) return `<div class="empty"><div class="icon">🧾</div><b>No hiciste órdenes todavía</b></div>`;
+  const open = list.filter(o => o.pending > 0), done = list.filter(o => o.pending === 0);
+  const row = o => {
+    const p = players.find(x => x.id === o.pid);
+    const [label, cls] = STATUS[statusOf(o)];
+    const confirming = state.pf.cancelId === o.id;
+    return `<div class="row">
+      <span class="tag ${o.side === 'BUY' ? 'buy' : 'sell'}">${o.side === 'BUY' ? 'Compra' : 'Venta'}</span>
+      <div class="grow"><div class="title">${esc(p.name)}</div>
+        <div class="sub">${o.pending > 0 ? `${o.pending} de ${o.requested} pendientes${o.reserved ? ` · ${cr(o.reserved)} reservados` : ''}` : `${o.executed} de ${o.requested} ejecutados`} · ${relDay(new Date(o.at))}</div></div>
+      <div class="end">${o.pending > 0
+        ? (confirming
+          ? `<button class="btn sm ghost" data-act="cancelno">No</button> <button class="btn sm danger" data-act="cancelyes" data-id="${o.id}">Cancelar orden</button>`
+          : `<button class="btn sm" data-act="cancelask" data-id="${o.id}">Cancelar</button>`)
+        : `<span class="tag ${cls}">${label}</span>`}</div>
+    </div>`;
+  };
+  return `${open.length ? `<div class="list-head">Pendientes</div><div class="list">${open.map(row).join('')}</div>` : ''}
+    ${done.length ? `<div class="list-head">Anteriores</div><div class="list">${done.map(row).join('')}</div>` : ''}`;
+}
+function renderMoves(){
+  const side = state.pf.txSide;
+  const list = txs.filter(t => !side || t.side === side).slice().sort((a, b) => b.at - a.at);
+  const groups = [];
+  list.forEach(t => { const k = relDay(new Date(t.at)); const g = groups[groups.length - 1]; if (g && g.k === k) g.items.push(t); else groups.push({ k, items: [t] }); });
+  return `
+    <div class="chips" role="group" aria-label="Tipo">
+      ${[['', 'Todos'], ['BUY', 'Compras'], ['SELL', 'Ventas']].map(([k, l]) => `<button class="chip" data-act="txside" data-side="${k}" aria-pressed="${side === k}">${l}</button>`).join('')}
+    </div>
+    ${groups.length ? groups.map(g => `<div class="list-head">${g.k}</div><div class="list">${g.items.map(t => {
+      const p = players.find(x => x.id === t.pid);
+      return `<button class="row" data-act="open" data-id="${p.id}">
+        <span class="tag ${t.side === 'BUY' ? 'buy' : 'sell'}">${t.side === 'BUY' ? 'Compra' : 'Venta'}</span>
+        <div class="grow"><div class="title">${t.q} × ${esc(p.name)}</div><div class="sub">a ${nf4.format(t.price)} cr${t.cp === 'ADMIN' ? ' · tokens iniciales' : ''} · ${fmtTime(new Date(t.at))}</div></div>
+        <div class="end"><b class="num">${t.side === 'BUY' ? '−' : '+'}${cr(t.total)}</b>${t.realized != null ? `<div class="sub">ganancia ${signedCr(t.realized)}</div>` : ''}</div>
+      </button>`;
+    }).join('')}</div>`).join('') : `<div class="empty"><div class="icon">📒</div><b>Sin movimientos</b></div>`}
+  `;
+}
+
+// ---------- vista: administración ----------
+function renderAdminView(){
+  const a = state.admin;
+  return `
+    <div class="page-head"><h1>Administración</h1></div>
+    <div class="seg" role="group" aria-label="Sección" style="margin-bottom:18px">
+      ${[['strategies', 'Estrategias'], ['recalc', 'Recálculo'], ['sim', 'Simulación']].map(([k, l]) => `<button data-act="admtab" data-tab="${k}" aria-pressed="${a.tab === k}">${l}</button>`).join('')}
+    </div>
+    ${a.tab === 'strategies' ? renderStrategies() : a.tab === 'recalc' ? renderRecalc() : renderSim()}
+  `;
+}
+function weightBars(w, limit = 5){
+  const top = Object.entries(w).sort((a, b) => b[1] - a[1]);
+  return `<div class="bars">${top.slice(0, limit).map(([k, v]) => `<div class="bar"><span>${metricLabel(k)}</span><div class="track"><div class="fill" style="width:${v * 100}%"></div></div><span class="num">${Math.round(v * 100)}%</span></div>`).join('')}</div>
+    ${top.length > limit ? `<div class="muted" style="font-size:13px">y ${top.length - limit} métrica${top.length - limit === 1 ? '' : 's'} más</div>` : ''}`;
+}
+function renderStrategies(){
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">
+      <span class="muted">La activa define las cotizaciones de todos los jugadores.</span>
+      <button class="btn primary" data-act="stratnew">+ Nueva estrategia</button>
+    </div>
+    ${strategies.map(s => {
+      const v = latest(s);
+      const isActive = activeStrategy.id === s.id && activeStrategy.v === v.v;
+      const customPos = Object.keys(v.pos);
+      return `<div class="strat ${isActive ? 'active' : ''}">
+        <div class="strat-head">
+          <h3>${esc(s.name)}</h3><span class="tag neutral">v${v.v}</span>
+          ${isActive ? '<span class="tag buy">Activa</span>' : ''}
+          <div class="spacer"></div>
+          ${isActive ? '' : `<button class="btn sm primary" data-act="stratactivate" data-id="${s.id}">Activar</button>`}
+          <button class="btn sm" data-act="stratversion" data-id="${s.id}">Editar</button>
+        </div>
+        <div class="muted" style="font-size:13px;margin-top:4px">Factor ${nf0.format(v.factor)} · Mínimo ${cr(v.min)}${customPos.length ? ` · Pesos propios: ${customPos.map(p => POS[p].many.toLowerCase()).join(', ')}` : ''}</div>
+        ${weightBars(v.w)}
+      </div>`;
+    }).join('')}
+  `;
+}
+function renderRecalc(){
+  const r = lastReport, a = state.admin;
+  return `
+    <div class="strat">
+      <div class="strat-head"><h3>Recalcular cotizaciones</h3><div class="spacer"></div>
+        <button class="btn primary" data-act="recalc" ${a.running ? 'disabled' : ''}>${a.running ? '<span class="spinner"></span> Calculando…' : 'Recalcular ahora'}</button></div>
+      <div class="muted" style="font-size:14px;margin-top:6px">Se hace solo cada lunes. Usalo si cargaste estadísticas nuevas.</div>
+    </div>
+    <div class="list-head">Última corrida · ${r.origin} · ${relDay(r.at)} ${fmtTime(r.at)} · ${esc(r.strategy)}</div>
+    ${r.nothing ? `<div class="list"><div class="row"><div class="grow">✅ Todo estaba al día: no había semanas para cotizar.</div></div></div>` : `
+    <div class="stat-grid">
+      <div class="stat"><small>Semanas cotizadas</small><b>${r.quoted.length}</b></div>
+      <div class="stat"><small>Jugadores cotizados</small><b>${nf0.format(r.quoted.reduce((s, q) => s + q.players, 0))}</b></div>
+      <div class="stat"><small>Semanas pendientes</small><b>${r.pending.length}</b></div>
+    </div>`}
+    ${r.pending.length ? `<div class="list">${r.pending.map(p => `<div class="row"><span class="tag warn">Pendiente</span><div class="grow"><div class="title">Semana del ${fmtDay(p.week)}</div><div class="sub">${p.reason}</div></div></div>`).join('')}</div>` : ''}
+  `;
+}
+function renderSim(){
+  const a = state.admin;
+  let rows = a.simResult ? a.simResult.rows : [];
+  if (a.simLeague) rows = rows.filter(r => r.p.league === a.simLeague);
+  return `
+    <div class="toolbar">
+      <select class="select" data-act="simstrat" aria-label="Estrategia a simular">${strategies.map(s => `<option value="${s.id}" ${a.simStrategy === s.id ? 'selected' : ''}>${esc(s.name)} v${latest(s).v}</option>`).join('')}</select>
+      <button class="btn primary" data-act="simrun">Simular</button>
+      ${a.simResult ? leagueSelect(a.simLeague, 'simleague') : ''}
+    </div>
+    ${a.simResult ? `
+      <div class="list-head">${a.simResult.name} · ${a.simResult.weeks} semanas simuladas · sin tocar las cotizaciones reales</div>
+      <div class="list">${rows.slice(0, 30).map(r => `<div class="row">
+        <div class="av" style="--h:${hueOf(r.p.team)};width:36px;height:36px;font-size:12px">${initials(r.p.name)}</div>
+        <div class="grow"><div class="title">${esc(r.p.name)}</div><div class="sub">Hoy ${cr(r.current)} → <b>${cr(r.sim)}</b></div></div>
+        <div class="end">${chg((r.sim / r.current - 1) * 100)}</div></div>`).join('')}</div>`
+    : `<div class="empty"><div class="icon">🧪</div><b>Probá una estrategia sin aplicarla</b>Elegí una y tocá Simular para ver cómo quedarían los valores.</div>`}
+  `;
+}
+
+// ---------- panel del jugador ----------
+function openDrawer(pid){
+  state.drawer = { pid, range: 13, side: 'BUY', qty: 1, confirming: false, result: null, error: null };
+  const root = document.getElementById('drawer-root');
+  root.innerHTML = `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="dname"></aside>`;
+  renderDrawer();
+  requestAnimationFrame(() => { root.querySelector('.scrim').classList.add('open'); root.querySelector('.drawer').classList.add('open'); root.querySelector('.drawer .icon-btn')?.focus(); });
+}
+function closeDrawer(){
+  const root = document.getElementById('drawer-root');
+  const d = root.querySelector('.drawer'); if (!d) return;
+  d.classList.remove('open'); root.querySelector('.scrim').classList.remove('open');
+  state.drawer = null;
+  setTimeout(() => { if (!state.drawer) root.innerHTML = ''; }, 260);
+}
+function renderDrawer(){
+  const d = state.drawer; if (!d) return;
+  const p = players.find(x => x.id === d.pid);
+  const vals = p.hist.slice(-d.range), dates = Array.from({ length: WEEKS }, (_, i) => weekStart(i)).slice(-d.range);
+  const rangeChg = (vals[vals.length - 1] / vals[0] - 1) * 100;
+  const own = state.role === 'USER' ? ownedOf(p.id) : null;
+  const book = orders.filter(o => o.pid === p.id && o.pending > 0).sort((a, b) => a.at - b.at);
+  const el = document.querySelector('#drawer-root .drawer');
+  el.innerHTML = `
+    <div class="d-head">
+      <div class="av lg" style="--h:${hueOf(p.team)}">${initials(p.name)}</div>
+      <div class="grow"><h2 id="dname">${esc(p.name)}</h2><div class="muted" style="font-size:14px">${esc(p.team)} · ${POS[p.position].one} · ${LEAGUES[p.league]}</div></div>
+      <button class="icon-btn" data-act="close" aria-label="Cerrar">${I.close}</button>
+    </div>
+    <div class="d-body">
+      <div class="price-row"><span class="big num">${nf2.format(tokenPrice(p))}</span><span class="unit">cr por token</span>${chg(weekChange(p), ' esta semana')}</div>
+      <div class="chart-wrap">${chartSVG(vals)}<div class="chart-tip"></div></div>
+      <div class="chart-foot"><span>${fmtDay(dates[0])} · ${pctTxt(rangeChg)}</span>
+        <div class="seg" role="group" aria-label="Período">${[[5, '1M'], [13, '3M'], [26, '6M']].map(([n, l]) => `<button data-act="range" data-n="${n}" aria-pressed="${d.range === n}">${l}</button>`).join('')}</div>
+      </div>
+      ${own ? `<div class="mine"><div class="grow"><b>Tenés ${own.tokens} token${own.tokens === 1 ? '' : 's'}</b><small>Valen ${cr(own.value)} · pagaste ${cr(own.invested)}</small></div>${chg(own.profitPct)}</div>` : ''}
+      ${renderTrade(p, own)}
+      <details class="more-info" ${state.role === 'ADMIN' ? 'open' : ''}>
+        <summary>Ofertas abiertas <span class="muted" style="font-weight:500;margin-left:auto;margin-right:12px">${book.length}</span></summary>
+        ${book.length ? `<div style="padding-bottom:10px">${book.map(o => offerRow(o, false)).join('')}</div>` : '<p class="muted" style="margin:0 0 12px">No hay ofertas de este jugador.</p>'}
+      </details>
+      <details class="more-info">
+        <summary>Cómo se cotiza</summary>
+        <dl class="kv">
+          <dt>Valor del jugador (100 tokens)</dt><dd class="num">${cr(value(p))}</dd>
+          <dt>Precio exacto por token</dt><dd class="num">${nf4.format(tokenPrice(p))} cr</dd>
+          <dt>Score de la semana</dt><dd class="num">${(scoreOf(p) >= 0 ? '+' : '−') + nf2.format(Math.abs(scoreOf(p)))}</dd>
+          <dt>Estrategia</dt><dd>${activeName()}</dd>
+          <dt>Vigente desde</dt><dd>${fmtDayLong(thisMonday)}</dd>
+        </dl>
+      </details>
+    </div>`;
+  wireChart(el, vals, dates);
+}
+function renderTrade(p, own){
+  const d = state.drawer;
+  if (state.role === 'ADMIN') return '';
+  if (state.role === 'GUEST') return `<div class="card" style="text-align:center"><b>¿Querés este jugador?</b><p class="muted" style="margin:4px 0 12px;font-size:14px">Entrá para comprar y vender tokens.</p><button class="btn primary big" data-act="login">Entrar</button></div>`;
+  if (!p.active) return `<div class="card"><div class="notice" style="margin:0">🚫 Este jugador está inactivo: no se puede operar.</div></div>`;
+  const sellBlocked = p.adminPending > 0;
+  const qtyOk = Number.isInteger(d.qty) && d.qty >= 1 && d.qty <= 100;
+  const est = qtyOk ? estimate(d.side, p, d.qty) : null;
+  const free = own ? own.tokens - own.committed : 0;
+  const verb = d.side === 'BUY' ? 'Comprar' : 'Vender';
+  let body;
+  if (d.side === 'SELL' && sellBlocked) {
+    body = `<div class="notice" style="margin:14px 0 0">🔒 Se podrá vender cuando se agoten los tokens iniciales (quedan ${p.adminPending}).</div>`;
+  } else if (d.confirming && est) {
+    body = `<div class="confirm-box" style="margin-top:14px">
+      <p>¿${verb} <b>${d.qty} token${d.qty === 1 ? '' : 's'}</b> de ${esc(p.name)} por <b class="num">~${cr(est.total)}</b>?</p>
+      ${est.atInitial && est.atQuote ? `<p class="muted" style="font-size:13px;margin-top:-6px">${est.atInitial} a 1,00 (iniciales) y ${est.atQuote} a ${nf4.format(tokenPrice(p))}</p>` : ''}
+      <div class="actions"><button class="btn" data-act="tcancel">Volver</button><button class="btn primary" data-act="tconfirm">Confirmar</button></div>
+    </div>`;
+  } else {
+    body = `
+      <div class="qty">
+        <button data-act="qty" data-d="-1" aria-label="Uno menos">−</button>
+        <input id="qtyin" type="number" inputmode="numeric" min="1" max="100" value="${Number.isFinite(d.qty) ? d.qty : ''}" aria-label="Cantidad de tokens">
+        <button data-act="qty" data-d="1" aria-label="Uno más">+</button>
+      </div>
+      <div class="quick">${(d.side === 'SELL' && free ? [1, 5, 10, 'Todo'] : [1, 5, 10, 25]).map(n => `<button data-act="qset" data-n="${n === 'Todo' ? free : n}">${n === 'Todo' ? 'Todos' : n}</button>`).join('')}</div>
+      <div class="total"><span class="muted">Total estimado</span><b class="num" id="esttotal">${est ? cr(est.total) : '—'}</b></div>
+      <div class="hint" id="esthint">${tradeHint(p, est, free)}</div>
+      <button class="btn primary big" data-act="tgo" id="tgo" ${qtyOk ? '' : 'disabled'}>${verb}${qtyOk ? ` ${d.qty} token${d.qty === 1 ? '' : 's'}` : ''}</button>`;
+  }
+  return `<div class="card">
+    <div class="seg full" role="group" aria-label="Operación">
+      <button data-act="tside" data-side="BUY" aria-pressed="${d.side === 'BUY'}">Comprar</button>
+      <button data-act="tside" data-side="SELL" aria-pressed="${d.side === 'SELL'}">Vender</button>
+    </div>
+    ${body}
+    ${d.error ? `<div class="err-box" role="alert">${esc(d.error)}</div>` : ''}
+    ${d.result ? `<div class="ok-box" role="status">${d.result}</div>` : ''}
+  </div>`;
+}
+function tradeHint(p, est, free){
+  const d = state.drawer;
+  if (!Number.isInteger(d.qty) || d.qty < 1 || d.qty > 100) return 'Entre 1 y 100 tokens.';
+  if (d.side === 'BUY'){
+    const parts = [`Saldo libre: ${cr(snapshot().available)}`];
+    if (est.atInitial) parts.push(est.atQuote ? `${est.atInitial} a precio inicial 1,00` : 'A precio inicial 1,00');
+    return parts.join(' · ');
+  }
+  return free ? `Podés vender hasta ${free}.` : 'No tenés tokens de este jugador.';
+}
+function refreshTradeTotals(){
+  const d = state.drawer; if (!d) return;
+  const p = players.find(x => x.id === d.pid);
+  const own = ownedOf(p.id); const free = own ? own.tokens - own.committed : 0;
+  const ok = Number.isInteger(d.qty) && d.qty >= 1 && d.qty <= 100;
+  const est = ok ? estimate(d.side, p, d.qty) : null;
+  const t = document.getElementById('esttotal'), h = document.getElementById('esthint'), b = document.getElementById('tgo');
+  if (t) t.textContent = est ? cr(est.total) : '—';
+  if (h) h.textContent = tradeHint(p, est, free);
+  if (b){ b.disabled = !ok; b.textContent = (d.side === 'BUY' ? 'Comprar' : 'Vender') + (ok ? ` ${d.qty} token${d.qty === 1 ? '' : 's'}` : ''); }
+}
+
+// ---------- modales ----------
+function openModal(m){ state.modal = m; renderModal(); requestAnimationFrame(() => { const s = document.querySelector('.modal-scrim'); s?.classList.add('open'); s?.querySelector('input,button.btn')?.focus(); }); }
+function closeModal(){ state.modal = null; document.getElementById('modal-root').innerHTML = ''; }
+function renderModal(){
+  const m = state.modal, root = document.getElementById('modal-root');
+  if (!m) { root.innerHTML = ''; return; }
+  const wasOpen = !!root.querySelector('.modal-scrim.open');
+  const head = (t) => `<div class="modal-head"><h2>${t}</h2><button class="icon-btn" data-act="mclose" aria-label="Cerrar">${I.close}</button></div>`;
+  let html = '';
+  if (m.type === 'login'){
+    html = `<div class="modal" role="dialog" aria-modal="true">
+      ${head(m.tab === 'login' ? '¡Hola de nuevo!' : 'Creá tu cuenta')}
+      <div class="seg full" style="margin-bottom:16px"><button data-act="ltab" data-tab="login" aria-pressed="${m.tab === 'login'}">Entrar</button><button data-act="ltab" data-tab="register" aria-pressed="${m.tab === 'register'}">Crear cuenta</button></div>
+      ${m.apiKey ? `
+        <p style="margin-top:0"><b>¡Listo! Tenés 1.000 cr para empezar.</b></p>
+        <p class="muted" style="font-size:14px">Esta es tu clave de API. Guardala: no se vuelve a mostrar.</p>
+        <div class="keybox">${m.apiKey}</div>
+        <div style="display:flex;gap:8px"><button class="btn" data-act="copykey" style="flex:1">Copiar</button><button class="btn primary" data-act="lfinish" style="flex:1">Ya la guardé</button></div>
+      ` : `<form data-form="login" novalidate>
+        <div class="field"><label for="lu">Usuario</label><input id="lu" name="u" autocomplete="username" value="${m.tab === 'login' ? 'valen' : ''}"></div>
+        ${m.tab === 'register' ? `<div class="field"><label for="le">Correo</label><input id="le" name="e" type="email" autocomplete="email"></div>` : ''}
+        <div class="field"><label for="lp">Contraseña</label><input id="lp" name="p" type="password" autocomplete="${m.tab === 'login' ? 'current-password' : 'new-password'}" value="${m.tab === 'login' ? 'demo1234' : ''}"></div>
+        ${m.error ? `<div class="err-box" style="margin:0 0 12px">${m.error}</div>` : ''}
+        <button class="btn primary big" type="submit">${m.tab === 'login' ? 'Entrar' : 'Crear cuenta'}</button>
+        <p class="muted" style="font-size:12px;text-align:center;margin:10px 0 0">Demo: cualquier usuario y contraseña sirven.</p>
+      </form>`}
+    </div>`;
+  } else if (m.type === 'account'){
+    const snap = state.role === 'USER' ? snapshot() : null;
+    html = `<div class="modal" role="dialog" aria-modal="true">
+      ${head('Mi cuenta')}
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+        <div class="av lg" style="--h:150">${initials(state.user.username)}</div>
+        <div><b style="font-size:17px">${esc(state.user.username)}</b><div class="muted" style="font-size:14px">${esc(state.user.email)} · ${state.role === 'ADMIN' ? 'Administrador' : 'Usuario'}</div></div>
+      </div>
+      ${snap ? `<dl class="kv" style="background:var(--surface-2);border-radius:14px;padding:12px 14px"><dt>Saldo total</dt><dd class="num">${cr(snap.balance)}</dd><dt>Libre</dt><dd class="num">${cr(snap.available)}</dd><dt>Reservado</dt><dd class="num">${cr(snap.reserved)}</dd></dl>` : ''}
+      <details class="more-info" ${m.pw ? 'open' : ''}><summary>Cambiar contraseña</summary>
+        <form data-form="pw" novalidate>
+          <div class="field"><label for="pc">Contraseña actual</label><input id="pc" type="password" autocomplete="current-password"></div>
+          <div class="field"><label for="pn">Contraseña nueva</label><input id="pn" type="password" autocomplete="new-password">${m.pwError ? `<span class="err">${m.pwError}</span>` : ''}</div>
+          ${m.pwOk ? '<div class="ok-box" style="margin:0 0 12px">Contraseña cambiada ✓</div>' : ''}
+          <button class="btn primary" type="submit">Guardar</button>
+        </form>
+      </details>
+      <details class="more-info" ${m.key ? 'open' : ''}><summary>Clave de API</summary>
+        ${m.newKey ? `<p class="muted" style="font-size:14px;margin:0">Tu clave nueva. Copiala ahora: no se vuelve a mostrar.</p><div class="keybox">${m.newKey}</div><button class="btn" data-act="copykey">Copiar</button>`
+          : m.keyConfirm ? `<p style="font-size:14px;margin:0 0 10px">La clave actual va a dejar de funcionar. ¿Seguimos?</p><div style="display:flex;gap:8px;padding-bottom:12px"><button class="btn" data-act="keyno">No</button><button class="btn danger" data-act="keyyes">Sí, generar otra</button></div>`
+          : `<p class="muted" style="font-size:14px;margin:0 0 10px">Para usar la API desde tus propios programas.</p><button class="btn" data-act="keyask" style="margin-bottom:12px">Generar una nueva</button>`}
+      </details>
+      <button class="btn big" data-act="logout" style="margin-top:16px;color:var(--down)">Cerrar sesión</button>
+    </div>`;
+  } else if (m.type === 'activate'){
+    const s = strategies.find(x => x.id === m.id);
+    html = `<div class="modal" role="dialog" aria-modal="true">
+      ${head(`Activar ${esc(s.name)}`)}
+      <p class="muted" style="margin-top:0">¿Desde cuándo cotiza con esta estrategia?</p>
+      ${timingChoice(m.timing)}
+      <button class="btn primary big" data-act="activateyes" style="margin-top:16px">Activar</button>
+    </div>`;
+  } else if (m.type === 'editor'){
+    const set = m.sets[m.tab];
+    const sum = set ? Object.values(set).reduce((s, v) => s + (Number(v) || 0), 0) : 1;
+    const allOk = Object.values(m.sets).every(w => !w || Math.abs(Object.values(w).reduce((s, v) => s + (Number(v) || 0), 0) - 1) < 0.001);
+    const strat = m.id ? strategies.find(x => x.id === m.id) : null;
+    const isActive = strat && activeStrategy.id === strat.id;
+    html = `<div class="modal wide" role="dialog" aria-modal="true">
+      ${head(strat ? `${esc(strat.name)} · nueva versión` : 'Nueva estrategia')}
+      ${strat ? '' : `<div class="field"><label for="sn">Nombre</label><input id="sn" data-ed="name" value="${esc(m.name)}" placeholder="Ej. Goleadora"></div>`}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label for="sf">Factor de escala</label><input id="sf" data-ed="factor" type="number" step="0.5" value="${m.factor}"></div>
+        <div class="field"><label for="sm">Valor mínimo (cr)</label><input id="sm" data-ed="min" type="number" step="1" value="${m.min}"></div>
+      </div>
+      <div class="field"><label>Pesos</label>
+        <div class="chips" style="margin:0">
+          <button class="chip" data-act="edtab" data-tab="DEFAULT" aria-pressed="${m.tab === 'DEFAULT'}">General</button>
+          ${Object.keys(POS).map(k => `<button class="chip" data-act="edtab" data-tab="${k}" aria-pressed="${m.tab === k}">${POS[k].many}${m.sets[k] ? ' •' : ''}</button>`).join('')}
+        </div>
+      </div>
+      ${!set ? `<div class="card" style="text-align:center;margin-top:6px"><p class="muted" style="margin:0 0 10px;font-size:14px">${POS[m.tab].many} usan los pesos generales.</p><button class="btn" data-act="edcustom">Usar pesos propios</button></div>` : `
+        ${Object.entries(set).map(([k, v]) => `<div class="wrow"><span>${metricLabel(k)}</span><input type="number" min="0" max="1" step="0.05" data-w="${k}" value="${v}" aria-label="Peso de ${metricLabel(k)}"><button class="icon-btn" style="width:30px;height:30px" data-act="edrm" data-k="${k}" aria-label="Quitar ${metricLabel(k)}">${I.close}</button></div>`).join('')}
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+          <select class="select" data-act="edadd" aria-label="Agregar métrica"><option value="">+ Agregar métrica</option>${METRICS.filter(([k]) => !(k in set)).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+          ${m.tab !== 'DEFAULT' ? `<button class="btn ghost sm" data-act="eddefault">Volver a los generales</button>` : ''}
+        </div>
+        <div class="sum ${Math.abs(sum - 1) < 0.001 ? 'good' : 'bad'}" id="sumbox"><span>Suma</span><span class="num">${nf2.format(sum)} ${Math.abs(sum - 1) < 0.001 ? '✓' : '· tiene que dar 1,00'}</span></div>
+      `}
+      ${isActive ? `<p class="muted" style="font-size:14px;margin:14px 0 8px">Es la estrategia activa. ¿Desde cuándo aplica?</p>${timingChoice(m.timing)}` : ''}
+      ${m.error ? `<div class="err-box">${m.error}</div>` : ''}
+      <button class="btn primary big" data-act="edsave" id="edsave" style="margin-top:16px" ${allOk ? '' : 'disabled'}>Guardar</button>
+    </div>`;
+  }
+  root.innerHTML = `<div class="modal-scrim ${wasOpen ? 'open' : ''}" data-act="mscrim">${html}</div>`;
+}
+function timingChoice(timing){
+  return `<div class="choice">
+    <label><input type="radio" name="timing" value="PROXIMA_SEMANA" ${timing !== 'AHORA' ? 'checked' : ''}><b>La semana que viene</b><small>Las cotizaciones actuales no cambian.</small></label>
+    <label><input type="radio" name="timing" value="AHORA" ${timing === 'AHORA' ? 'checked' : ''}><b>Ahora</b><small>Recotiza a todos en el acto.</small></label>
+  </div>`;
+}
+
+// ---------- toasts ----------
+function toast(msg){
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+// ---------- render principal ----------
+function render(){
+  if (state.view === 'portfolio' && state.role !== 'USER') state.view = 'players';
+  if (state.view === 'admin' && state.role !== 'ADMIN') state.view = 'players';
+  renderTop();
+  const main = document.getElementById('main');
+  main.innerHTML = state.view === 'players' ? renderPlayersView() : state.view === 'portfolio' ? renderPortfolioView() : renderAdminView();
+  renderDemo();
+}
+function renderDemo(){
+  document.getElementById('demo').innerHTML = `<b>Prototipo · ver como</b>
+    <div class="seg">${[['GUEST', 'Visitante'], ['USER', 'Usuario'], ['ADMIN', 'Admin']].map(([k, l]) => `<button data-act="role" data-role="${k}" aria-pressed="${state.role === k}">${l}</button>`).join('')}</div>`;
+}
+const randomKey = () => 'fm_' + Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+
+// ---------- eventos ----------
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const act = el.dataset.act, ds = el.dataset;
+  if (el.tagName === 'SELECT') return;
+  const d = state.drawer, m = state.modal;
+  switch (act){
+    case 'go': state.view = ds.view; closeDrawer(); render(); window.scrollTo(0, 0); break;
+    case 'exmode': state.ex.mode = ds.mode; state.ex.league = ''; state.ex.team = ''; render(); break;
+    case 'pos': state.ex.pos = ds.pos; state.ex.limit = 12; render(); break;
+    case 'side': state.ex.side = ds.side; render(); break;
+    case 'more': state.ex.limit += 12; document.getElementById('grid').innerHTML = renderGrid(); break;
+    case 'clear': Object.assign(state.ex, { q: '', league: '', team: '', pos: '', limit: 12 }); render(); break;
+    case 'open': openDrawer(Number(ds.id)); break;
+    case 'close': closeDrawer(); break;
+    case 'range': d.range = Number(ds.n); renderDrawer(); break;
+    case 'tside': d.side = ds.side; d.confirming = false; d.error = null; d.result = null; renderDrawer(); break;
+    case 'qty': d.qty = Math.max(1, Math.min(100, (Number.isInteger(d.qty) ? d.qty : 0) + Number(ds.d))); d.error = null; document.getElementById('qtyin').value = d.qty; refreshTradeTotals(); break;
+    case 'qset': d.qty = Math.max(1, Math.min(100, Number(ds.n))); d.error = null; document.getElementById('qtyin').value = d.qty; refreshTradeTotals(); break;
+    case 'tgo': d.confirming = true; d.error = null; d.result = null; renderDrawer(); break;
+    case 'tcancel': d.confirming = false; renderDrawer(); break;
+    case 'tconfirm': {
+      const p = players.find(x => x.id === d.pid);
+      const r = execute(d.side, d.pid, d.qty);
+      d.confirming = false;
+      if (r.error){ d.error = r.error; }
+      else {
+        const verb = d.side === 'BUY' ? 'Compraste' : 'Vendiste';
+        const parts = [];
+        if (r.executed) parts.push(`✓ ${verb} ${r.executed} token${r.executed === 1 ? '' : 's'} por ${cr(r.executedTotal)}.`);
+        if (r.order.pending) parts.push(`${r.executed ? '' : '⏳ '}${r.order.pending} quedaron en espera hasta que aparezca alguien que ${d.side === 'BUY' ? 'venda' : 'compre'}.`);
+        d.result = parts.join(' ');
+        toast(r.executed ? `${verb} ${r.executed} de ${p.name}` : 'Orden publicada');
+      }
+      renderDrawer(); render(); break;
+    }
+    case 'pftab': state.pf.tab = ds.tab; state.pf.cancelId = null; render(); break;
+    case 'pftoday': state.pf.date = ''; state.pf.dateError = ''; render(); break;
+    case 'txside': state.pf.txSide = ds.side; render(); break;
+    case 'cancelask': state.pf.cancelId = Number(ds.id); render(); break;
+    case 'cancelno': state.pf.cancelId = null; render(); break;
+    case 'cancelyes': { const o = cancelOrder(Number(ds.id)); state.pf.cancelId = null; toast(o.side === 'BUY' ? `Orden cancelada · se liberaron los créditos reservados` : 'Orden cancelada · tus tokens quedan libres'); render(); break; }
+    case 'admtab': state.admin.tab = ds.tab; render(); break;
+    case 'stratnew': openModal({ type: 'editor', id: null, name: '', factor: 10, min: 10, sets: { DEFAULT: { GOALS: 0.5, RATING: 0.5 } }, tab: 'DEFAULT', timing: 'PROXIMA_SEMANA' }); break;
+    case 'stratversion': {
+      const s = strategies.find(x => x.id === Number(ds.id)), v = latest(s);
+      const sets = { DEFAULT: { ...v.w } }; Object.entries(v.pos).forEach(([k, w]) => sets[k] = { ...w });
+      openModal({ type: 'editor', id: s.id, factor: v.factor, min: v.min, sets, tab: 'DEFAULT', timing: 'PROXIMA_SEMANA' }); break;
+    }
+    case 'stratactivate': openModal({ type: 'activate', id: Number(ds.id), timing: 'PROXIMA_SEMANA' }); break;
+    case 'activateyes': {
+      const s = strategies.find(x => x.id === m.id); const timing = document.querySelector('input[name=timing]:checked').value;
+      activeStrategy = { id: s.id, v: latest(s).v }; closeModal(); render();
+      toast(timing === 'AHORA' ? `${s.name} activa · se recotizó a todos` : `${s.name} activa desde la semana que viene`);
+      if (timing === 'AHORA') lastReport = { origin: 'Cambio de estrategia', at: new Date(), strategy: activeName(), quoted: Array.from({ length: 12 }, (_, i) => ({ week: weekStart(WEEKS - 13 + i), players: 2614 })), pending: [{ week: weekStart(WEEKS - 1), reason: 'Faltan estadísticas' }] };
+      break;
+    }
+    case 'edtab': m.tab = ds.tab; renderModal(); break;
+    case 'edcustom': m.sets[m.tab] = { ...m.sets.DEFAULT }; renderModal(); break;
+    case 'eddefault': delete m.sets[m.tab]; renderModal(); break;
+    case 'edrm': delete m.sets[m.tab][ds.k]; renderModal(); break;
+    case 'edsave': {
+      const timingEl = document.querySelector('input[name=timing]:checked');
+      const clean = w => Object.fromEntries(Object.entries(w).map(([k, v]) => [k, Number(v) || 0]).filter(([, v]) => v > 0));
+      const pos = {}; Object.keys(POS).forEach(k => { if (m.sets[k]) pos[k] = clean(m.sets[k]); });
+      if (!m.id){
+        if (!m.name.trim()){ m.error = 'Ponele un nombre.'; renderModal(); return; }
+        if (strategies.some(s => norm(s.name) === norm(m.name.trim()))){ m.error = 'Ya hay una estrategia con ese nombre.'; renderModal(); return; }
+        strategies.push({ id: strategies.length + 1, name: m.name.trim(), versions: [{ v: 1, factor: Number(m.factor), min: Number(m.min), w: clean(m.sets.DEFAULT), pos, at: new Date() }] });
+        toast(`Estrategia ${m.name.trim()} creada`);
+      } else {
+        const s = strategies.find(x => x.id === m.id), nv = latest(s).v + 1;
+        s.versions.push({ v: nv, factor: Number(m.factor), min: Number(m.min), w: clean(m.sets.DEFAULT), pos, at: new Date() });
+        if (activeStrategy.id === s.id){ activeStrategy.v = nv; toast(timingEl?.value === 'AHORA' ? `${s.name} v${nv} activa · se recotizó a todos` : `${s.name} v${nv} activa desde la semana que viene`); }
+        else toast(`${s.name} v${nv} guardada`);
+      }
+      closeModal(); render(); break;
+    }
+    case 'recalc':
+      state.admin.running = true; render();
+      setTimeout(() => {
+        state.admin.running = false;
+        lastReport = { origin: 'Manual', at: new Date(), strategy: activeName(), quoted: [], pending: [{ week: weekStart(WEEKS - 1), reason: 'Faltan estadísticas' }], nothing: true };
+        toast('Recálculo terminado'); render();
+      }, 1300);
+      break;
+    case 'simrun': {
+      const s = strategies.find(x => x.id === state.admin.simStrategy), r = mulberry32(s.id * 97 + latest(s).v);
+      state.admin.simResult = { name: `${s.name} v${latest(s).v}`, weeks: WEEKS - 1, rows: players.map(p => ({ p, current: value(p), sim: r2(Math.max(latest(s).min, value(p) * (1 + (r() - 0.5) * 0.5))) })).sort((a, b) => Math.abs(b.sim / b.current - 1) - Math.abs(a.sim / a.current - 1)) };
+      render(); break;
+    }
+    case 'login': closeDrawer(); openModal({ type: 'login', tab: 'login' }); break;
+    case 'ltab': m.tab = ds.tab; m.error = null; renderModal(); break;
+    case 'lfinish': state.role = 'USER'; closeModal(); render(); toast(`¡Bienvenido, ${state.user.username}!`); break;
+    case 'copykey': navigator.clipboard?.writeText((m.apiKey || m.newKey)).then(() => toast('Clave copiada')); break;
+    case 'account': openModal({ type: 'account' }); break;
+    case 'keyask': m.keyConfirm = true; m.key = true; renderModal(); break;
+    case 'keyno': m.keyConfirm = false; renderModal(); break;
+    case 'keyyes': m.keyConfirm = false; m.newKey = randomKey(); renderModal(); break;
+    case 'logout': state.role = 'GUEST'; closeModal(); closeDrawer(); state.view = 'players'; render(); toast('Sesión cerrada'); break;
+    case 'mclose': closeModal(); break;
+    case 'mscrim': if (e.target === el) closeModal(); break;
+    case 'role':
+      state.role = ds.role;
+      state.user = ds.role === 'ADMIN' ? { username: 'admin', email: 'admin@lapizarra.test' } : { username: 'valen', email: 'valen@ejemplo.com' };
+      closeDrawer(); closeModal(); render(); break;
+  }
+});
+
+document.addEventListener('change', e => {
+  const el = e.target, act = el.dataset.act;
+  if (act === 'league'){ state.ex.league = el.value; state.ex.team = ''; state.ex.limit = 12; render(); }
+  else if (act === 'team'){ state.ex.team = el.value; state.ex.limit = 12; render(); }
+  else if (act === 'sort'){ state.ex.sort = el.value; state.ex.limit = 12; render(); }
+  else if (act === 'simstrat'){ state.admin.simStrategy = Number(el.value); state.admin.simResult = null; render(); }
+  else if (act === 'simleague'){ state.admin.simLeague = el.value; render(); }
+  else if (act === 'edadd' && el.value){ state.modal.sets[state.modal.tab][el.value] = 0; renderModal(); }
+  else if (el.id === 'pfdate'){
+    const v = el.value;
+    state.pf.dateError = '';
+    if (!v) state.pf.date = '';
+    else if (v > isoDay(now)) { state.pf.date = ''; state.pf.dateError = 'No se puede ver una fecha futura.'; }
+    else if (v < isoDay(REGISTERED_AT)) { state.pf.date = ''; state.pf.dateError = `Te registraste el ${fmtDay(REGISTERED_AT)}: elegí una fecha posterior.`; }
+    else state.pf.date = v === isoDay(now) ? '' : v;
+    render();
+  }
+  else if (el.name === 'timing' && state.modal) state.modal.timing = el.value;
+});
+
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.id === 'q'){ state.ex.q = el.value; state.ex.limit = 12; document.getElementById('grid').innerHTML = renderGrid(); }
+  else if (el.id === 'qtyin' && state.drawer){ state.drawer.qty = el.value === '' ? NaN : Number(el.value); state.drawer.error = null; refreshTradeTotals(); }
+  else if (el.dataset.w && state.modal){
+    const m = state.modal; m.sets[m.tab][el.dataset.w] = el.value;
+    const sum = Object.values(m.sets[m.tab]).reduce((s, v) => s + (Number(v) || 0), 0), ok = Math.abs(sum - 1) < 0.001;
+    const box = document.getElementById('sumbox'); box.className = 'sum ' + (ok ? 'good' : 'bad'); box.lastElementChild.textContent = `${nf2.format(sum)} ${ok ? '✓' : '· tiene que dar 1,00'}`;
+    const allOk = Object.values(m.sets).every(w => !w || Math.abs(Object.values(w).reduce((s, v) => s + (Number(v) || 0), 0) - 1) < 0.001);
+    document.getElementById('edsave').disabled = !allOk;
+  }
+  else if (el.dataset.ed && state.modal){ state.modal[el.dataset.ed] = el.value; }
+});
+
+document.addEventListener('submit', e => {
+  const f = e.target; e.preventDefault();
+  const m = state.modal;
+  if (f.dataset.form === 'login'){
+    const u = f.u.value.trim(), p = f.p.value;
+    if (!u || !p){ m.error = 'Completá usuario y contraseña.'; renderModal(); return; }
+    if (m.tab === 'register' && p.length < 8){ m.error = 'La contraseña tiene que tener al menos 8 caracteres.'; renderModal(); return; }
+    state.user = { username: u, email: m.tab === 'register' ? (f.e.value || `${u}@ejemplo.com`) : 'valen@ejemplo.com' };
+    if (m.tab === 'register'){ m.apiKey = randomKey(); renderModal(); return; }
+    state.role = u.toLowerCase() === 'admin' ? 'ADMIN' : 'USER';
+    closeModal(); render(); toast(`¡Hola, ${u}!`);
+  } else if (f.dataset.form === 'pw'){
+    const cur = f.querySelector('#pc').value, nw = f.querySelector('#pn').value;
+    m.pw = true; m.pwOk = false; m.pwError = null;
+    if (!cur) m.pwError = 'Escribí tu contraseña actual.';
+    else if (nw.length < 8) m.pwError = 'La nueva tiene que tener al menos 8 caracteres.';
+    else m.pwOk = true;
+    renderModal();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (state.modal) closeModal(); else if (state.drawer) closeDrawer();
+});
+
+render();
+</script>
+</body>
+</html>

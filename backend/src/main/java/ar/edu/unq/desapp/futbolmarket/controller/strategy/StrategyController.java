@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -142,6 +143,30 @@ public class StrategyController {
         StrategyParametersRequest parameters = request.parameters();
         return StrategyChangeResponse.from(strategyChangeService.createVersion(id, parameters.scaleFactor(),
                 parameters.minimumValue(), parameters.defaultWeightSet(), parameters.positionWeightSets(), timing));
+    }
+
+    @Operation(summary = "Elimina una estrategia",
+            description = "Baja lógica: la estrategia deja de listarse y de poder editarse, activarse o simularse, "
+                    + "pero se conserva porque las cotizaciones que calculó apuntan a sus versiones. Se renombra a "
+                    + "'<nombre> (eliminada el dd/mm/aaaa hh:mm)', así el nombre queda libre para una nueva y el "
+                    + "historial de cotizaciones distingue una de otra. Una de arranque eliminada no se vuelve a "
+                    + "crear al reiniciar. La estrategia activa no se elimina: primero hay que activar otra. "
+                    + "Ningún valor de cotización cambia.")
+    @ApiResponse(responseCode = "204", description = "La estrategia quedó eliminada.")
+    @ApiResponse(responseCode = "400", description = "Identificador con formato inválido.",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "401", description = UNAUTHORIZED,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "403", description = FORBIDDEN,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "404", description = NOT_FOUND + " También si ya se eliminó.",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "409", description = "Es la estrategia activa. No se elimina nada.",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable @Min(1) Long id) {
+        strategyService.delete(id);
     }
 
     @Operation(summary = "Activa una estrategia",

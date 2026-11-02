@@ -1,8 +1,8 @@
-// Texto escrito en tiza sobre el pizarrón.
+// Texto de la interfaz, con sus variantes tipográficas; 'srOnly' lo deja solo para lectores de pantalla.
 import type { ElementType, ReactNode } from 'react';
 import styles from './ChalkText.module.css';
 
-export type ChalkTextVariant = 'title' | 'heading' | 'body' | 'hint' | 'scribble';
+export type ChalkTextVariant = 'title' | 'heading' | 'body' | 'hint' | 'scribble' | 'srOnly';
 
 interface ChalkTextProps {
   as?: ElementType;

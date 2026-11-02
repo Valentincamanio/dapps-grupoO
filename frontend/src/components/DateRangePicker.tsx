@@ -50,6 +50,7 @@ function sameRange(a: QuoteRange, b: QuoteRange): boolean {
 export function DateRangePicker({ value, onChange, today }: DateRangePickerProps) {
   // Lo escrito en los campos; solo un rango válido llega a onChange
   const [draft, setDraft] = useState<QuoteRange>(value);
+  const [initiallyOpen] = useState(value.from !== undefined || value.to !== undefined);
   const fromId = useId();
   const toId = useId();
   const errorId = useId();
@@ -70,37 +71,6 @@ export function DateRangePicker({ value, onChange, today }: DateRangePickerProps
 
   return (
     <div className={styles.picker}>
-      <div className={styles.fields}>
-        <div className={styles.field}>
-          <label htmlFor={fromId}>Desde</label>
-          <input
-            id={fromId}
-            type="date"
-            value={draft.from ?? ''}
-            max={draft.to ?? day}
-            aria-invalid={invalid || undefined}
-            aria-describedby={invalid ? errorId : undefined}
-            onChange={(event) => setEdge('from', event.target.value)}
-          />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor={toId}>Hasta</label>
-          <input
-            id={toId}
-            type="date"
-            value={draft.to ?? ''}
-            min={draft.from}
-            aria-invalid={invalid || undefined}
-            aria-describedby={invalid ? errorId : undefined}
-            onChange={(event) => setEdge('to', event.target.value)}
-          />
-        </div>
-      </div>
-      {invalid ? (
-        <p id={errorId} className={styles.error} role="alert">
-          {INVALID_RANGE}
-        </p>
-      ) : null}
       <div className={styles.quick} role="group" aria-label="rangos rápidos">
         {QUICK_RANGES.map(({ label, weeks }) => {
           const range = quickRange(weeks, day);
@@ -117,6 +87,41 @@ export function DateRangePicker({ value, onChange, today }: DateRangePickerProps
           );
         })}
       </div>
+      {/* Plegadas, salvo que ya vengan con un rango (por ejemplo, desde la dirección) */}
+      <details className={styles.custom} open={initiallyOpen}>
+        <summary>elegir fechas</summary>
+        <div className={styles.fields}>
+          <div className={styles.field}>
+            <label htmlFor={fromId}>Desde</label>
+            <input
+              id={fromId}
+              type="date"
+              value={draft.from ?? ''}
+              max={draft.to ?? day}
+              aria-invalid={invalid || undefined}
+              aria-describedby={invalid ? errorId : undefined}
+              onChange={(event) => setEdge('from', event.target.value)}
+            />
+          </div>
+          <div className={styles.field}>
+            <label htmlFor={toId}>Hasta</label>
+            <input
+              id={toId}
+              type="date"
+              value={draft.to ?? ''}
+              min={draft.from}
+              aria-invalid={invalid || undefined}
+              aria-describedby={invalid ? errorId : undefined}
+              onChange={(event) => setEdge('to', event.target.value)}
+            />
+          </div>
+        </div>
+      </details>
+      {invalid ? (
+        <p id={errorId} className={styles.error} role="alert">
+          {INVALID_RANGE}
+        </p>
+      ) : null}
     </div>
   );
 }

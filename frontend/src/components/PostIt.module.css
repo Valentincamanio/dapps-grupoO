@@ -1,69 +1,161 @@
 .postIt {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 22px 16px 16px;
-  background: var(--c);
-  color: var(--ink);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1px 12px;
+  align-items: center;
+  height: 100%;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
   text-decoration: none;
-  box-shadow: var(--shadow-note);
-  transform: rotate(-1deg);
-  transition: transform 0.15s;
-}
-
-li:nth-child(even) > .postIt {
-  transform: rotate(1.2deg);
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
 }
 
 .postIt:hover {
-  transform: rotate(0deg) scale(1.03);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
 }
 
-.yellow {
-  --c: var(--yellow);
-}
-
-.blue {
-  --c: var(--blue);
-}
-
-.green {
-  --c: var(--green);
-}
-
-.pink {
-  --c: var(--pink);
-}
-
-.pin {
-  position: absolute;
-  top: 6px;
-  left: 50%;
-  width: 14px;
-  height: 14px;
-  margin-left: -7px;
+.avatar {
+  display: grid;
+  grid-row: span 3;
+  place-items: center;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  background: var(--pin);
-  box-shadow: var(--shadow-pin);
+  background: hsl(var(--hue) 45% 42%);
 }
 
-.position {
-  font-family: var(--font-marker);
+.avatar::before {
+  content: attr(data-initials);
+  color: #ffffff;
   font-size: 14px;
-  color: var(--ink-soft);
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .name {
-  font-family: var(--font-script);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.1;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+.position,
 .meta {
-  font-family: var(--font-hand);
-  font-size: 16px;
-  color: var(--ink-soft);
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Potenciado: borde dorado que brilla despacio, la cinta con el multiplicador y la barra */
+.boosted {
+  position: relative;
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--gold-soft) 55%, var(--surface)), var(--surface) 55%)
+      padding-box,
+    linear-gradient(135deg, var(--gold-1), var(--gold-2) 30%, var(--gold-1) 50%, var(--gold-3) 75%, var(--gold-1))
+      border-box;
+  background-size:
+    100% 100%,
+    300% 300%;
+  box-shadow:
+    0 0 0 1px var(--gold-glow),
+    0 6px 22px var(--gold-glow);
+  animation: shine 6s linear infinite;
+}
+
+.boosted:hover {
+  box-shadow:
+    0 0 0 1px var(--gold-glow),
+    0 10px 30px var(--gold-glow);
+}
+
+@keyframes shine {
+  from {
+    background-position:
+      0 0,
+      0% 50%;
+  }
+  to {
+    background-position:
+      0 0,
+      300% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boosted {
+    animation: none;
+  }
+}
+
+.boosted .avatar {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--gold-2);
+}
+
+/* Lugar para la cinta, que va arriba a la derecha */
+.boosted .name {
+  padding-right: 58px;
+}
+
+.ribbon {
+  position: absolute;
+  top: -11px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold-1), var(--gold-2));
+  box-shadow: 0 2px 8px var(--gold-glow);
+  color: var(--gold-ink);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.boost {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.boost b {
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.meter {
+  flex: 1;
+  min-width: 24px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--gold-2), var(--gold-1));
 }

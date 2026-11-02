@@ -1,6 +1,7 @@
 package ar.edu.unq.desapp.futbolmarket.service.strategy;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +16,7 @@ import ar.edu.unq.desapp.futbolmarket.modelo.strategy.StrategyDetail;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.WeightSet;
 import ar.edu.unq.desapp.futbolmarket.modelo.strategy.exception.DuplicateStrategyNameException;
 import ar.edu.unq.desapp.futbolmarket.persistence.repository.strategy.StrategyRepository;
+import ar.edu.unq.desapp.futbolmarket.service.quote.QuoteCacheInvalidator;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -29,6 +31,8 @@ import lombok.RequiredArgsConstructor;
 public class StrategyService {
 
     private final StrategyRepository strategyRepository;
+    private final QuoteCacheInvalidator cacheInvalidator;
+    private final Clock clock;
 
     /**
      * Crea la versión 1, inactiva. Si dos altas con el mismo nombre se cruzan, la segunda choca con
@@ -50,11 +54,22 @@ public class StrategyService {
     }
 
     /**
-     * Todas las estrategias, en orden de creación, con todas sus versiones.
+     * Todas las estrategias no eliminadas, en orden de creación, con todas sus versiones.
      */
     public List<StrategyDetail> list() {
         StrategyCatalog catalog = strategyRepository.findCatalog();
-        return catalog.strategies().stream().map(strategy -> StrategyDetail.of(catalog, strategy)).toList();
+        return catalog.listed().stream().map(strategy -> StrategyDetail.of(catalog, strategy)).toList();
+    }
+
+    /**
+     * Elimina la estrategia (baja lógica) y la renombra, así su nombre queda libre. Si no existe o ya
+     * se eliminó, 404; si es la activa, 409. No es transaccional, como {@link StrategyChangeService}:
+     * el guardado va en su propia transacción y el caché se vacía recién después del commit, porque
+     * las cotizaciones que calculó informan el nombre nuevo.
+     */
+    public void delete(Long strategyId) {
+        strategyRepository.saveDeletion(strategyRepository.findCatalog().delete(strategyId, clock.instant()));
+        cacheInvalidator.invalidateAll();
     }
 
     /**

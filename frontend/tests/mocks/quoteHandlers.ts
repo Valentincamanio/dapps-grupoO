@@ -396,6 +396,24 @@ const adminHandlers = [
     return changeResponse(strategy, requote === 'AHORA' ? requotationReport(refOf(strategy)) : null, 200);
   }),
 
+  // Baja lógica: la eliminada sale del listado; la activa responde 409
+  http.delete('*/api/strategies/:id', ({ params, request }) => {
+    const raw = String(params.id);
+    const path = `/strategies/${raw}`;
+    const denied = requireCredential(request, path);
+    if (denied) return denied;
+    const strategy = findStrategy(raw, path);
+    if (strategy instanceof Response) return strategy;
+    if (strategy.active) {
+      return conflict(
+        path,
+        `No se puede eliminar '${strategy.name}' porque es la estrategia activa: primero hay que activar otra.`,
+      );
+    }
+    strategies = strategies.filter((candidate) => candidate.id !== strategy.id);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
   http.post('*/api/quotes/recalculate', ({ request }) => {
     const path = '/quotes/recalculate';
     const denied = requireCredential(request, path);
@@ -415,6 +433,7 @@ const adminHandlers = [
     const position = search.get('position');
     const league = search.get('league');
     const team = search.get('team');
+    const playerId = search.get('playerId');
     const invalidQuery =
       !(size >= 1 && size <= MAX_SIMULATION_SIZE) ||
       !(page >= 0) ||
@@ -442,7 +461,8 @@ const adminHandlers = [
       (row) =>
         (position === null || row.position === position) &&
         (league === null || row.league === league) &&
-        (team === null || row.team.toLowerCase() === team.trim().toLowerCase()),
+        (team === null || row.team.toLowerCase() === team.trim().toLowerCase()) &&
+        (playerId === null || row.playerId === Number(playerId)),
     );
     const result: SimulationPage = {
       strategy,

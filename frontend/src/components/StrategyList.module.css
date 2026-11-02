@@ -1,82 +1,78 @@
 .list {
-  list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  list-style: none;
 }
 
 .strategy {
-  border: 2px dashed var(--chalk-faint);
-  border-radius: 6px;
-  padding: 12px 14px;
   min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .header {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 14px;
+  align-items: center;
+  gap: 8px 12px;
 }
 
 .name {
-  font-family: var(--font-script);
-  font-size: 30px;
-  font-weight: 700;
+  font-size: 18px;
   overflow-wrap: anywhere;
 }
 
 .badge {
-  font-family: var(--font-marker);
-  font-size: 18px;
-  color: var(--ink);
-  background: var(--green);
-  padding: 0 10px;
-  transform: rotate(-3deg);
-  box-shadow: var(--shadow-pin);
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--up-soft);
+  color: var(--up);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .actions {
-  margin-left: auto;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .versions {
-  list-style: none;
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 10px;
+  list-style: none;
 }
 
 .version {
-  border-top: 1px dashed var(--chalk-faint);
   padding-top: 8px;
+  border-top: 1px solid var(--line);
 }
 
 .versionLine {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 14px;
+  gap: 2px 12px;
+  font-size: 14px;
 }
 
 .versionNumber {
-  font-family: var(--font-marker);
-  color: var(--yellow);
+  font-weight: 600;
 }
 
 .activeMark {
-  font-family: var(--font-script);
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--green);
+  color: var(--up);
+  font-weight: 600;
 }
 
 .muted {
-  color: var(--chalk-dim);
+  color: var(--muted);
 }
 
 .weights {
@@ -84,10 +80,9 @@
 }
 
 .weights summary {
-  cursor: pointer;
-  font-family: var(--font-script);
-  font-size: 20px;
-  color: var(--chalk-dim);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .weights dl {
@@ -95,6 +90,7 @@
   flex-direction: column;
   gap: 4px;
   margin-top: 6px;
+  font-size: 14px;
 }
 
 .weights dl div {
@@ -104,11 +100,19 @@
 }
 
 .weights dt {
-  font-family: var(--font-script);
-  font-size: 20px;
-  color: var(--yellow);
+  color: var(--muted);
 }
 
 .weights dd {
   overflow-wrap: anywhere;
+}
+
+/* Eliminar se ve como una acción delicada, sin competir con Editar y Activar */
+.delete {
+  background: var(--down-soft);
+  color: var(--down);
+}
+
+.delete:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--down) 18%, var(--surface));
 }

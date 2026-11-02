@@ -331,7 +331,7 @@ class QuoteControllerIT {
     }
 
     @Test
-    void ningunaRespuestaTraeElScoreNiEstadisticas() throws Exception {
+    void ningunaRespuestaTraeEstadisticasYTodasTraenElScore() throws Exception {
         List<MvcTestResult> results = List.of(
                 get("/players/" + ndiaye.id() + "/quotes/current"),
                 get("/players/" + ndiaye.id() + "/quotes/at?date=2026-08-24"),
@@ -341,7 +341,8 @@ class QuoteControllerIT {
 
         assertThat(results).allSatisfy(result -> {
             assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
-            assertThat(raw(result)).doesNotContain("score", "baseValue", "goals", "minutes", "rating");
+            assertThat(raw(result)).doesNotContain("baseValue", "goals", "minutes", "rating");
+            assertThat(raw(result)).contains("\"score\"");
         });
     }
 

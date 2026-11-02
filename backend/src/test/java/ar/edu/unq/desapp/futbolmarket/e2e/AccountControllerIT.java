@@ -72,7 +72,8 @@ class AccountControllerIT {
         String rawBody = profileWithApiKey(user.apiKey()).getResponse().getContentAsString();
 
         assertThat(jsonMapper.readTree(rawBody).propertyNames())
-                .containsExactlyInAnyOrder("id", "username", "email", "role", "balance");
+                .containsExactlyInAnyOrder("id", "username", "email", "role", "balance", "availableBalance",
+                        "reservedBalance");
         assertThat(rawBody)
                 .doesNotContain(user.password())
                 .doesNotContain(user.apiKey())
