@@ -80,10 +80,11 @@ public final class PlayerBook {
     public BookOutcome placeBuy(long ownerId, int quantity, Instant at) {
         AppUser buyer = accountOf(ownerId);
         buyer.requireCanTrade();
-        requireTradable();
+        Tradable tradable = requireTradable();
         requireNoOpenOrderOf(ownerId, OrderSide.SELL);
-        BigDecimal price = quote.tokenPrice();
-        MatchPlan plan = OrderMatcher.matchBuy(ownerId, quantity, Optional.of(initialOrder), openOrders, price);
+        BigDecimal price = tradable.quote().tokenPrice();
+        MatchPlan plan = OrderMatcher.matchBuy(ownerId, quantity, Optional.of(tradable.initialOrder()), openOrders,
+                price);
         BigDecimal needed = plan.executedTotal().add(MarketMath.total(plan.remainder(), price));
         MarketOrder order = MarketOrder.buy(ownerId, playerId(), quantity, needed, price, at);
         PartyState before = stateOf(buyer);
@@ -105,8 +106,8 @@ public final class PlayerBook {
     public BookOutcome placeSell(long ownerId, int quantity, Instant at) {
         AppUser seller = accountOf(ownerId);
         seller.requireCanTrade();
-        requireTradable();
-        requireInitialOrderSoldOut();
+        Tradable tradable = requireTradable();
+        requireInitialOrderSoldOut(tradable.initialOrder());
         requireNoOpenOrderOf(ownerId, OrderSide.BUY);
         Holding sellerHolding = holdingOf(ownerId);
         MarketOrder order = MarketOrder.sell(ownerId, playerId(), quantity, at);
@@ -116,7 +117,8 @@ public final class PlayerBook {
         outcome.changed(sellerHolding);
         outcome.orderCreated(AuditEntry.orderCreated(order, player, AuditActor.user(ownerId),
                 new PartyChange(before, stateOf(seller)), at));
-        MatchPlan plan = OrderMatcher.matchSell(ownerId, quantity, openOrders, freeBalances(), quote.tokenPrice());
+        MatchPlan plan = OrderMatcher.matchSell(ownerId, quantity, openOrders, freeBalances(),
+                tradable.quote().tokenPrice());
         plan.fills().forEach(fill -> executeTrade(outcome, fill.counterpart(), order, fill, ownerId, at));
         plan.shortfalls().forEach(shortfall -> cancelForShortfall(outcome, shortfall.order(), at));
         plan.fills().forEach(fill -> adjustReservation(fill.counterpart()));
@@ -231,7 +233,7 @@ public final class PlayerBook {
      * Las ventas de usuarios esperan a que el superusuario venda todos sus tokens del jugador
      * (FR-011): no se crea nada.
      */
-    private void requireInitialOrderSoldOut() {
+    private static void requireInitialOrderSoldOut(MarketOrder initialOrder) {
         if (initialOrder.pending() > 0) {
             throw new SaleBlockedByInitialOrderException(initialOrder.pending());
         }
@@ -255,10 +257,21 @@ public final class PlayerBook {
         return realized;
     }
 
-    private void requireTradable() {
+    /**
+     * Rechaza un jugador no operable y, si se opera, devuelve su cotización y su orden inicial, que
+     * entonces existen las dos.
+     */
+    private Tradable requireTradable() {
         notTradableReason().ifPresent(reason -> {
             throw new PlayerNotTradableException(reason);
         });
+        return new Tradable(quote, initialOrder);
+    }
+
+    /**
+     * Lo que tiene un jugador operable: su cotización vigente y su orden inicial, nunca nulas.
+     */
+    private record Tradable(Quote quote, MarketOrder initialOrder) {
     }
 
     private Optional<NotTradableReason> notTradableReason() {
