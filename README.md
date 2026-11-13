@@ -212,6 +212,37 @@ En PowerShell: `$env:MARKET_BENCHMARK = 'true'; ./gradlew test --tests '*MarketV
 El contrato está en [contracts/](specs/008-mercado-tokens-portfolio/contracts/), y la validación de
 punta a punta, en [quickstart.md](specs/008-mercado-tokens-portfolio/quickstart.md).
 
+### Auditoría de web services
+
+Cada invocación a un endpoint propio del backend deja **una línea** con seis datos: el momento en
+que terminó, el usuario, la operación, los parámetros, cuánto tardó y cómo terminó. Por ejemplo
+(en una sola línea):
+
+    2026-11-12T10:16:40.007-03:00 | INFO | user=42(USER,JWT) | op=PortfolioController.getPortfolio GET /users/42/portfolio | params={"id":42,"date":null} | time=12ms | result=OK
+
+- **Usuario**: `<id>(<ROL>,<CREDENCIAL>)`, con `JWT` o `API_KEY` según cómo se autenticó, o
+  `anonymous` en las rutas públicas y sin credencial.
+- **Parámetros**: los de ruta, los de query y el cuerpo, en JSON y con su nombre. Las contraseñas,
+  los tokens, las claves de API y cualquier campo que se llame así (`password`, `token`, `apikey`,
+  `secret`) van como `***`. La identidad va solo en `user`, y el cuerpo de la respuesta no se
+  registra. Un valor de más de 500 caracteres y un total de más de 2000 se cortan con
+  `...(truncado)`.
+- **Resultado**: `OK`, o `ERROR(<Excepción>)` con el tipo y sin el mensaje. Siempre en `INFO`: la
+  auditoría registra eventos, y la respuesta al cliente no cambia.
+
+Las líneas van a la consola y a `backend/logs/web-service-audit.log` (con `./gradlew bootRun`), que
+rota por día y a los 10 MB, guarda 30 días con un tope de 1 GB en total y no se versiona. En los
+tests van solo a la consola. No se mezclan con el log general y siguen escribiéndose aunque se suba
+su nivel (`logging.level.root=WARN`); para apagarlas, `logging.level.WEB_SERVICE_AUDIT=OFF`.
+
+**Qué no se audita**: los 401 y 403 del filtro de seguridad, los 400 que se rechazan antes de
+llegar al endpoint (cuerpo ilegible, cuerpo inválido, parámetro faltante o de otro tipo), las rutas
+sin endpoint, el actuator, Swagger, la consola de H2 y los procesos programados.
+
+No es la auditoría del mercado (`GET /audit`, de la 008): esa guarda en la base cada orden,
+operación y cancelación para el administrador; esta es un registro técnico de cada request. El
+formato exacto está en [contracts/](specs/011-auditoria-web-services/contracts/web-service-audit-line.md).
+
 ### Base local con el dataset ficticio
 
 Si tu base local es de antes de Football-Data.org, tiene el dataset ficticio y tablas sin las

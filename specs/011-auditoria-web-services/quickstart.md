@@ -47,8 +47,8 @@ Desde `backend/`:
 ./gradlew bootRun
 ```
 
-Arranca con el perfil `local`. Al primer request auditado aparece el archivo
-`backend/logs/web-service-audit.log`.
+Arranca con el perfil `local`. Al arrancar se crea `backend/logs/web-service-audit.log`, vacío
+(Logback abre el archivo cuando inicia el appender), y cada request auditado le suma su línea.
 
 En otra terminal, seguir el archivo:
 

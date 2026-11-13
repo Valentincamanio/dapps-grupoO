@@ -6,7 +6,6 @@ import java.util.Optional;
 
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.user.AppUser;
 import ar.edu.unq.desapp.futbolmarket.service.auth.AuthService;
+import ar.edu.unq.desapp.futbolmarket.shared.CredentialType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,6 +35,9 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  * <p>{@code shouldNotFilter} usa el mismo matcher de rutas públicas que la autorización, así una
  * credencial inválida no bloquea un recurso público.</p>
+ *
+ * <p>La autenticación lleva como {@code details} el {@link CredentialType} con el que se resolvió,
+ * así la auditoría de web services sabe si el request vino con token o con clave de API.</p>
  */
 public class CredentialAuthenticationFilter extends OncePerRequestFilter {
 
@@ -77,17 +80,19 @@ public class CredentialAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /** Vacío significa request anónimo; una credencial que no resuelve lanza la excepción. */
-    private Optional<AppUser> resolveUser(HttpServletRequest request) {
+    private Optional<ResolvedCredential> resolveUser(HttpServletRequest request) {
         String token = bearerToken(request);
         if (token != null) {
-            return Optional.of(authService.findById(jwtService.parseUserId(token))
-                    .orElseThrow(CredentialAuthenticationFilter::unknownCredential));
+            AppUser user = authService.findById(jwtService.parseUserId(token))
+                    .orElseThrow(CredentialAuthenticationFilter::unknownCredential);
+            return Optional.of(new ResolvedCredential(user, CredentialType.JWT));
         }
 
         String apiKey = request.getHeader(API_KEY_HEADER);
         if (apiKey != null && !apiKey.isBlank()) {
-            return Optional.of(authService.findByApiKey(apiKey)
-                    .orElseThrow(CredentialAuthenticationFilter::unknownCredential));
+            AppUser user = authService.findByApiKey(apiKey)
+                    .orElseThrow(CredentialAuthenticationFilter::unknownCredential);
+            return Optional.of(new ResolvedCredential(user, CredentialType.API_KEY));
         }
 
         return Optional.empty();
@@ -101,11 +106,13 @@ public class CredentialAuthenticationFilter extends OncePerRequestFilter {
         return new BadCredentialsException(UNKNOWN_CREDENTIAL_MESSAGE);
     }
 
-    private void authenticate(AppUser user) {
-        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
+    private void authenticate(ResolvedCredential credential) {
+        AppUser user = credential.user();
+        UsernamePasswordAuthenticationToken authentication = UsernamePasswordAuthenticationToken.authenticated(
                 user.getId(),
                 null,
                 List.of(new SimpleGrantedAuthority(ROLE_PREFIX + user.getRole().name())));
+        authentication.setDetails(credential.type());
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 
@@ -115,5 +122,9 @@ public class CredentialAuthenticationFilter extends OncePerRequestFilter {
             return null;
         }
         return header.substring(BEARER_PREFIX.length());
+    }
+
+    /** El usuario que resolvió la credencial y con qué tipo de credencial. */
+    private record ResolvedCredential(AppUser user, CredentialType type) {
     }
 }
