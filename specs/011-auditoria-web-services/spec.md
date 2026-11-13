@@ -31,7 +31,7 @@ services:
 - Q: ¿Los requests rechazados por la validación de forma (400 antes de que el método del
   controller se ejecute, incluido un JSON mal formado) se auditan? → A: Sí, se registran con
   `ERROR` y el tipo de error de validación; lo que no se pudo leer va con un marcador fijo
-  (US3 escenarios 4 y 5, FR-001, FR-001a).
+  (US3 escenarios 4 y 5, FR-001, FR-001a). **Reemplazada en la revisión del plan, más abajo.**
 - Q: ¿En qué formato se escribe cada línea: texto `clave=valor` o un JSON por línea? → A: Texto
   con pares `clave=valor` en orden fijo, igual en el archivo y en la consola (FR-012).
 - Q: ¿El límite de largo se aplica a cada campo o a todo el parámetro? → A: A los dos: cada valor
@@ -39,6 +39,25 @@ services:
   (FR-017).
 - Q: ¿El campo user indica también con qué credencial se autenticó? → A: Sí, el tipo de
   credencial (`JWT` o `API_KEY`), nunca su valor: `user=42(USER,JWT)` (FR-006).
+
+### Session 2026-11-12 (revisión durante el plan)
+
+El plan encontró tres puntos de la spec que chocaban con el diseño acordado o con el código
+vigente. El equipo los resolvió así:
+
+- Q: Un request rechazado mientras se arman los argumentos del endpoint (cuerpo ilegible, cuerpo
+  que no pasa la validación, parámetro que no se puede convertir o que falta) no llega a invocar
+  el endpoint. ¿Se audita igual? → A: No. Reemplaza la primera clarificación: esos rechazos no
+  dejan línea, igual que los 401 y 403 del filtro. Se elimina FR-001a, se ajustan FR-001, FR-003,
+  US3 escenarios 4 y 5 y el edge case correspondiente.
+- Q: Las rutas públicas (`POST /auth/login`, `GET /players/**`, `GET /orders`, entre otras) no
+  evalúan la credencial que traiga el request. ¿Qué usuario registra la línea en esas rutas?
+  → A: `anonymous`, aunque el request traiga una credencial válida: la feature no cambia cómo se
+  autentica. El escenario 1 de la US1 pasa a usar un endpoint protegido y se corrige el edge case
+  de la credencial en un endpoint público (FR-006).
+- Q: ¿El timestamp es el momento en que empieza la invocación o el momento en que termina?
+  → A: El momento en que termina, cuando se escribe la línea; el inicio se obtiene restando el
+  tiempo de ejecución (Assumptions, FR-005).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -63,18 +82,18 @@ seis datos completos y correctos.
 
 **Acceptance Scenarios**:
 
-1. **Given** un usuario autenticado con su token de sesión, **When** consulta
-   `GET /players/{id}` con un id existente, **Then** se agrega una línea con el timestamp de la
-   invocación (con milisegundos y zona horaria), el id y el rol de ese usuario con el tipo de
-   credencial `JWT`, la operación
-   (controller, método, verbo `GET` y la ruta pedida), el parámetro de ruta `id` con su valor,
-   el tiempo de ejecución en milisegundos y el resultado `OK`.
+1. **Given** un usuario autenticado con su token de sesión, **When** consulta su portfolio con
+   `GET /users/{id}/portfolio`, **Then** se agrega una línea con el timestamp de la invocación
+   (con milisegundos y zona horaria), el id y el rol de ese usuario con el tipo de credencial
+   `JWT`, la operación (controller, método, verbo `GET` y la ruta pedida), el parámetro de ruta
+   `id` con su valor, el tiempo de ejecución en milisegundos y el resultado `OK`.
 2. **Given** un integrador autenticado con su clave de API, **When** invoca un endpoint
    protegido, **Then** la línea identifica al usuario dueño de la clave, con su id, su rol y el
    tipo de credencial `API_KEY`; con un token de sesión, el tipo es `JWT`. El valor de la
    credencial no aparece en ningún caso.
-3. **Given** un cliente sin credencial, **When** invoca un endpoint público (por ejemplo
-   `POST /auth/login`), **Then** la línea registra el usuario como `anonymous`.
+3. **Given** un cliente, con o sin credencial, **When** invoca un endpoint público (por ejemplo
+   `POST /auth/login` o `GET /players/{id}`), **Then** la línea registra el usuario como
+   `anonymous`: en las rutas públicas la credencial no se evalúa.
 4. **Given** una invocación con parámetros de query (por ejemplo, un listado paginado o
    filtrado), **When** termina, **Then** la línea incluye cada parámetro de query con su nombre y
    su valor.
@@ -143,13 +162,14 @@ y el cuerpo de error que recibe el cliente son idénticos a los de antes de la f
 3. **Given** una invocación que termina en error, **When** se escribe su línea, **Then** la
    línea tiene la misma severidad informativa que las exitosas.
 4. **Given** un request con un cuerpo que no cumple la forma pedida (un campo obligatorio
-   faltante, un valor fuera de rango), **When** se invoca el endpoint, **Then** se registra una
-   línea con resultado `ERROR` y el tipo de error de validación, aunque el método del controller
-   no llegue a ejecutarse, y el cliente recibe el mismo 400 que sin auditoría.
-5. **Given** un request con un JSON mal formado, **When** se invoca el endpoint, **Then** se
-   registra una línea con resultado `ERROR` y el tipo de error de lectura del cuerpo; los
-   parámetros que sí se pudieron leer (de ruta y de query) aparecen con su nombre y su valor, y
-   el cuerpo aparece con un marcador fijo de "no legible".
+   faltante, un valor fuera de rango) o con un JSON mal formado, **When** se envía al endpoint,
+   **Then** el cliente recibe el mismo 400 que sin auditoría y NO se registra línea: el request
+   se rechazó antes de invocar el endpoint.
+5. **Given** un parámetro de ruta o de query con un valor que se puede leer pero que está fuera
+   de rango (por ejemplo, un id que tiene que ser positivo), **When** se invoca el endpoint,
+   **Then** la restricción se evalúa como parte de la invocación: la línea tiene resultado
+   `ERROR` con el tipo de error de validación y el cliente recibe el mismo 400 que sin
+   auditoría.
 
 ---
 
@@ -199,18 +219,20 @@ sube el nivel general a advertencia, se repite la invocación y la línea se sig
 - **Falla al escribir la línea** (archivo inaccesible, disco lleno, un valor que no se puede
   representar): el request termina exactamente igual que sin auditoría. Si un valor no se puede
   representar, se usa un marcador fijo en su lugar y el resto de la línea se escribe.
-- **Request rechazado por la validación de forma** (400 por un campo inválido, un parámetro de
-  ruta o de query con un tipo incorrecto, o un JSON mal formado): SÍ deja su línea, con `ERROR` y
-  el tipo de error de validación. Lo que no se pudo leer aparece con un marcador fijo; los
-  secretos que sí se pudieron leer se enmascaran igual.
+- **Request rechazado antes de invocar el endpoint** (400 por un cuerpo ilegible o que no pasa
+  la validación, o por un parámetro de ruta o de query que falta o que no se puede convertir a
+  su tipo): no deja línea, igual que los rechazos del filtro de seguridad. Un parámetro que se
+  pudo leer pero está fuera de rango se valida dentro de la invocación y sí deja su línea, con
+  `ERROR` (US3 escenario 5).
 - **Request rechazado por seguridad antes de llegar al endpoint** (401 o 403 del filtro): no deja
   línea de auditoría de web services.
 - **Ruta inexistente o verbo no soportado** (no hay endpoint que lo atienda): no deja línea.
 - **Endpoints técnicos** (actuator, Swagger/OpenAPI, consola de H2) y el frontend: no dejan línea.
 - **Procesos programados** (la sincronización semanal o la del arranque): no son invocaciones de
   web services y no dejan línea. La sincronización manual por endpoint sí deja la suya.
-- **Credencial válida en un endpoint público**: el campo user registra al usuario autenticado,
-  con su tipo de credencial, no `anonymous`.
+- **Credencial en un endpoint público**: las rutas públicas no evalúan la credencial (ni válida
+  ni inválida), así que el campo user registra `anonymous`. La feature no cambia cómo se
+  autentica.
 - **Invocaciones simultáneas**: cada una tiene su propia línea, con su propio usuario y su propio
   tiempo; ninguna toma datos de otra.
 
@@ -222,16 +244,16 @@ sube el nivel general a advertencia, se repite la invocación y la línea se sig
 
 - **FR-001**: El sistema MUST registrar en la auditoría de web services cada invocación a un
   endpoint REST propio del backend, público o protegido, tanto si termina bien como si termina en
-  error. Cuenta como invocación también el request que llega a un endpoint y es rechazado por la
-  validación de forma (400), aunque el método del controller no llegue a ejecutarse.
-- **FR-001a**: En un request rechazado por la validación de forma, los parámetros que no se
-  pudieron leer (por ejemplo, el cuerpo de un JSON mal formado, o un parámetro que no se pudo
-  convertir a su tipo) MUST registrarse con un marcador fijo de "no legible", y los que sí se
-  pudieron leer, con su nombre y su valor, aplicando las mismas reglas de enmascarado.
+  error. Una invocación empieza cuando el endpoint recibe sus argumentos ya leídos; las
+  restricciones sobre esos argumentos que se evalúan al invocarlo forman parte de la invocación.
+- **FR-001a**: *(Eliminado en la revisión del plan: los requests rechazados antes de invocar el
+  endpoint no dejan línea; ver FR-003.)*
 - **FR-002**: Cada invocación MUST generar exactamente una línea de auditoría: ni cero ni más de
   una.
 - **FR-003**: El sistema MUST NOT registrar en la auditoría de web services los requests
-  rechazados por seguridad antes de llegar al endpoint (401 y 403 del filtro), los endpoints de
+  rechazados por seguridad antes de llegar al endpoint (401 y 403 del filtro), los rechazados
+  antes de invocar el endpoint mientras se leen sus argumentos (cuerpo ilegible o inválido,
+  parámetro faltante o que no se puede convertir a su tipo), los endpoints de
   actuator, Swagger/OpenAPI, la consola de H2, los recursos del frontend, los requests a rutas o
   verbos sin endpoint, ni los procesos programados que no son invocaciones de web services.
 - **FR-004**: La auditoría de web services MUST NOT persistirse en base de datos, MUST NOT tener
@@ -241,12 +263,12 @@ sube el nivel general a advertencia, se repite la invocación y la línea se sig
 **Contenido de la línea**
 
 - **FR-005**: Cada línea MUST contener el timestamp de la invocación: fecha y hora con
-  milisegundos y zona horaria.
+  milisegundos y zona horaria, del momento en que la invocación termina.
 - **FR-006**: Cada línea MUST contener el usuario: el id y el rol del usuario autenticado y el
   tipo de credencial con la que se autenticó (`JWT` para el token de sesión, `API_KEY` para la
-  clave de API), por ejemplo `user=42(USER,JWT)`; o `anonymous` si la invocación llegó sin
-  credencial a un endpoint público. Del tipo de credencial se registra solo el tipo, nunca su
-  valor.
+  clave de API), por ejemplo `user=42(USER,JWT)`; o `anonymous` si la invocación llegó a un
+  endpoint público, donde la credencial no se evalúa. Del tipo de credencial se registra solo el
+  tipo, nunca su valor.
 - **FR-007**: Cada línea MUST contener la operación: el controller y el método invocados, el
   verbo HTTP y la ruta pedida.
 - **FR-008**: Cada línea MUST contener los parámetros con los que se invocó el endpoint (de ruta,
@@ -263,9 +285,9 @@ sube el nivel general a advertencia, se repite la invocación y la línea se sig
 - **FR-012**: Cada línea MUST ser texto con pares `clave=valor` en este orden fijo: timestamp,
   severidad, `user`, `op`, `params`, `time` y `result`, igual en el archivo y en la consola, de
   modo que una persona o una herramienta de búsqueda de texto pueda ubicar cada dato. Ejemplo
-  ilustrativo: `2026-11-12T10:15:03.412-03:00 INFO user=42(USER,JWT)
-  op=PlayerController.getById GET /players/7 params={id=7} time=12ms result=OK` (en una sola
-  línea).
+  ilustrativo: `2026-11-12T10:15:03.412-03:00 | INFO | user=42(USER,JWT) |
+  op=PortfolioController.getPortfolio GET /users/42/portfolio | params={"id":42,"date":null} |
+  time=12ms | result=OK` (en una sola línea; el formato exacto lo fija el contrato del plan).
 
 **Datos sensibles**
 
@@ -358,11 +380,12 @@ sube el nivel general a advertencia, se repite la invocación y la línea se sig
   aparezca, así un endpoint nuevo queda cubierto sin configurarlo.
 - **Tipo de error**: es el nombre del tipo de error con el que terminó la invocación (por ejemplo,
   el de "jugador no encontrado"). El mensaje no se registra porque puede llevar datos del request.
-- **Timestamp**: es el momento en que empieza la invocación, en la zona horaria del servidor,
-  expresada en la propia línea.
+- **Timestamp**: es el momento en que termina la invocación, cuando se escribe la línea; el
+  inicio es el timestamp menos el tiempo de ejecución. Va en la zona horaria de Argentina, la
+  misma que usan los procesos programados, con el desplazamiento expresado en la propia línea.
 - **Tiempo de ejecución**: es el tiempo que tarda el endpoint en atender la invocación, no el
-  tiempo de red del cliente. En un request rechazado por la validación de forma es el tiempo hasta
-  el rechazo, por lo que puede ser casi nulo.
+  tiempo de red del cliente. En una invocación rechazada por una restricción sobre sus
+  parámetros es el tiempo hasta el rechazo, por lo que puede ser casi nulo.
 - **Rotación y retención**: rotación diaria y por tamaño, conservando los archivos de los últimos
   30 días con un tope total de espacio. No es un requisito de la consigna; es un valor razonable
   para un proyecto académico.

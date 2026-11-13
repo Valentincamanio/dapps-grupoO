@@ -35,6 +35,9 @@
   de forma (400, incluido un JSON mal formado) SÍ se auditan, con `ERROR` y el tipo de error de
   validación; lo que no se pudo leer va con un marcador fijo. Quedó en la sección Clarifications,
   en la US3 (escenarios 4 y 5), en Edge Cases, en FR-001 y en el nuevo FR-001a.
+- Revisión durante el plan (2026-11-12): esa decisión se revirtió. Los rechazos previos a la
+  invocación no dejan línea, FR-001a quedó eliminado y las rutas públicas registran `anonymous`.
+  El timestamp pasó a ser el del fin de la invocación. Ver la segunda sesión de Clarifications.
 - Detalles técnicos que quedan a propósito en la spec porque los pide la consigna o el usuario:
   "controller y método" en la operación (FR-007), la mención a Log4j/logback (solo en
   Assumptions, como restricción de la cátedra) y los nombres de los endpoints técnicos excluidos
