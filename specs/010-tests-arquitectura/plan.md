@@ -81,7 +81,7 @@ constitución. Detalle en [research.md](./research.md#lo-que-el-plan-resuelve-di
 |---|---|---|
 | G1 | **La rama tiene todo `develop`** | **Cumplida**: la rama sale de `967f8e6`, que es `develop` |
 | G2 | **Aval de un desarrollador para las dos carpetas nuevas del árbol de tests del backend**: `futbolmarket/architecture/` (D4) y `ar/edu/unq/desapp/archfixture/` (D13) | **Cumplida el 2026-11-12**: `architecture/` venía en el pedido; `archfixture/` recibió el aval después de leer este plan |
-| G3 | **Confirmación del equipo** de los puntos 3 a 12 de la tabla anterior | Conviene antes de implementar; no bloquea el diseño |
+| G3 | **Confirmación del equipo** de los puntos 3 a 12 de la tabla anterior | **Cumplida el 2026-11-14**: sin objeción a los puntos 3 a 12; B7.1 a B7.4 llevan fixtures con caso borde y el logo va como slot `homeLink: ReactNode` (el SVG y las cinco reglas de CSS pasan a `AppLayout`) |
 
 ## Contexto técnico
 
@@ -274,7 +274,8 @@ Los pasos 1-2 y 3-4 son independientes entre sí; el 5 va al final, sobre las re
 ## Puntos a confirmar con el equipo
 
 1. ~~**G2**: el aval para `ar/edu/unq/desapp/archfixture/` (D13).~~ **Resuelto el 2026-11-12**: aval dado.
-2. **B7.1 a B7.4 con fixtures** (punto 3 de la tabla de ajustes): sigue la spec; si el equipo prefiere no tenerlas, hay
-   que cambiar la spec (FR-007 y SC-002), no solo el plan.
-3. **Forma del slot del logo** (punto 12): `homeLink: ReactNode` como pidió el equipo, moviendo el SVG y la CSS del
-   logo a `AppLayout`, o una render prop que deja todo en `TopBar` y no mueve estilos.
+2. ~~**B7.1 a B7.4 con fixtures** (punto 3 de la tabla de ajustes): sigue la spec; si el equipo prefiere no tenerlas,
+   hay que cambiar la spec (FR-007 y SC-002), no solo el plan.~~ **Resuelto el 2026-11-14**: con fixtures y caso borde.
+3. ~~**Forma del slot del logo** (punto 12): `homeLink: ReactNode` como pidió el equipo, moviendo el SVG y la CSS del
+   logo a `AppLayout`, o una render prop que deja todo en `TopBar` y no mueve estilos.~~ **Resuelto el 2026-11-14**:
+   slot `homeLink: ReactNode`.

@@ -44,8 +44,10 @@ US1 y US2 no comparten código y se pueden hacer en paralelo; US3 va al final, s
 **Propósito**: confirmar que los dos lados están en verde antes de tocar nada y tener la referencia de tiempos para
 SC-005.
 
-- [ ] T001 Verificar el punto de partida del backend: en `backend/`, `./gradlew build` da BUILD SUCCESSFUL con el código actual; anotar cuánto tarda la tarea `test` (referencia de SC-005) y confirmar en `backend/build.gradle` que no hay ninguna dependencia de ArchUnit
-- [ ] T002 [P] Verificar el punto de partida del frontend: en `frontend/`, `npm ci`, `npm test`, `npm run lint` y `npm run build` terminan sin errores, y `frontend/vitest.config.ts` incluye `tests/**/*.test.{ts,tsx}`, usa jsdom y carga `tests/setup.ts` (F-D2, F-D10)
+- [X] T001 Verificar el punto de partida del backend: en `backend/`, `./gradlew build` da BUILD SUCCESSFUL con el código actual; anotar cuánto tarda la tarea `test` (referencia de SC-005) y confirmar en `backend/build.gradle` que no hay ninguna dependencia de ArchUnit
+  - 2026-11-14: `./gradlew clean build` da BUILD SUCCESSFUL en 7 min 56 s; la tarea `test` tarda 5 min 33 s (2028 tests, 0 fallas, 2 omitidos). `build.gradle` no tiene ArchUnit.
+- [X] T002 [P] Verificar el punto de partida del frontend: en `frontend/`, `npm ci`, `npm test`, `npm run lint` y `npm run build` terminan sin errores, y `frontend/vitest.config.ts` incluye `tests/**/*.test.{ts,tsx}`, usa jsdom y carga `tests/setup.ts` (F-D2, F-D10)
+  - 2026-11-14: los cuatro comandos terminan sin errores; `npm test` pasa 85 archivos y 659 tests en 177 s. `vitest.config.ts` cumple los tres puntos.
 
 ---
 
@@ -56,7 +58,7 @@ SC-005.
 **⚠️ CRÍTICO**: sin esta confirmación no se empiezan las fixtures de B7.1 a B7.4 (US1) ni la corrección de TopBar
 (US2).
 
-- [ ] T003 Confirmar con el equipo la puerta G3 (ajustes 3 a 12 de la tabla "Lo que el plan resuelve distinto del pedido") y los dos puntos abiertos: fixtures con caso borde para B7.1 a B7.4 y slot `homeLink: ReactNode` para el logo (con el SVG y las cinco reglas de CSS movidas a `AppLayout`). Si no hay objeción, quedan las opciones del plan. Registrar la respuesta y la fecha en la tabla "Puertas antes de implementar" de `specs/010-tests-arquitectura/plan.md`
+- [X] T003 Confirmar con el equipo la puerta G3 (ajustes 3 a 12 de la tabla "Lo que el plan resuelve distinto del pedido") y los dos puntos abiertos: fixtures con caso borde para B7.1 a B7.4 y slot `homeLink: ReactNode` para el logo (con el SVG y las cinco reglas de CSS movidas a `AppLayout`). Si no hay objeción, quedan las opciones del plan. Registrar la respuesta y la fecha en la tabla "Puertas antes de implementar" de `specs/010-tests-arquitectura/plan.md`
 
 **Checkpoint**: decisiones cerradas; US1 y US2 pueden arrancar en paralelo.
 
