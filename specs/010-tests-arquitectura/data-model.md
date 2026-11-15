@@ -71,8 +71,9 @@ Piezas privadas:
 
 ### 2.2 `ProductionClasses`
 
-- `static JavaClasses get()`: devuelve las clases de `PRODUCTION_BASE` importadas con `DO_NOT_INCLUDE_TESTS`, una sola
-  vez por corrida (holder perezoso). `JavaClasses` es inmutable.
+- `static JavaClasses get()`: devuelve las clases de `PRODUCTION_BASE` importadas con `DO_NOT_INCLUDE_TESTS`. Las
+  guarda en una `SoftReference`: importa la primera vez y solo vuelve a importar si la JVM las liberó por falta de
+  memoria (D2). `JavaClasses` es inmutable.
 
 ### 2.3 `ViolationReport`
 

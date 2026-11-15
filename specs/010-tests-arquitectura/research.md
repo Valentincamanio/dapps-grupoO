@@ -68,14 +68,25 @@ dependencia más); `rule.check(classes)` (lanza `AssertionError` sin AssertJ y m
 
 ## D2. Import único de las clases de producción
 
-**Decisión**: `ProductionClasses` guarda en un campo estático, inicializado una sola vez (holder perezoso),
+**Decisión**: `ProductionClasses` guarda en un campo estático, dentro de una `SoftReference`,
 `new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages("ar.edu.unq.desapp.futbolmarket")`.
-`JavaClasses` es inmutable, así que compartirla entre tests no es "compartir estado" en el sentido del Principio IV.
+El primer `get()` importa; los siguientes devuelven lo cacheado, salvo que la JVM lo haya liberado por falta de memoria,
+y en ese caso se vuelve a importar. `JavaClasses` es inmutable, así que compartirla entre tests no es "compartir
+estado" en el sentido del Principio IV.
 
 **Motivo**: importar las 447 clases de producción una vez por corrida, no una vez por test (SC-005).
 `DO_NOT_INCLUDE_TESTS` deja afuera `build/classes/java/test` (FR-006 y escenario 8 de la US1).
 
-**Alternativas descartadas**: importar en cada test (más lento); `@AnalyzeClasses` (descartado en D1).
+**Ajuste** (2026-11-15, T033): la decisión original era un holder perezoso que retenía el import toda la corrida.
+El import ocupa unos 46 MB, y el worker de tests tiene el heap por defecto de Gradle (512 MB) compartido con los
+contextos de Spring que cachean los `@SpringBootTest`. Con el holder, `./gradlew build` se quedó sin heap al levantar
+`StrategyChangeIT`. La `SoftReference` deja que la JVM libere el import antes de quedarse sin memoria. Es lo mismo
+que hace el cache de clases de `archunit-junit5`.
+
+**Alternativas descartadas**: importar en cada test (más lento); `@AnalyzeClasses` (descartado en D1); subir
+`maxHeapSize` del task `test` en `build.gradle` (agrega una línea fuera de la de ArchUnit, en contra de SC-006, y el
+import seguiría retenido toda la corrida). El margen escaso de heap de la suite existía antes de esta feature y se
+resuelve aparte.
 
 ## D3. Reglas parametrizadas por paquete base
 
