@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!--
+    Log general: el mismo que arma Spring Boot sin este archivo (appender CONSOLE con su pattern y
+    las propiedades logging.pattern.* y logging.threshold.*). No se incluye base.xml porque suma un
+    appender FILE que escribiría spring.log en el directorio temporal.
+    -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!--
+    Auditoría de web services: una línea por invocación a un endpoint propio, con el formato de
+    specs/011-auditoria-web-services/contracts/web-service-audit-line.md.
+    La ruta es relativa al directorio de trabajo: con ./gradlew bootRun queda en backend/logs/.
+    El timestamp va en la zona de Argentina, la misma que usan los procesos programados.
+    -->
+    <property name="WEB_SERVICE_AUDIT_FILE" value="logs/web-service-audit.log"/>
+    <property name="WEB_SERVICE_AUDIT_MAX_FILE_SIZE" value="10MB"/>
+    <property name="WEB_SERVICE_AUDIT_MAX_HISTORY" value="30"/>
+    <property name="WEB_SERVICE_AUDIT_TOTAL_SIZE_CAP" value="1GB"/>
+    <property name="WEB_SERVICE_AUDIT_PATTERN"
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX, America/Argentina/Buenos_Aires} | %level | %msg%n"/>
+
+    <appender name="WEB_SERVICE_AUDIT_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${WEB_SERVICE_AUDIT_PATTERN}</pattern>
+            <charset>${CONSOLE_LOG_CHARSET}</charset>
+        </encoder>
+    </appender>
+
+    <!--
+    El logger WEB_SERVICE_AUDIT tiene su propio nivel y additivity="false":
+    - additivity="false" hace que sus líneas vayan solo a sus appenders y no se repitan en el log
+      general con el pattern de Spring (PID, hilo, nombre del logger).
+    - El nivel fijo en INFO hace que subir logging.level.root (por ejemplo a WARN) no apague la
+      auditoría. Para apagarla hay que configurar el propio registro:
+      logging.level.WEB_SERVICE_AUDIT=OFF.
+    -->
+
+    <!-- En los tests solo consola: así no se crea logs/ y los e2e leen las líneas de la salida capturada. -->
+    <springProfile name="test">
+        <logger name="WEB_SERVICE_AUDIT" level="INFO" additivity="false">
+            <appender-ref ref="WEB_SERVICE_AUDIT_CONSOLE"/>
+        </logger>
+    </springProfile>
+
+    <!-- Fuera de los tests, consola y archivo, con el mismo pattern en los dos. -->
+    <springProfile name="!test">
+        <!-- Rotación diaria y por tamaño; los rotados se comprimen y se borran por antigüedad o por tope total. -->
+        <appender name="WEB_SERVICE_AUDIT_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${WEB_SERVICE_AUDIT_FILE}</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>logs/web-service-audit.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                <maxFileSize>${WEB_SERVICE_AUDIT_MAX_FILE_SIZE}</maxFileSize>
+                <maxHistory>${WEB_SERVICE_AUDIT_MAX_HISTORY}</maxHistory>
+                <totalSizeCap>${WEB_SERVICE_AUDIT_TOTAL_SIZE_CAP}</totalSizeCap>
+            </rollingPolicy>
+            <encoder>
+                <pattern>${WEB_SERVICE_AUDIT_PATTERN}</pattern>
+                <charset>UTF-8</charset>
+            </encoder>
+        </appender>
+
+        <logger name="WEB_SERVICE_AUDIT" level="INFO" additivity="false">
+            <appender-ref ref="WEB_SERVICE_AUDIT_CONSOLE"/>
+            <appender-ref ref="WEB_SERVICE_AUDIT_FILE"/>
+        </logger>
+    </springProfile>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
