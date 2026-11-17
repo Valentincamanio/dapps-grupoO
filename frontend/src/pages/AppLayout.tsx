@@ -66,6 +66,19 @@ export function AppLayout() {
   const active = topSectionOf(page.location.pathname);
   // Los jugadores no tienen entrada propia: el logo lleva a la pizarra. Sin secciones del rol (un
   // visitante) no hay barra de secciones
+  const homeLink = (
+    <Link to="/pizarra" className={styles.logo} aria-label="La Pizarra, ir al inicio">
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <circle cx="16" cy="16" r="15" className={styles.ball} />
+        <path d="M16 9l5 3.6-1.9 5.9h-6.2L11 12.6z" className={styles.patch} />
+        <path
+          d="M16 9V3.5M21 12.6l5-1.7M19.1 18.5l3.2 4.4M12.9 18.5l-3.2 4.4M11 12.6l-5-1.7"
+          className={styles.seams}
+        />
+      </svg>
+      La Pizarra
+    </Link>
+  );
   let navSlot: ReactNode;
   if (profile?.role === 'USER') {
     // El portfolio, las operaciones y las órdenes son de quien opera: solo USER
@@ -100,6 +113,7 @@ export function AppLayout() {
       {/* Con el panel abierto, lo de atrás no recibe el foco ni el teclado */}
       <div {...(background ? { inert: '' } : {})}>
         <TopBar
+          homeLink={homeLink}
           navSlot={navSlot}
           themeToggle={<ThemeToggle theme={theme} onToggle={toggleTheme} />}
           balance={profile ? formatBalance(profile.availableBalance) : undefined}

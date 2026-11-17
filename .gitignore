@@ -30,3 +30,6 @@ Thumbs.db
 
 # Env
 .env*
+
+# Auditoría de web services: archivo y rotados
+backend/logs/
