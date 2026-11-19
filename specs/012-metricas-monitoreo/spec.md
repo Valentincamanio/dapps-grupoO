@@ -29,6 +29,22 @@ sin leerse entre sí:
 - una compra deja su registro de auditoría del mercado, su línea de auditoría de web services y,
   además, incrementa la métrica de órdenes, sin que ninguna dependa de la otra.
 
+## Clarifications
+
+### Session 2026-11-19
+
+- Q: ¿Qué status recibe un visitante sin credencial que pide un endpoint de Actuator no
+  expuesto (por ejemplo `/actuator/env`)? → A: 401, como en cualquier ruta no pública; un `USER`
+  o un `ADMIN` reciben 404 (US3 escenario 7, FR-030, Edge Cases).
+- Q: ¿El timer de sincronizaciones mide también la sincronización de una sola liga? → A: Sí,
+  las dos, distinguidas con la etiqueta `type` (`full`, `single_league`) (FR-012, FR-016).
+- Q: ¿Qué cuenta como orden `rejected`? → A: Cualquier excepción propia del dominio que lance el
+  caso de uso: conflictos de negocio (409), jugador u orden inexistente (404) y operación no
+  permitida por el modelo, como cancelar una orden ajena (403). Un error interno inesperado no
+  cuenta como `rejected` (FR-010, Edge Cases).
+- Q: ¿Quién puede pedir la raíz `GET /actuator`, que lista los endpoints expuestos? → A: Solo
+  `ADMIN`: 401 para un visitante y 403 para un `USER` (FR-036, Edge Cases, US3 escenario 4).
+
 ## User Scenarios & Testing *(mandatory)*
 
 Los actores son:
@@ -151,8 +167,8 @@ configuración.
    **Given** un `USER` o un `ADMIN`, **When** pide lo mismo, **Then** recibe 200 con nombre,
    descripción y versión de la aplicación, datos del build (artefacto, versión, momento del
    build) y versión de Java.
-4. **Given** un visitante, **When** pide `GET /actuator/metrics`, `GET /actuator/prometheus` o
-   `GET /actuator/loggers`, **Then** recibe 401 con el JSON de error estándar; **Given** un
+4. **Given** un visitante, **When** pide `GET /actuator`, `GET /actuator/metrics`,
+   `GET /actuator/prometheus` o `GET /actuator/loggers`, **Then** recibe 401 con el JSON de error estándar; **Given** un
    `USER`, **Then** recibe 403 con el JSON de error estándar; **Given** un `ADMIN`, **Then**
    recibe 200.
 5. **Given** un `ADMIN`, **When** pide `GET /actuator/metrics/http.server.requests`, **Then**
@@ -226,9 +242,11 @@ y que `GET /actuator/health` sigue respondiendo 200.
 - **Excepción de dominio**: una orden rechazada se cuenta como `rejected` y la excepción de
   dominio original llega intacta al manejador de errores; la métrica no la envuelve ni la
   reemplaza.
-- **Error inesperado en el caso de uso** (no una regla de negocio): una orden que falla por un
-  error interno no se cuenta como `rejected`, porque `rejected` significa que el mercado la
-  rechazó por una regla del dominio.
+- **Error inesperado en el caso de uso** (no una excepción propia del dominio): una orden que
+  falla por un error interno no se cuenta como `rejected`, porque `rejected` significa que el
+  caso de uso la rechazó con una excepción del dominio (409, 404 o 403 del modelo).
+- **Orden ajena o inexistente**: cancelar una orden de otro usuario (403) o una orden que no
+  existe (404) cuenta como `operation="cancel"`, `result="rejected"`.
 - **Recálculo o sincronización que falla a mitad de camino**: se registra con `result="failure"`
   y con la duración hasta la falla.
 - **Reinicio**: todas las métricas vuelven a cero; los gauges se recalculan con los datos
@@ -236,7 +254,8 @@ y que `GET /actuator/health` sigue respondiendo 200.
 - **Visitante en un endpoint no expuesto**: un visitante que pide `/actuator/env` recibe 401,
   igual que en cualquier ruta no pública, antes de saber si el endpoint existe. Un usuario
   autenticado (`USER` o `ADMIN`) recibe 404. En ningún caso se revela configuración.
-- **Raíz `/actuator`**: pide credencial y solo lista los endpoints expuestos.
+- **Raíz `/actuator`**: es solo de `ADMIN` (401 visitante, 403 `USER`) y solo lista los
+  endpoints expuestos.
 - **Nivel de log inválido**: cambiar un logger a un nivel inexistente responde 400 con el JSON de
   error estándar y no cambia nada.
 - **Cambio de nivel de log y reinicio**: el nivel cambiado en caliente se pierde al reiniciar; el
@@ -282,15 +301,20 @@ y que `GET /actuator/health` sigue respondiendo 200.
 
 - **FR-010**: El sistema MUST contar las órdenes del mercado con la etiqueta `operation`
   (`buy`, `sell`, `cancel`) y la etiqueta `result` (`success`, `rejected`). `rejected` MUST
-  significar que el caso de uso rechazó la operación por una regla del dominio o porque lo
-  pedido no existe.
+  significar que el caso de uso terminó con una excepción propia del dominio: un conflicto de
+  negocio (409, por ejemplo créditos o tokens insuficientes, mercado ocupado, orden no
+  cancelable), algo pedido que no existe (404, jugador u orden) o una operación que el modelo no
+  permite (403, por ejemplo cancelar una orden ajena). Un error interno inesperado MUST NOT
+  contarse como `rejected`.
 - **FR-011**: El sistema MUST medir la duración de cada recálculo de cotizaciones con la etiqueta
   `trigger` (`manual`, `scheduled`, `startup`) y la etiqueta `result` (`success`, `failure`,
   `blocked`). `blocked` MUST significar que no se ejecutó porque ya había otro recálculo en
   curso.
-- **FR-012**: El sistema MUST medir la duración de cada sincronización con la etiqueta `source`
-  (`football_data`, `whoscored`) y la etiqueta `result` (`success`, `failure`, `in_progress`).
-  `in_progress` MUST significar que no se ejecutó porque ya había otra sincronización en curso.
+- **FR-012**: El sistema MUST medir la duración de cada sincronización, completa o de una sola
+  liga, con la etiqueta `source` (`football_data`, `whoscored`), la etiqueta `type` (`full`,
+  `single_league`) y la etiqueta `result` (`success`, `failure`, `in_progress`). `in_progress`
+  MUST significar que no se ejecutó porque ya había otra sincronización en curso. La etiqueta
+  `type` MUST NOT llevar el nombre ni el id de la liga.
 - **FR-013**: El sistema MUST contar los logins con la etiqueta `result` (`success`,
   `failure`). `failure` MUST incluir usuario inexistente y contraseña incorrecta, sin distinguir
   entre ambos en la etiqueta.
@@ -302,7 +326,7 @@ y que `GET /actuator/health` sigue respondiendo 200.
   descripción en español visible en `/actuator/metrics/{nombre}`:
   - `futbolmarket.market.orders` (contador; `operation`, `result`);
   - `futbolmarket.quotes.recalculation` (timer; `trigger`, `result`);
-  - `futbolmarket.sync` (timer; `source`, `result`);
+  - `futbolmarket.sync` (timer; `source`, `type`, `result`);
   - `futbolmarket.auth.logins` (contador; `result`);
   - `futbolmarket.auth.registrations` (contador);
   - `futbolmarket.users.registered` (gauge);
@@ -338,7 +362,8 @@ y que `GET /actuator/health` sigue respondiendo 200.
 - **FR-035**: Un `ADMIN` MUST poder consultar los niveles de log configurados y efectivos y
   cambiar en caliente el nivel de un logger; el cambio rige desde el siguiente mensaje y no
   sobrevive a un reinicio. Un nivel inválido MUST responder 400.
-- **FR-036**: La raíz `/actuator` MUST pedir credencial y listar solo los endpoints expuestos.
+- **FR-036**: La raíz `GET /actuator` MUST ser solo de `ADMIN` (401 sin credencial y 403 para un
+  `USER`, con el JSON de error estándar) y listar solo los endpoints expuestos.
 - **FR-037**: Los endpoints de monitoreo MUST figurar en Swagger en un grupo o sección propia,
   separada de la API de negocio, y ejecutarse desde Swagger UI con los dos esquemas de
   autenticación existentes. `GET /v3/api-docs` MUST seguir respondiendo 200 y declarando
@@ -385,7 +410,7 @@ leen de datos existentes:
 - **Métrica**: una serie con nombre, tipo (contador, timer o gauge), descripción y un conjunto
   acotado de etiquetas. Se pierde al reiniciar.
 - **Etiqueta**: un par nombre-valor de cardinalidad acotada (`operation`, `result`, `trigger`,
-  `source`, `application`, y las de las métricas HTTP: ruta como plantilla, método, status,
+  `source`, `type`, `application`, y las de las métricas HTTP: ruta como plantilla, método, status,
   resultado).
 - **Indicador de salud**: un componente con estado (`UP` o `UNKNOWN` en los propios) y detalles
   sin secretos.
@@ -428,10 +453,10 @@ leen de datos existentes:
   recolección de 15 segundos.
 - **Clave de API del `ADMIN`**: se obtiene con los mecanismos que ya existen para el
   administrador; la feature no agrega endpoints para generarla.
-- **Visitante en endpoints no expuestos**: el pedido dice "responde 404". Se interpreta como 404
-  para cualquier usuario autenticado; un visitante recibe 401, como en cualquier ruta no
-  pública, porque la autenticación se evalúa antes de saber si la ruta existe. Ninguno de los
-  dos revela configuración.
+- **Visitante en endpoints no expuestos** (confirmado en Clarifications): 404 para cualquier
+  usuario autenticado; un visitante recibe 401, como en cualquier ruta no pública, porque la
+  autenticación se evalúa antes de saber si la ruta existe. No se abren rutas `/actuator/**` en
+  la cadena de seguridad. Ninguno de los dos revela configuración.
 - **Detalle de salud para `USER`**: se le muestra el estado del componente pero no los detalles;
   los detalles son solo de `ADMIN`.
 - **Logins**: se cuentan los intentos que llegan al caso de uso de login; la autenticación de
@@ -444,9 +469,13 @@ leen de datos existentes:
   abiertas.
 - **Usuarios registrados**: el gauge cuenta todas las cuentas existentes, incluida la del
   administrador.
-- **Sincronizaciones**: el timer cuenta las sincronizaciones completas de cada fuente, sin
-  importar si las disparó el cron, el arranque o un `ADMIN`; la fuente y el resultado alcanzan
-  para operar y no se agrega una etiqueta de disparador.
+- **Sincronizaciones**: el timer cuenta las sincronizaciones completas y las de una sola liga de
+  cada fuente (confirmado en Clarifications), sin importar si las disparó el cron, el arranque o
+  un `ADMIN`; la fuente, el tipo y el resultado alcanzan para operar y no se agrega una etiqueta
+  de disparador.
+- **Recálculo al arrancar sin semanas pendientes**: si al arrancar no hay semanas cerradas sin
+  cotizar y el recálculo no se ejecuta, no se registra nada en el timer; `blocked` queda solo
+  para el recálculo que no corre porque ya hay otro en curso.
 - **Plazo de puesta al día**: el indicador `sync` usa el mismo plazo que ya rige la puesta al día
   al arrancar (hoy, 7 días), con la misma regla de borde: con exactamente ese plazo, todavía está
   al día.
