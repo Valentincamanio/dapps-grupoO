@@ -327,11 +327,13 @@ Sin violaciones de la constitución que justificar.
 
 - **Aval de `observability/`** (Principio I): sin él, la alternativa es la opción B de research D5
   (componente inyectado en los servicios), que no necesita carpeta nueva pero toca cinco servicios.
+  **Confirmado** por Valentin el 2026-11-21 (T002): se crea `observability/` según la opción A.
 - **`blocked` para `RecalculationBlockedBySyncException`**: FR-011 define `blocked` como "otro
   recálculo en curso"; el pedido de plan dice "lock tomado". Las dos excepciones son el mismo
   `RecalculationLock` que rechaza sin ejecutar y ningún otro valor las describe, así que el plan
   las registra como `blocked`. Si el equipo prefiere no registrar el caso de la sincronización,
-  es una línea del aspecto.
+  es una línea del aspecto. **Confirmado** por Valentin el 2026-11-21 (T002): las dos se
+  registran como `blocked`.
 - Que el compañero sepa que los tests que pidan `/actuator/prometheus` necesitan
   `@AutoConfigureMetrics` (Boot 4 apaga la exportación en `@SpringBootTest`).
 - Que Prometheus local tiene que ser **2.55.0 o posterior** por `http_headers`.

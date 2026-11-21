@@ -33,6 +33,7 @@ dependencies {
 	runtimeOnly 'com.h2database:h2'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
@@ -87,4 +88,12 @@ tasks.register('exportStatsSnapshot', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'ar.edu.unq.desapp.futbolmarket.StatsSnapshotExport'
     workingDir = projectDir
+}
+
+springBoot {
+    buildInfo {
+        properties {
+            additional = [description: 'Mercado simulado de valoración de jugadores de fútbol.']
+        }
+    }
 }

@@ -702,3 +702,40 @@ están en `service/`).
 
 **Alternativas descartadas**: agregar exclusiones preventivas en `build.gradle`; se agregan solo si
 el análisis marca algo y queda justificado ahí.
+
+---
+
+## Verificación de nombres contra el código (T003, 2026-11-21)
+
+Se contrastaron con el código todos los nombres que usa el diseño. **No hay diferencias**: firmas,
+visibilidades, excepciones, constantes y beans coinciden con lo que dan por hechos D3 a D12.
+Detalles que confirman el diseño:
+
+- `MarketOrderService.buy/sell(long, long, int)` y `cancel(long, long)` devuelven `BookOutcome`;
+  `AuthService.login` devuelve `SessionToken` y `register` devuelve `RegisteredUser`;
+  `QuoteRecalculationService.recalculate(RecalculationOrigin)` devuelve `RecalculationReport`.
+- `SyncService` y `StatsSyncService`: `synchronizeAll(SyncOrigin)` y `synchronizeLeague(League)`
+  públicos, `runFull(SyncOrigin)` package-private. `synchronizeAll` llama a `runFull` por
+  auto-invocación (en `SyncService` a través del método privado `synchronize`, en
+  `StatsSyncService` dentro de `lock.runExclusively`), así que el proxy no la cuenta dos veces.
+  `SyncCoordinator.runWeeklyChain()` llama a `runFull` sobre los beans inyectados (proxies), dentro
+  de `lock.runExclusively`, y omite Football-Data si `footballDataProperties.hasToken()` es falso.
+- Excepciones: `InvalidCredentialsException` extiende `UnauthorizedException`;
+  `RecalculationInProgressException`, `RecalculationBlockedBySyncException` y
+  `SyncInProgressException` extienden `ConflictException`; `SyncDisabledException` extiende
+  `ServiceUnavailableException`. Las diez excepciones de `modelo/market/exception/` extienden
+  `ConflictException`, `NotFoundException` o `ForbiddenException` de `shared/`, salvo
+  `MarketInvariantException`, que extiende `RuntimeException`. Como los pointcuts de órdenes y de
+  recálculo son distintos, que las de recálculo también sean `ConflictException` no mezcla las
+  clasificaciones.
+- `RecalculationReport.wasInterrupted()`, `OrderStatus.isOpen()` (`PENDING`, `PARTIAL`),
+  `MarketOrderSQL.status` como `String`, `AppUserSQLDAO extends JpaRepository<AppUserSQL, Long>`,
+  `LastFullSyncRepository.find(SyncSource)`, `FootballDataProperties.hasToken()`,
+  `SyncProperties.catchUpAfter()` (componente de record, `@NotNull` y positivo), el bean `Clock`
+  (`Clock.systemUTC()`) de `config/ApplicationConfig`, `CatchUpPolicy.isUpToDate` privado (con
+  `<= maxAge`, así que el borde exacto cuenta como al día), `INVALID_PARAMETERS` y
+  `handleUnexpected` en `shared/GlobalExceptionHandler`, y `BEARER_AUTH`/`API_KEY_AUTH` públicos
+  en `config/OpenApiConfig`: todos existen como los nombra el diseño.
+- `e2e/AdminAccountIT` da de alta el `ADMIN` con `@DynamicPropertySource`
+  (`futbolmarket.auth.admin.username/email/password`) y una base H2 propia
+  (`spring.datasource.url` = `jdbc:h2:mem:admin-e2e-<sufijo>`).
