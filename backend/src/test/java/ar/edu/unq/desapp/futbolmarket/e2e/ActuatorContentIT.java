@@ -3,6 +3,7 @@ package ar.edu.unq.desapp.futbolmarket.e2e;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.LongStream;
 
@@ -23,6 +24,8 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
 import ar.edu.unq.desapp.futbolmarket.e2e.AuthTestHelper.TestUser;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Lo que publica {@code /actuator/prometheus} de punta a punta (US1): el formato de exposición, la
@@ -72,6 +75,19 @@ class ActuatorContentIT {
             "process_cpu_usage",
             "process_uptime_seconds",
             "hikaricp_connections_active");
+
+    /** Cuántas series publica cada métrica propia desde el arranque (data-model §2 de la 012). */
+    private static final Map<String, Integer> OWN_SERIES = Map.of(
+            "futbolmarket_market_orders_total{", 6,
+            "futbolmarket_quotes_recalculation_seconds_count{", 9,
+            "futbolmarket_sync_seconds_count{", 12,
+            "futbolmarket_auth_logins_total{", 2,
+            "futbolmarket_auth_registrations_total{", 1,
+            "futbolmarket_users_registered{", 1,
+            "futbolmarket_market_orders_open{", 1);
+    private static final String ORDERS_METRIC_PATH = "/actuator/metrics/futbolmarket.market.orders";
+    private static final String ORDERS_DESCRIPTION = "Órdenes de compra, venta y cancelación pedidas por usuarios, "
+            + "aceptadas o rechazadas por el mercado.";
 
     @DynamicPropertySource
     static void adminConfiguration(DynamicPropertyRegistry registry) {
@@ -158,6 +174,26 @@ class ActuatorContentIT {
 
         assertThat(output.getOut().lines().filter(line -> line.contains(AUDIT_MARK)))
                 .noneMatch(line -> line.contains(ACTUATOR_PREFIX));
+    }
+
+    @Test
+    void recienLevantadoFiguranLasTreintaSeriesPropiasYLosDosGauges() throws Exception {
+        List<String> samples = sampleLines();
+
+        assertThat(OWN_SERIES).allSatisfy((prefix, series) ->
+                assertThat(samples.stream().filter(line -> line.startsWith(prefix))).hasSize(series));
+    }
+
+    @Test
+    void elDetalleDeUnaMetricaPropiaTraeSuDescripcionYSusEtiquetas() throws Exception {
+        MvcTestResult result = mvc.get().uri(ORDERS_METRIC_PATH)
+                .header(AUTHORIZATION_HEADER, BEARER_PREFIX + adminToken).exchange();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        JsonNode body = JsonMapper.builder().build().readTree(result.getResponse().getContentAsString());
+        assertThat(body.get("description").asString()).isEqualTo(ORDERS_DESCRIPTION);
+        assertThat(body.get("availableTags").valueStream().map(tag -> tag.get("tag").asString()))
+                .contains("operation", "result");
     }
 
     // --- apoyo ---

@@ -29,6 +29,14 @@ public record SyncReport(SyncType type, SyncOrigin origin, Instant startedAt, In
     }
 
     /**
+     * La corrida terminó sin ligas fallidas. Es el mismo criterio que decide la última completa
+     * exitosa y el resultado que publican las métricas de sincronización.
+     */
+    public boolean succeeded() {
+        return failedLeagues().isEmpty();
+    }
+
+    /**
      * Por qué no se inactivó a nadie, o vacío si se aplicó la inactivación. La decisión queda en el
      * modelo y el registro solo la escribe (Principio II).
      */
@@ -47,7 +55,7 @@ public record SyncReport(SyncType type, SyncOrigin origin, Instant startedAt, In
      * (FR-047). Una de una sola liga nunca cuenta.
      */
     public Optional<LastFullSync> lastFullSync() {
-        if (type != SyncType.FULL || !failedLeagues().isEmpty()) {
+        if (type != SyncType.FULL || !succeeded()) {
             return Optional.empty();
         }
         return Optional.of(new LastFullSync(SyncSource.FOOTBALL_DATA, finishedAt));
