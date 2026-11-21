@@ -78,7 +78,8 @@ cada 15 s y manda `X-API-Key` leído de `admin-api-key`, ruta relativa al direct
 <ruta-a-prometheus>/prometheus --config.file=monitoring/prometheus.yml --storage.tsdb.path=monitoring/data
 ```
 
-`monitoring/data/` también está ignorado. Si tu versión no resolviera `files` relativo al archivo
+`monitoring/data/` también está ignorado. Verificado con Prometheus 3.16.0 (T011, 2026-11-21): lanzado
+desde la raíz del repo, `files` se resuelve relativo a `monitoring/` y el target queda UP. Si tu versión no resolviera `files` relativo al archivo
 de configuración (el target queda DOWN con un error de lectura del archivo), cambiá la entrada por
 la ruta absoluta en tu copia local, sin commitearla.
 
@@ -97,7 +98,7 @@ Generar algo de tráfico antes, por ejemplo `curl -s localhost:8080/players/1` y
 | `sum by (uri) (rate(http_server_requests_seconds_count[1m]))` | requests por segundo por ruta |
 | `histogram_quantile(0.95, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket[5m])))` | p95 por ruta y método |
 | `histogram_quantile(0.99, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket[5m])))` | p99 por ruta y método |
-| `count({application!="futbol-market", job="futbol-market"})` | vacío: todas las series llevan la etiqueta (SC-002) |
+| `count({application!="futbol-market", job="futbol-market", __name__!~"up\|scrape_.*"})` | vacío: todas las series del backend llevan la etiqueta (SC-002). Se excluyen `up` y `scrape_*`, que las agrega Prometheus a cada target y no vienen del backend |
 | `jvm_memory_used_bytes{area="heap"}`, `process_cpu_usage`, `hikaricp_connections_active` | métricas técnicas (FR-005) |
 | `futbolmarket_market_orders_total` | 6 series (`operation` × `result`), desde el arranque |
 | `futbolmarket_auth_logins_total`, `futbolmarket_auth_registrations_total` | 2 y 1 series |

@@ -1,0 +1,25 @@
+# Ejemplo de configuración de un Prometheus local para recolectar las métricas del backend.
+#
+# - Requiere Prometheus 2.55.0 o posterior: http_headers dentro de scrape_configs aparece en esa
+#   versión (cualquier 3.x también sirve).
+# - El endpoint /actuator/prometheus es solo para ADMIN. La clave de API de un ADMIN va en el
+#   archivo monitoring/admin-api-key, en una sola línea. Ese archivo está ignorado por git: este
+#   ejemplo no contiene ninguna clave, solo nombra el archivo.
+# - La ruta de "files" es relativa al directorio de este archivo, así que funciona sin importar
+#   desde dónde se lance el binario.
+# - Cómo correrlo, desde la raíz del repositorio y con el backend levantado en el puerto 8080:
+#     prometheus --config.file=monitoring/prometheus.yml --storage.tsdb.path=monitoring/data
+#   (monitoring/data también está ignorado por git). Después, http://localhost:9090/targets.
+
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: futbol-market
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["localhost:8080"]
+    # La clave viaja en el header X-API-Key, el mismo que acepta el backend.
+    http_headers:
+      X-API-Key:
+        files: ["admin-api-key"]
