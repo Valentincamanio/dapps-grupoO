@@ -12,10 +12,35 @@ server:
   port: 8080
 
 management:
+  # Lista explícita de los endpoints expuestos por web: los que no figuran (env, beans, heapdump, ...)
+  # no tienen handler. No se usa "*" con exclude para que un endpoint nuevo de Boot no quede expuesto solo.
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus,loggers
+  # La raíz de salud muestra solo el estado; componentes y detalles, según el rol (detalles solo para ADMIN).
+  endpoint:
+    health:
+      show-components: when-authorized
+      show-details: when-authorized
+      roles: ADMIN
+  # env apagado a propósito para no publicar variables de entorno; java prendido para ver versión y JVM.
+  info:
+    env:
+      enabled: false
+    java:
+      enabled: true
+  # Toda serie lleva la etiqueta application; el histograma de buckets es solo para los requests HTTP.
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        "[http.server.requests]": true
+
+# Muestra los endpoints de Actuator en Swagger (grupo de monitoreo).
+springdoc:
+  show-actuator: true
 
 futbolmarket:
   auth:

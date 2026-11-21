@@ -85,6 +85,12 @@ public class SecurityConfig {
      * ({@code POST /orders/**}) son de {@code USER}: el administrador recibe 403 antes del controller
      * y un visitante, 401. La auditoría ({@code /audit/**}) es de {@code ADMIN}. Las cuentas
      * ({@code /users/**}) piden credencial, y quién ve cuál lo decide el modelo.</p>
+     *
+     * <p>Actuator (research D4 de la 012): la raíz, {@code metrics}, {@code prometheus} y
+     * {@code loggers} son de {@code ADMIN}; {@code health/**} e {@code info} piden credencial, y
+     * {@code GET /actuator/health} exacto sigue público por {@link #publicEndpoints()}. No hay una
+     * regla {@code /actuator/**} genérica: los endpoints no expuestos caen en
+     * {@code anyRequest().authenticated()} (401 a un visitante, 404 a un autenticado).</p>
      */
     @Bean
     public SecurityFilterChain apiFilterChain(HttpSecurity http, RequestMatcher publicEndpoints,
@@ -108,6 +114,11 @@ public class SecurityConfig {
                         .requestMatchers(pathPattern("/strategies/**")).hasRole(Role.ADMIN.name())
                         .requestMatchers(pathPattern(HttpMethod.POST, "/orders/**")).hasRole(Role.USER.name())
                         .requestMatchers(pathPattern("/audit/**")).hasRole(Role.ADMIN.name())
+                        .requestMatchers(pathPattern("/actuator")).hasRole(Role.ADMIN.name())
+                        .requestMatchers(pathPattern("/actuator/metrics/**")).hasRole(Role.ADMIN.name())
+                        .requestMatchers(pathPattern("/actuator/prometheus")).hasRole(Role.ADMIN.name())
+                        .requestMatchers(pathPattern("/actuator/loggers/**")).hasRole(Role.ADMIN.name())
+                        .requestMatchers(pathPattern("/actuator/health/**"), pathPattern("/actuator/info")).authenticated()
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(jsonAuthenticationEntryPoint)
