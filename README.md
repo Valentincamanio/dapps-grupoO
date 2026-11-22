@@ -243,6 +243,70 @@ No es la auditoría del mercado (`GET /audit`, de la 008): esa guarda en la base
 operación y cancelación para el administrador; esta es un registro técnico de cada request. El
 formato exacto está en [contracts/](specs/011-auditoria-web-services/contracts/web-service-audit-line.md).
 
+### Métricas y monitoreo
+
+El backend publica sus métricas en formato Prometheus en `GET /actuator/prometheus`. Todas las
+series llevan la etiqueta `application="futbol-market"`.
+
+- **Métricas técnicas**: JVM (memoria, hilos, GC), proceso (CPU, uptime), pool de conexiones
+  (`hikaricp_*`) y requests HTTP (`http_server_requests_seconds`, con histograma para p95 y p99). La
+  ruta va como plantilla (`uri="/players/{id}"`), nunca con el id concreto.
+- **Métricas del negocio**, siete, todas con el prefijo `futbolmarket`:
+
+| Métrica | Tipo | Etiquetas |
+|---|---|---|
+| `futbolmarket.market.orders` | contador | `operation` (`buy`, `sell`, `cancel`), `result` (`success`, `rejected`) |
+| `futbolmarket.market.orders.open` | gauge | — (órdenes `PENDING` o `PARTIAL` en la base) |
+| `futbolmarket.users.registered` | gauge | — (usuarios en la base) |
+| `futbolmarket.auth.logins` | contador | `result` (`success`, `failure`) |
+| `futbolmarket.auth.registrations` | contador | — |
+| `futbolmarket.quotes.recalculation` | timer | `trigger` (`manual`, `scheduled`, `startup`), `result` (`success`, `failure`, `blocked`) |
+| `futbolmarket.sync` | timer | `source` (`football_data`, `whoscored`), `type` (`full`, `single_league`), `result` (`success`, `failure`, `in_progress`) |
+
+Los contadores y timers existen en cero desde el arranque, con todas sus combinaciones. Medir nunca
+cambia la respuesta de un caso de uso. El catálogo completo está en
+[data-model.md](specs/012-metricas-monitoreo/data-model.md).
+
+Endpoints de Actuator y quién los usa (la matriz completa está en
+[contracts/](specs/012-metricas-monitoreo/contracts/actuator-access.md)):
+
+| Endpoint | Visitante | `USER` | `ADMIN` |
+|---|---|---|---|
+| `GET /actuator/health` | 200, solo el estado | 200, solo el estado | 200, solo el estado |
+| `GET /actuator/health/{componente}` | 401 | 200, solo el estado | 200, con detalles |
+| `GET /actuator/info` (build y Java) | 401 | 200 | 200 |
+| `/actuator`, `/actuator/metrics/**`, `/actuator/prometheus`, `/actuator/loggers/**` | 401 | 403 | 200 |
+| Cualquier otro (`env`, `beans`, `heapdump`, ...) | 401 | 404 | 404 |
+
+Sirven el token de sesión (`Authorization: Bearer`) y la clave de API (`X-API-Key`). Los
+componentes propios de la salud son `footballData` (si hay token configurado, sin llamar a la API)
+y `sync` (cuándo terminó la última sincronización completa de cada fuente y si está vencida): solo
+dan `UP` o `UNKNOWN`, así que nunca bajan la salud general. `POST /actuator/loggers/{nombre}` con
+`{"configuredLevel":"DEBUG"}` cambia el nivel de log sin reiniciar. En Swagger, el selector de
+arriba separa **API de negocio** y **Monitoreo**.
+
+**Prometheus local** (sin Docker): hace falta el binario oficial, versión **2.55.0 o posterior**.
+El ejemplo versionado es [monitoring/prometheus.yml](monitoring/prometheus.yml), que recolecta
+`localhost:8080` cada 15 s con la clave de API de un `ADMIN`. La clave va, sola y en una línea, en
+`monitoring/admin-api-key`, que git ignora (igual que `monitoring/data/`). Desde la raíz del repo:
+
+    <ruta-a-prometheus>/prometheus --config.file=monitoring/prometheus.yml --storage.tsdb.path=monitoring/data
+
+El target `futbol-market` figura UP en http://localhost:9090/targets. Consultas útiles:
+
+- `up{job="futbol-market"}`: `1` si el backend responde.
+- `sum by (uri) (rate(http_server_requests_seconds_count[1m]))`: requests por segundo por ruta.
+- `histogram_quantile(0.95, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket[5m])))`: p95 por ruta.
+- `increase(futbolmarket_market_orders_total{result="rejected"}[1h])`: órdenes rechazadas.
+- `increase(futbolmarket_auth_logins_total{result="failure"}[5m])`: logins fallidos.
+
+Si se emite una clave nueva para el `ADMIN`, el target pasa a DOWN hasta actualizar el archivo. El
+paso a paso está en [quickstart.md](specs/012-metricas-monitoreo/quickstart.md).
+
+No es ninguna de las dos auditorías: la del mercado guarda en la base cada operación para el
+administrador, y la de web services registra cada request; las métricas son agregados numéricos
+para ver el sistema en conjunto, y los requests a `/actuator` no se auditan.
+
 ### Base local con el dataset ficticio
 
 Si tu base local es de antes de Football-Data.org, tiene el dataset ficticio y tablas sin las

@@ -164,3 +164,6 @@ Después de los pasos anteriores, `backend/logs/web-service-audit.log` no tiene 
 Si se emite una clave nueva para el `ADMIN`, Prometheus empieza a recibir 401 y el target pasa a
 DOWN. Se actualiza `monitoring/admin-api-key`; si el target no vuelve a UP en el siguiente
 scrape, se reinicia Prometheus para que relea el archivo.
+
+Verificado con Prometheus 3.16.0 (T049, 2026-11-22): el target pasó a DOWN con `server returned
+HTTP status 401` y volvió a UP en el scrape siguiente a actualizar el archivo, sin reiniciar.

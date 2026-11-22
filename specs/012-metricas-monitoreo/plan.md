@@ -335,5 +335,7 @@ Sin violaciones de la constitución que justificar.
   es una línea del aspecto. **Confirmado** por Valentin el 2026-11-21 (T002): las dos se
   registran como `blocked`.
 - Que el compañero sepa que los tests que pidan `/actuator/prometheus` necesitan
-  `@AutoConfigureMetrics` (Boot 4 apaga la exportación en `@SpringBootTest`).
-- Que Prometheus local tiene que ser **2.55.0 o posterior** por `http_headers`.
+  `@AutoConfigureMetrics` (Boot 4 apaga la exportación en `@SpringBootTest`). Queda escrito en las
+  reglas de tasks.md y en el Javadoc de los IT de Actuator; el aviso va también en la descripción del PR (T051).
+- Que Prometheus local tiene que ser **2.55.0 o posterior** por `http_headers`. Queda escrito en el
+  README ("Métricas y monitoreo"), en quickstart.md §1 y en `monitoring/prometheus.yml`.
