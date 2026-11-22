@@ -47,6 +47,9 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // Spring cachea un contexto por cada configuración de @SpringBootTest; con los 512 MB por
+    // defecto de Gradle la suite completa se queda sin memoria (OutOfMemoryError).
+    maxHeapSize = '1g'
     finalizedBy tasks.named('jacocoTestReport')
     testLogging {
         events "passed", "skipped", "failed"

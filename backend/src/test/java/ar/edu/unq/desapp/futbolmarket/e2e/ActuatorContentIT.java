@@ -4,22 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.LongStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
@@ -31,20 +26,14 @@ import tools.jackson.databind.json.JsonMapper;
  * Lo que publica {@code /actuator/prometheus} de punta a punta (US1): el formato de exposición, la
  * etiqueta común {@code application}, el histograma HTTP con las rutas como plantilla y las
  * métricas técnicas. Lleva {@link AutoConfigureMetrics} porque sin ella Boot apaga la exportación
- * en los tests y el endpoint responde 404 (research D12). El {@code ADMIN} se da de alta con una H2
- * propia, igual que {@code AdminAccountIT}.
+ * en los tests y el endpoint responde 404 (research D12). El {@code ADMIN} y esa configuración
+ * vienen de {@link ActuatorITSupport}.
+ *
+ * <p>También cubre {@code /actuator/info} y que ningún endpoint expuesto, para ningún rol, devuelva
+ * un secreto (US3), entre ellos el token de Football-Data ficticio de {@link ActuatorITSupport}.</p>
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@AutoConfigureMetrics
-@ActiveProfiles("test")
 @ExtendWith(OutputCaptureExtension.class)
-class ActuatorContentIT {
-
-    private static final String SUFFIX = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-    private static final String ADMIN_USERNAME = "admin_" + SUFFIX;
-    private static final String ADMIN_EMAIL = "admin_" + SUFFIX + "@correo.com";
-    private static final String ADMIN_PASSWORD = "Admin_" + UUID.randomUUID();
+class ActuatorContentIT extends ActuatorITSupport {
 
     private static final String PROMETHEUS_PATH = "/actuator/prometheus";
     private static final String PLAYERS_PATH = "/players/";
@@ -89,16 +78,18 @@ class ActuatorContentIT {
     private static final String ORDERS_DESCRIPTION = "Órdenes de compra, venta y cancelación pedidas por usuarios, "
             + "aceptadas o rechazadas por el mercado.";
 
-    @DynamicPropertySource
-    static void adminConfiguration(DynamicPropertyRegistry registry) {
-        registry.add("futbolmarket.auth.admin.username", () -> ADMIN_USERNAME);
-        registry.add("futbolmarket.auth.admin.email", () -> ADMIN_EMAIL);
-        registry.add("futbolmarket.auth.admin.password", () -> ADMIN_PASSWORD);
-        registry.add("spring.datasource.url", () -> "jdbc:h2:mem:actuator-content-e2e-" + SUFFIX + ";DB_CLOSE_DELAY=-1");
-    }
+    private static final String INFO_PATH = "/actuator/info";
+    private static final String API_KEY_HEADER = "X-API-Key";
+    private static final List<String> BUILD_KEYS = List.of("name", "description", "version", "artifact", "group", "time");
+    private static final List<String> MONITORING_PATHS = List.of(
+            "/actuator/health", "/actuator/health/db", INFO_PATH, "/actuator/metrics", PROMETHEUS_PATH,
+            "/actuator/loggers");
 
     @Autowired
     private MockMvcTester mvc;
+
+    @Value("${futbolmarket.security.jwt.secret}")
+    private String jwtSecret;
 
     private String adminToken;
 
@@ -194,6 +185,41 @@ class ActuatorContentIT {
         assertThat(body.get("description").asString()).isEqualTo(ORDERS_DESCRIPTION);
         assertThat(body.get("availableTags").valueStream().map(tag -> tag.get("tag").asString()))
                 .contains("operation", "result");
+    }
+
+    @Test
+    void elInfoTraeElBuildYJavaSinVariablesDeEntorno() throws Exception {
+        TestUser user = new AuthTestHelper(mvc).registerUser();
+
+        MvcTestResult result = mvc.get().uri(INFO_PATH).header(API_KEY_HEADER, user.apiKey()).exchange();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value());
+        JsonNode body = JsonMapper.builder().build().readTree(result.getResponse().getContentAsString());
+        JsonNode build = body.get("build");
+        assertThat(BUILD_KEYS).allSatisfy(key -> assertThat(build.hasNonNull(key)).as(key).isTrue());
+        assertThat(build.get("name").asString()).isEqualTo("futbol-market");
+        assertThat(body.get("java").get("version").asString()).isNotBlank();
+        assertThat(body.has("env")).isFalse();
+    }
+
+    @Test
+    void ningunEndpointDeMonitoreoDevuelveUnSecretoParaNingunRol() throws Exception {
+        AuthTestHelper helper = new AuthTestHelper(mvc);
+        TestUser user = helper.registerUser();
+        String userToken = helper.login(user);
+        List<String> secrets = List.of(jwtSecret, user.apiKey(), userToken, adminToken, FAKE_FOOTBALL_DATA_TOKEN);
+
+        for (String path : MONITORING_PATHS) {
+            List<String> bodies = List.of(
+                    mvc.get().uri(path).exchange().getResponse().getContentAsString(),
+                    mvc.get().uri(path).header(API_KEY_HEADER, user.apiKey()).exchange().getResponse().getContentAsString(),
+                    mvc.get().uri(path).header(AUTHORIZATION_HEADER, BEARER_PREFIX + userToken).exchange()
+                            .getResponse().getContentAsString(),
+                    mvc.get().uri(path).header(AUTHORIZATION_HEADER, BEARER_PREFIX + adminToken).exchange()
+                            .getResponse().getContentAsString());
+            assertThat(bodies).as(path).allSatisfy(body ->
+                    assertThat(secrets).allSatisfy(secret -> assertThat(body).doesNotContain(secret)));
+        }
     }
 
     // --- apoyo ---

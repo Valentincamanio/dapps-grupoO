@@ -24,6 +24,10 @@ management:
       show-components: when-authorized
       show-details: when-authorized
       roles: ADMIN
+      # Boot 4 prende las probes de liveness y readiness por defecto, y con ellas la raíz pública
+      # publica "groups". Se apagan: la raíz muestra solo el estado y la feature no usa probes (FR-052).
+      probes:
+        enabled: false
   # env apagado a propósito para no publicar variables de entorno; java prendido para ver versión y JVM.
   info:
     env:
