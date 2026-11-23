@@ -1,6 +1,7 @@
 package ar.edu.unq.desapp.futbolmarket.persistence.repository.market;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +36,10 @@ import lombok.RequiredArgsConstructor;
 @Repository
 @RequiredArgsConstructor
 public class MarketOrderRepository {
-    private static final List<String> OPEN_STATUSES = List.of(OrderStatus.PENDING.name(), OrderStatus.PARTIAL.name());
+    private static final List<String> OPEN_STATUSES = Arrays.stream(OrderStatus.values())
+            .filter(OrderStatus::isOpen)
+            .map(OrderStatus::name)
+            .toList();
 
     private final MarketOrderSQLDAO orderDAO;
     private final AppUserSQLDAO appUserDAO;
@@ -123,6 +127,15 @@ public class MarketOrderRepository {
                 filter.playerId(), initial, PageRequest.of(page, size));
         return new QuotePage<>(rows.getContent().stream().map(this::toView).toList(), rows.getNumber(),
                 rows.getSize(), rows.getTotalElements());
+    }
+
+    /**
+     * Cuántas órdenes del mercado tienen tokens pendientes, de usuarios y del superusuario. Los
+     * estados abiertos los decide {@link OrderStatus#isOpen()} (research D7 de la 012).
+     */
+    @Transactional(readOnly = true)
+    public long countOpen() {
+        return orderDAO.countByStatusIn(OPEN_STATUSES);
     }
 
     /**

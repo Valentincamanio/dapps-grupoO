@@ -32,11 +32,19 @@ public record StatsSyncReport(SyncType type, SyncOrigin origin, Instant startedA
     }
 
     /**
+     * La corrida terminó sin corte. Es el mismo criterio que decide la última completa exitosa y el
+     * resultado que publican las métricas de sincronización.
+     */
+    public boolean succeeded() {
+        return cut == null;
+    }
+
+    /**
      * Solo una corrida completa y sin corte es la última completa exitosa de WhoScored (FR-047). Una
      * de una sola liga nunca cuenta.
      */
     public Optional<LastFullSync> lastFullSync() {
-        if (type != SyncType.FULL || cut != null) {
+        if (type != SyncType.FULL || !succeeded()) {
             return Optional.empty();
         }
         return Optional.of(new LastFullSync(SyncSource.WHOSCORED, finishedAt));
