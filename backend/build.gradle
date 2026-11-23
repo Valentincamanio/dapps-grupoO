@@ -24,6 +24,7 @@ dependencies {
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
 	implementation 'org.springframework.boot:spring-boot-h2console'
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'org.springframework.boot:spring-boot-starter-aspectj'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -32,11 +33,13 @@ dependencies {
 	runtimeOnly 'com.h2database:h2'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'com.tngtech.archunit:archunit:1.5.1'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
@@ -44,6 +47,9 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // Spring cachea un contexto por cada configuración de @SpringBootTest; con los 512 MB por
+    // defecto de Gradle la suite completa se queda sin memoria (OutOfMemoryError).
+    maxHeapSize = '1g'
     finalizedBy tasks.named('jacocoTestReport')
     testLogging {
         events "passed", "skipped", "failed"
@@ -85,4 +91,12 @@ tasks.register('exportStatsSnapshot', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'ar.edu.unq.desapp.futbolmarket.StatsSnapshotExport'
     workingDir = projectDir
+}
+
+springBoot {
+    buildInfo {
+        properties {
+            additional = [description: 'Mercado simulado de valoración de jugadores de fútbol.']
+        }
+    }
 }

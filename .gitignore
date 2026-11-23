@@ -30,3 +30,11 @@ Thumbs.db
 
 # Env
 .env*
+
+# Auditoría de web services: archivo y rotados
+backend/logs/
+
+# Prometheus local: la clave de API del ADMIN que usa para recolectar (nunca se versiona)
+# y el almacenamiento local de sus series
+monitoring/admin-api-key
+monitoring/data/

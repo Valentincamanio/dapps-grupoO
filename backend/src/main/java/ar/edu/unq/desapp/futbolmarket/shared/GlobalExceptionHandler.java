@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
@@ -81,6 +82,20 @@ public class GlobalExceptionHandler {
             IllegalArgumentException.class
     })
     public ResponseEntity<ApiError> handleBadRequest(HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, INVALID_PARAMETERS, request, null);
+    }
+
+    /**
+     * En Spring MVC solo Actuator lanza {@link ResponseStatusException}, por ejemplo con un nivel de
+     * log inválido en {@code POST /actuator/loggers/{nombre}}. El 400 responde el formato común con
+     * un mensaje fijo, nunca el {@code reason} interno de Boot; cualquier otro status se relanza,
+     * como antes, para que Spring MVC lo traduzca.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiError> handleResponseStatus(ResponseStatusException exception, HttpServletRequest request) {
+        if (!exception.getStatusCode().isSameCodeAs(HttpStatus.BAD_REQUEST)) {
+            throw exception;
+        }
         return response(HttpStatus.BAD_REQUEST, INVALID_PARAMETERS, request, null);
     }
 

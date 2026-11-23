@@ -160,4 +160,10 @@ public interface MarketOrderSQLDAO extends JpaRepository<MarketOrderSQL, Long> {
                                     @Param("league") League league, @Param("team") String team,
                                     @Param("playerId") Long playerId, @Param("initial") Boolean initial,
                                     Pageable pageable);
+
+    /**
+     * Cuántas órdenes hay en alguno de esos estados, de cualquier dueño: el gauge de órdenes abiertas
+     * (research D7 de la 012). Usa el índice {@code ix_market_orders_status_created}.
+     */
+    long countByStatusIn(Collection<String> statuses);
 }

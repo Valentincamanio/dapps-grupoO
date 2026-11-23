@@ -212,6 +212,101 @@ En PowerShell: `$env:MARKET_BENCHMARK = 'true'; ./gradlew test --tests '*MarketV
 El contrato está en [contracts/](specs/008-mercado-tokens-portfolio/contracts/), y la validación de
 punta a punta, en [quickstart.md](specs/008-mercado-tokens-portfolio/quickstart.md).
 
+### Auditoría de web services
+
+Cada invocación a un endpoint propio del backend deja **una línea** con seis datos: el momento en
+que terminó, el usuario, la operación, los parámetros, cuánto tardó y cómo terminó. Por ejemplo
+(en una sola línea):
+
+    2026-11-12T10:16:40.007-03:00 | INFO | user=42(USER,JWT) | op=PortfolioController.getPortfolio GET /users/42/portfolio | params={"id":42,"date":null} | time=12ms | result=OK
+
+- **Usuario**: `<id>(<ROL>,<CREDENCIAL>)`, con `JWT` o `API_KEY` según cómo se autenticó, o
+  `anonymous` en las rutas públicas y sin credencial.
+- **Parámetros**: los de ruta, los de query y el cuerpo, en JSON y con su nombre. Las contraseñas,
+  los tokens, las claves de API y cualquier campo que se llame así (`password`, `token`, `apikey`,
+  `secret`) van como `***`. La identidad va solo en `user`, y el cuerpo de la respuesta no se
+  registra. Un valor de más de 500 caracteres y un total de más de 2000 se cortan con
+  `...(truncado)`.
+- **Resultado**: `OK`, o `ERROR(<Excepción>)` con el tipo y sin el mensaje. Siempre en `INFO`: la
+  auditoría registra eventos, y la respuesta al cliente no cambia.
+
+Las líneas van a la consola y a `backend/logs/web-service-audit.log` (con `./gradlew bootRun`), que
+rota por día y a los 10 MB, guarda 30 días con un tope de 1 GB en total y no se versiona. En los
+tests van solo a la consola. No se mezclan con el log general y siguen escribiéndose aunque se suba
+su nivel (`logging.level.root=WARN`); para apagarlas, `logging.level.WEB_SERVICE_AUDIT=OFF`.
+
+**Qué no se audita**: los 401 y 403 del filtro de seguridad, los 400 que se rechazan antes de
+llegar al endpoint (cuerpo ilegible, cuerpo inválido, parámetro faltante o de otro tipo), las rutas
+sin endpoint, el actuator, Swagger, la consola de H2 y los procesos programados.
+
+No es la auditoría del mercado (`GET /audit`, de la 008): esa guarda en la base cada orden,
+operación y cancelación para el administrador; esta es un registro técnico de cada request. El
+formato exacto está en [contracts/](specs/011-auditoria-web-services/contracts/web-service-audit-line.md).
+
+### Métricas y monitoreo
+
+El backend publica sus métricas en formato Prometheus en `GET /actuator/prometheus`. Todas las
+series llevan la etiqueta `application="futbol-market"`.
+
+- **Métricas técnicas**: JVM (memoria, hilos, GC), proceso (CPU, uptime), pool de conexiones
+  (`hikaricp_*`) y requests HTTP (`http_server_requests_seconds`, con histograma para p95 y p99). La
+  ruta va como plantilla (`uri="/players/{id}"`), nunca con el id concreto.
+- **Métricas del negocio**, siete, todas con el prefijo `futbolmarket`:
+
+| Métrica | Tipo | Etiquetas |
+|---|---|---|
+| `futbolmarket.market.orders` | contador | `operation` (`buy`, `sell`, `cancel`), `result` (`success`, `rejected`) |
+| `futbolmarket.market.orders.open` | gauge | — (órdenes `PENDING` o `PARTIAL` en la base) |
+| `futbolmarket.users.registered` | gauge | — (usuarios en la base) |
+| `futbolmarket.auth.logins` | contador | `result` (`success`, `failure`) |
+| `futbolmarket.auth.registrations` | contador | — |
+| `futbolmarket.quotes.recalculation` | timer | `trigger` (`manual`, `scheduled`, `startup`), `result` (`success`, `failure`, `blocked`) |
+| `futbolmarket.sync` | timer | `source` (`football_data`, `whoscored`), `type` (`full`, `single_league`), `result` (`success`, `failure`, `in_progress`) |
+
+Los contadores y timers existen en cero desde el arranque, con todas sus combinaciones. Medir nunca
+cambia la respuesta de un caso de uso. El catálogo completo está en
+[data-model.md](specs/012-metricas-monitoreo/data-model.md).
+
+Endpoints de Actuator y quién los usa (la matriz completa está en
+[contracts/](specs/012-metricas-monitoreo/contracts/actuator-access.md)):
+
+| Endpoint | Visitante | `USER` | `ADMIN` |
+|---|---|---|---|
+| `GET /actuator/health` | 200, solo el estado | 200, solo el estado | 200, solo el estado |
+| `GET /actuator/health/{componente}` | 401 | 200, solo el estado | 200, con detalles |
+| `GET /actuator/info` (build y Java) | 401 | 200 | 200 |
+| `/actuator`, `/actuator/metrics/**`, `/actuator/prometheus`, `/actuator/loggers/**` | 401 | 403 | 200 |
+| Cualquier otro (`env`, `beans`, `heapdump`, ...) | 401 | 404 | 404 |
+
+Sirven el token de sesión (`Authorization: Bearer`) y la clave de API (`X-API-Key`). Los
+componentes propios de la salud son `footballData` (si hay token configurado, sin llamar a la API)
+y `sync` (cuándo terminó la última sincronización completa de cada fuente y si está vencida): solo
+dan `UP` o `UNKNOWN`, así que nunca bajan la salud general. `POST /actuator/loggers/{nombre}` con
+`{"configuredLevel":"DEBUG"}` cambia el nivel de log sin reiniciar. En Swagger, el selector de
+arriba separa **API de negocio** y **Monitoreo**.
+
+**Prometheus local** (sin Docker): hace falta el binario oficial, versión **2.55.0 o posterior**.
+El ejemplo versionado es [monitoring/prometheus.yml](monitoring/prometheus.yml), que recolecta
+`localhost:8080` cada 15 s con la clave de API de un `ADMIN`. La clave va, sola y en una línea, en
+`monitoring/admin-api-key`, que git ignora (igual que `monitoring/data/`). Desde la raíz del repo:
+
+    <ruta-a-prometheus>/prometheus --config.file=monitoring/prometheus.yml --storage.tsdb.path=monitoring/data
+
+El target `futbol-market` figura UP en http://localhost:9090/targets. Consultas útiles:
+
+- `up{job="futbol-market"}`: `1` si el backend responde.
+- `sum by (uri) (rate(http_server_requests_seconds_count[1m]))`: requests por segundo por ruta.
+- `histogram_quantile(0.95, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket[5m])))`: p95 por ruta.
+- `increase(futbolmarket_market_orders_total{result="rejected"}[1h])`: órdenes rechazadas.
+- `increase(futbolmarket_auth_logins_total{result="failure"}[5m])`: logins fallidos.
+
+Si se emite una clave nueva para el `ADMIN`, el target pasa a DOWN hasta actualizar el archivo. El
+paso a paso está en [quickstart.md](specs/012-metricas-monitoreo/quickstart.md).
+
+No es ninguna de las dos auditorías: la del mercado guarda en la base cada operación para el
+administrador, y la de web services registra cada request; las métricas son agregados numéricos
+para ver el sistema en conjunto, y los requests a `/actuator` no se auditan.
+
 ### Base local con el dataset ficticio
 
 Si tu base local es de antes de Football-Data.org, tiene el dataset ficticio y tablas sin las
@@ -241,6 +336,102 @@ La app queda en http://localhost:5173. Más detalle en [frontend/README.md](fron
 
 La suite no necesita token ni conexión a internet: nunca llama a la API de Football-Data.org
 ni consulta WhoScored.
+
+## Tests de arquitectura
+
+Son tests comunes, del backend (JUnit con ArchUnit) y del frontend (Vitest), que leen el código
+y verifican que respete la arquitectura de [la constitución](.specify/memory/constitution.md):
+qué capa o carpeta puede usar a cuál, dónde vive cada cosa y qué no se usa nunca. Corren solos
+en cada `./gradlew build` y cada `npm test`, en local y en el CI, sin Spring, sin base y sin red.
+Fallan cuando un cambio rompe una regla, aunque compile y todos los demás tests pasen.
+
+**Ante un fallo se corrige el código, no la regla.** Si la regla parece equivocada para ese caso,
+se frena y se consulta al equipo: no se agregan excepciones por clase o archivo, no se congela la
+violación (`FreezingArchRule`, `archunit.properties`) y no se desactiva ninguna parte de la regla.
+
+### Cómo se corren
+
+| Qué | Dónde | Comando |
+|---|---|---|
+| Solo las reglas del backend | `backend/` | `./gradlew test --tests "ar.edu.unq.desapp.futbolmarket.architecture.*"` |
+| Solo las reglas del frontend | `frontend/` | `npx vitest run tests/architecture.test.ts` |
+| Todo, como en el CI | `backend/` y `frontend/` | `./gradlew build` y `npm test` |
+
+Los nombres de los tests (en español) dicen qué regla verifican. En el backend, cada regla es un
+test de un `*RulesTest` (contra el código real) y uno o más de
+`ArchitectureRulesDetectViolationsTest` (contra clases que la rompen a propósito, en
+`ar.edu.unq.desapp.archfixture`). En el frontend, cada regla tiene un `it` en "código real" y al
+menos uno en "casos borde".
+
+### Reglas del backend (20)
+
+Paquetes relativos a `ar.edu.unq.desapp.futbolmarket`. "Depender" incluye campo, parámetro,
+retorno, argumento genérico, anotación, herencia, llamada y acceso.
+
+| Id | Nombre | Qué verifica | Por qué |
+|---|---|---|---|
+| B1 | Dirección de capas | Nadie fuera de `controller` depende de `controller`, y nadie fuera de `security` depende de `security`. De `service` solo dependen `controller`, `security` y el paquete raíz. De `persistence` y de `adapter`, solo `service`. Vale también para `modelo`, `config` y `shared` | Principio I: el controller solo habla con el servicio, el servicio con la persistencia y el adapter, y ninguna capa se saltea |
+| B2 | Modelo puro | `modelo` depende solo de la JDK, de `modelo`, de Lombok y de las excepciones base de `shared` | Principio I: el modelo no lleva anotaciones de persistencia ni conoce Spring ni otras capas |
+| B3.1 | JPA solo en persistence/sql | Fuera de `persistence.sql` nadie depende de `jakarta.persistence`, Hibernate ni Spring Data JPA (la paginación de Spring Data no cuenta) | Principio I: las anotaciones y la API de JPA viven únicamente en las clases \*SQL y en sus SQLDAO |
+| B3.2 | Entidades \*SQL | Toda `@Entity` o `@Embeddable` vive en `persistence.sql.entity` y termina en `SQL` | Principio I: cada clase de modelo tiene su contraparte \*SQL en persistence/sql/entity |
+| B3.3 | SQLDAO | Todo lo que extiende `JpaRepository`, vive en `persistence.sql.interfaces` o termina en `SQLDAO` es una interfaz de `persistence.sql.interfaces`, termina en `SQLDAO` y extiende `JpaRepository` | Principio I: los \*SQLDAO son interfaces de persistence/sql/interfaces que extienden JpaRepository |
+| B3.4 | SQLDAO y mappers solo desde repository | Los SQLDAO se usan solo desde `persistence.repository`; los mappers, desde `persistence.repository` y otros mappers | Principio I: repository es el único punto donde conviven modelo y persistencia, y es quien invoca al SQLDAO y al mapper |
+| B3.5 | Sin queries nativas | Ningún `@Query(nativeQuery = true)`, ningún `@NativeQuery`, ninguna llamada a `createNativeQuery` | Principio VI: solo derived queries y JPQL, nunca SQL nativo |
+| B3.6 | El servicio no conoce las entidades | `service` no depende de `persistence.sql.entity` | Principio I: el servicio recibe y devuelve modelo y no conoce JPA ni las clases \*SQL |
+| B4.1 | Controllers REST | Todo `@RestController` vive en `controller.<contexto>` y termina en `Controller` | Principio I: los controllers viven en controller/\<contexto>/ y se llaman \*Controller |
+| B4.2 | DTO del controller | Lo de `controller.<contexto>.dto` se usa solo desde `controller`; sus clases de primer nivel terminan en `Request` o `Response` (los tipos anidados no necesitan sufijo) | Principio I: los Request y Response viven en controller/\<contexto>/dto/ y nunca cruzan hacia el servicio |
+| B4.3 | Qué devuelve un endpoint | Ningún método público de un `@RestController` devuelve una clase de `modelo` ni de `persistence`, ni directa ni dentro de un genérico (en cualquier nivel) ni en un arreglo | Principio I: ninguna clase de modelo ni de persistencia sale en una respuesta HTTP; sale siempre un Response |
+| B5.1 | DTO del proveedor | Lo de `adapter.<proveedor>.dto` se usa solo desde `adapter` | Principio I: los DTO del proveedor viven en adapter/\<proveedor>/dto/ y nunca salen del adapter |
+| B5.2 | Adapter independiente | `adapter` no depende de `service`, `controller` ni `persistence` | Principio I: el adapter recibe y devuelve modelo; no conoce el servicio, el controller ni la persistencia |
+| B5.3 | Clientes HTTP | Solo `adapter` y `config` usan clientes HTTP: `RestClient` y compañía (`org.springframework.web.client`), `WebClient`, `org.springframework.http.client` y `java.net.http` | Principio I: el servicio habla con una API externa solo a través de su adapter y nunca usa un cliente HTTP |
+| B6 | Servicios sin ciclos | Los contextos de `service` no forman ciclos | Principio I (reglas de monolito): un servicio puede depender de otro solo si no se forma un ciclo |
+| B7.1 | Sin salida estándar | Nadie usa `System.out`, `System.err` ni `printStackTrace()` | Principio V: nada de System.out; el logging va con SLF4J |
+| B7.2 | Sin excepciones genéricas | Nadie crea `Exception`, `RuntimeException`, `Throwable` ni `Error` (las subclases propias sí) | Principio III: las excepciones son propias y con nombre; prohibido throw new RuntimeException(...) |
+| B7.3 | Sin java.util.logging | Nadie usa `java.util.logging` | Principio V: el logging va con SLF4J |
+| B7.4 | Sin inyección por campo | Ningún campo con `@Autowired`, `@Value`, `@Inject` ni `@Resource` | Principio V: inyección por constructor, nunca @Autowired sobre el campo |
+| B7.5 | Un solo manejador de excepciones | Hay exactamente un `@RestControllerAdvice` (o `@ControllerAdvice`) y vive en `shared` | Principio III: un único @RestControllerAdvice en shared/ centraliza el manejo de errores |
+
+### Reglas del frontend (13)
+
+Rutas relativas a `frontend/`. "Usar" una carpeta es importar cualquier archivo de ella, aunque
+traiga solo tipos. El porqué de todas sale de la sección Frontend de la constitución.
+
+| Id | Nombre | Qué verifica | Por qué |
+|---|---|---|---|
+| F1 | Componentes sin API ni router | `src/components/` usa solo `components/`, `types/`, `utils/` y el paquete `react` | los componentes reciben datos y callbacks por props; no conocen la API, el router, los hooks ni los contextos |
+| F2 | utils puro | `src/utils/` usa solo `utils/` y `types/`, sin paquetes | utils son funciones puras: no usan React, otros paquetes ni services |
+| F3 | types | `src/types/` usa solo `types/` | types tiene solo los tipos de la API y del dominio del front |
+| F4 | services | `src/services/` usa solo `services/` y `types/`, sin paquetes | services es el cliente HTTP y una función por endpoint; no conoce React ni la interfaz |
+| F5 | hooks y context | `src/hooks/` y `src/context/` no usan `components/`, `pages/` ni `router/` | la lógica con estado vive en hooks y context, que no conocen los componentes, las pantallas ni las rutas |
+| F6.1 | Quién usa pages | Fuera de `router/` y `pages/` nadie usa `pages/` | hay una pantalla por ruta: las pantallas las usa el router |
+| F6.2 | Quién usa router | Fuera de `main.tsx` y `router/` nadie usa `router/` | la definición de rutas la usa solo main.tsx |
+| F7 | Red y almacenamiento | Fuera de `services/` nadie usa `fetch`, `sessionStorage` ni `localStorage`, tampoco por `window`, `globalThis` o `self` | los componentes y las páginas nunca llaman a fetch directo, y la sesión se guarda solo desde services |
+| F8.1 | Paquetes permitidos | `src/` importa solo `react`, `react-dom` y `react-router`, y sus subrutas | sin frameworks de UI ni paquetes fuera del stack |
+| F8.2 | Nada de afuera | `src/` no importa nada fuera de `src/` (ni de `mockups/`) | mockups son diseños de referencia y no se importan desde src |
+| F9 | Sin ciclos | Los imports entre archivos de `src/` no forman ciclos | un ciclo ata dos archivos que tienen que poder entenderse y probarse por separado |
+| F10.1 | Tests fuera de src | `src/` no tiene archivos `.test.*` ni `.spec.*` | los tests viven solo en frontend/tests/, nunca junto al código |
+| F10.2 | Correspondencia de tests | Cada test de `tests/components/`, `tests/hooks/`, `tests/services/` y `tests/utils/` tiene un archivo de `src/` con el mismo nombre base en la carpeta del mismo nombre | tests/ replica la estructura de src/: el test de src/\<carpeta>/X.tsx está en tests/\<carpeta>/X.test.tsx |
+
+### Cómo leer un fallo
+
+1. **El identificador** (`[B1]`, `[F7]`) dice qué regla se rompió; se busca en las tablas de
+   arriba.
+2. **El porqué** cita el principio o la sección de la constitución que origina la regla.
+3. **Los infractores**:
+   - Backend: debajo de `Infractores (n):`, una línea por violación con la clase, el método o
+     el campo, el tipo del que depende y el archivo con su línea. Está en inglés (es la
+     redacción de ArchUnit), salvo B4.3 y B7.5, que escriben en español. B6 muestra el ciclo
+     entre contextos y las dependencias que lo forman.
+   - Frontend: una línea por violación con el archivo y el import, paquete o identificador que
+     la rompe. F9 muestra el ciclo completo.
+
+Por ejemplo:
+
+    [B1] Dirección de capas, porque Principio I: el controller solo habla con el servicio, el servicio con la persistencia y el adapter, y ninguna capa se saltea
+    Infractores (1):
+    - Constructor <...RepositoryAwareController.<init>(...SampleRepository)> has parameter of type <...SampleRepository> in (RepositoryAwareController.java:0)
+
+    [F1] src/components/TopBar.tsx usa react-router: los componentes reciben datos y callbacks por props; no conocen la API, el router, los hooks ni los contextos (Constitución, sección Frontend)
 
 ## Estructura
 

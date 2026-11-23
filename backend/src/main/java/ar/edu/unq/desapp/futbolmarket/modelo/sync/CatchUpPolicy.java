@@ -37,6 +37,18 @@ public record CatchUpPolicy(Duration maxAge) {
         return CatchUp.NONE;
     }
 
+    /**
+     * Qué tan reciente es la última completa de una fuente, con la misma regla que usa
+     * {@link #decide}: sin ninguna, {@link SyncFreshness#NEVER}; con exactamente {@code maxAge},
+     * todavía al día.
+     */
+    public SyncFreshness freshness(Optional<LastFullSync> lastFullSync, Instant now) {
+        if (lastFullSync.isEmpty()) {
+            return SyncFreshness.NEVER;
+        }
+        return isUpToDate(lastFullSync, now) ? SyncFreshness.UP_TO_DATE : SyncFreshness.STALE;
+    }
+
     private boolean isUpToDate(Optional<LastFullSync> lastFullSync, Instant now) {
         return lastFullSync
                 .map(last -> Duration.between(last.finishedAt(), now).compareTo(maxAge) <= 0)

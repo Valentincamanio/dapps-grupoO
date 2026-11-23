@@ -96,6 +96,14 @@ public class AppUserRepository {
     }
 
     /**
+     * Cuántas cuentas hay registradas, incluida la del administrador: el gauge de usuarios
+     * registrados (research D7 de la 012).
+     */
+    public long count() {
+        return appUserSQLDAO.count();
+    }
+
+    /**
      * El superusuario del mercado: la primera cuenta {@code ADMIN}, la del alta de arranque. No se
      * busca por el nombre configurado porque, si la configuración cambia, la cuenta original sigue
      * siendo la dueña de las órdenes iniciales (research D7 de la 008).
