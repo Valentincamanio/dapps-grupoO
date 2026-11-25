@@ -82,3 +82,13 @@ futbolmarket:
   market:
     initial-orders:
       automatic: true
+  # Cachés de cotizaciones (Assumptions de la spec y research R5 de la 013): tope de entradas y
+  # vencimiento de seguridad de cada uno. El vaciado después de cada cambio no cambia; el
+  # vencimiento es solo una red. Un valor ausente, cero o negativo impide arrancar.
+  cache:
+    ranking:
+      maximum-size: 500
+      expire-after-write: 10m
+    current:
+      maximum-size: 5000
+      expire-after-write: 10m

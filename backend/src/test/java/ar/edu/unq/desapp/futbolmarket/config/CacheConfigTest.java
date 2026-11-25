@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.test.context.ActiveProfiles;
 
 import ar.edu.unq.desapp.futbolmarket.service.quote.QuoteCacheInvalidator;
@@ -29,7 +29,7 @@ class CacheConfigTest {
 
     @Test
     void elCacheManagerEsElNuestroConLosDosCachesDeCotizaciones() {
-        assertThat(cacheManager).isInstanceOf(ConcurrentMapCacheManager.class);
+        assertThat(cacheManager).isInstanceOf(CaffeineCacheManager.class);
         assertThat(cacheManager.getCacheNames())
                 .containsExactlyInAnyOrder(CacheConfig.QUOTES_CURRENT, CacheConfig.QUOTES_RANKING);
     }

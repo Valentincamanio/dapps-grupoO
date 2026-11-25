@@ -307,6 +307,87 @@ No es ninguna de las dos auditorías: la del mercado guarda en la base cada oper
 administrador, y la de web services registra cada request; las métricas son agregados numéricos
 para ver el sistema en conjunto, y los requests a `/actuator` no se auditan.
 
+**Caché del ranking y de la cotización actual**: los dos cachés (`quotes-ranking` y
+`quotes-current`) son de Caffeine, con un tope de entradas y un vencimiento de seguridad propios:
+
+| Propiedad | Por defecto | Qué es |
+|---|---|---|
+| `futbolmarket.cache.ranking.maximum-size` | `500` | Hojas del ranking guardadas como mucho (filtro, hoja y tamaño) |
+| `futbolmarket.cache.ranking.expire-after-write` | `10m` | Cuánto se sirve una hoja desde que se guardó |
+| `futbolmarket.cache.current.maximum-size` | `5000` | Cotizaciones actuales guardadas como mucho (una por jugador) |
+| `futbolmarket.cache.current.expire-after-write` | `10m` | Cuánto se sirve una cotización actual desde que se guardó |
+
+Un valor ausente, cero o negativo impide arrancar con un mensaje que nombra la propiedad. Los
+cachés se siguen vaciando enteros después de cada recálculo, recotización o cambio de la estrategia
+activa, y una consulta que estaba en curso durante el vaciado no deja guardado su resultado viejo;
+el vencimiento es solo una red por si falla una invalidación. Las estadísticas salen en
+`/actuator/prometheus` con la etiqueta `cache`: `cache_gets_total` (`result="hit"` o
+`"miss"`), `cache_evictions_total` (descartes por tope o vencimiento) y `cache_size`. El índice de
+aciertos del ranking:
+
+    sum(rate(cache_gets_total{cache="quotes-ranking",result="hit"}[5m])) / sum(rate(cache_gets_total{cache="quotes-ranking"}[5m]))
+
+**Métricas del mercado**: tres contadores más cuentan las operaciones ejecutadas, es decir, los
+cruces confirmados de una compra con una venta. Se registran solo cuando la compra o la venta
+terminó bien; una orden que queda pendiente suma cuando la cruza el pedido siguiente, y las
+cancelaciones y los rechazos no suman.
+
+| Métrica | En Prometheus | Suma por operación |
+|---|---|---|
+| `futbolmarket.market.trades` | `futbolmarket_market_trades_total` | 1 |
+| `futbolmarket.market.tokens.traded` | `futbolmarket_market_tokens_traded_total` | los tokens de la operación |
+| `futbolmarket.market.credits.traded` | `futbolmarket_market_credits_traded_total` | los créditos de la operación, con centavos |
+
+Las tres llevan una sola etiqueta, `counterparty`: `initial_order` si la venta vino de la orden
+inicial del superusuario y `user` si vino de un usuario. Son seis series, en cero desde el arranque.
+El contrato está en [contracts/metrics.md](specs/013-ranking-metricas-grafana/contracts/metrics.md).
+
+**Grafana local** (sin Docker): el zip oficial de Grafana OSS para Windows, versión **11.0 o
+posterior** (se probó con la 13.3.2), con el Prometheus de arriba (2.55.0 o posterior) corriendo.
+Se descomprime en cualquier carpeta, por ejemplo `C:grafana`. El data source, el dashboard y el
+script que los levanta están versionados en [monitoring/grafana/](monitoring/grafana/). Las carpetas
+`provisioning/plugins` y `provisioning/alerting` llevan un archivo que no configura nada: Grafana
+las lee siempre y, si faltan, deja un error en su log.
+
+1. Opcional: la contraseña del administrador de Grafana. Se copia el ejemplo y se completa
+   `admin_password`; el archivo `monitoring/grafana/admin-credentials` no se versiona (git lo
+   ignora, igual que `monitoring/grafana/data/`). Grafana la aplica solo la primera vez, cuando crea
+   su base: para cambiarla después hay que borrar `monitoring/grafana/data/` (el dashboard y el data
+   source vuelven a salir solos). Sin el archivo, se entra con `admin`/`admin` y Grafana pide
+   cambiarla.
+
+       Copy-Item monitoring/grafana/admin-credentials.example monitoring/grafana/admin-credentials
+
+2. Desde la raíz del repo (sin `-GrafanaHome` usa la variable `GRAFANA_HOME`):
+
+       powershell -ExecutionPolicy Bypass -File monitoring/grafana/start-grafana.ps1 -GrafanaHome C:grafana
+
+3. El dashboard queda en http://localhost:3000/d/futbol-market, en la carpeta `futbol-market`, sin
+   configurar nada a mano. Tiene tres filas: **Negocio** (operaciones, tokens y créditos, con su
+   total desde el arranque del backend y su evolución por contraparte, órdenes pedidas y órdenes
+   abiertas), **Ranking** (p95 de `/players/ranking` y
+   respuestas desde el caché) y **General** (pedidos por segundo y tasa de errores 4xx y 5xx, sin
+   contar `/actuator`). Si Prometheus no responde, los paneles muestran "No data".
+
+**Medición del ranking**: [monitoring/measure-ranking.ps1](monitoring/measure-ranking.ps1) hace 1000
+consultas iguales a `GET /players/ranking?page=0&size=20` y reporta los tiempos del cliente y, con
+la clave del `ADMIN`, los del servidor y los aciertos del caché. Resultados, con el mismo equipo y la
+misma base (detalle en
+[medicion-ranking.md](specs/013-ranking-metricas-grafana/medicion-ranking.md)):
+
+| Variante | Corridas | Promedio cliente | Promedio servidor | Aciertos |
+|---|---|---|---|---|
+| Caché anterior (`ConcurrentMapCacheManager`) | 2 | 9,67 ms | 2,90 ms | n/d |
+| Sin caché | 1 | 15,76 ms | 8,28 ms | n/d |
+| Caché nuevo (Caffeine) | 3 | 10,16 ms | 3,39 ms | 100 % |
+
+Con el caché nuevo, las consultas repetidas no van a la base (100 % de aciertos) y el tiempo medio
+del servidor baja de 8,28 ms a 3,39 ms: un factor de 2,44 y un ahorro de 4,9 ms por consulta. Lo
+que queda, unos 3,4 ms, es el costo fijo de cada pedido (seguridad, auditoría, métrica HTTP y JSON),
+que el caché no toca. Por eso el factor depende de cuánto cuesta la consulta a la base: con una
+base remota o con más datos sería mayor. Contra el caché anterior, la diferencia (+0,49 ms en el
+servidor) está dentro de la variación entre corridas.
+
 ### Base local con el dataset ficticio
 
 Si tu base local es de antes de Football-Data.org, tiene el dataset ficticio y tablas sin las

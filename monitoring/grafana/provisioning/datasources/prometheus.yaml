@@ -1,0 +1,18 @@
+# Data source de Grafana para el Prometheus local de la 012 (research R15 de la 013).
+#
+# - El uid es fijo: el dashboard monitoring/grafana/dashboards/futbol-market.json lo referencia.
+# - No lleva credencial: el Prometheus local no la pide. La clave de API del ADMIN del backend la
+#   usa Prometheus para recolectar (monitoring/admin-api-key), no Grafana.
+# - timeInterval es el scrape_interval de monitoring/prometheus.yml, para que $__rate_interval
+#   nunca quede más corto que dos recolecciones.
+apiVersion: 1
+datasources:
+  - name: Prometheus futbol-market
+    type: prometheus
+    uid: futbol-market-prometheus
+    access: proxy
+    url: http://localhost:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
