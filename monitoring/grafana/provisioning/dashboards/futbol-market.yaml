@@ -1,0 +1,16 @@
+# Provider de dashboards de Grafana (research R15 de la 013).
+#
+# Carga los dashboards de monitoring/grafana/dashboards/ en la carpeta "futbol-market". La ruta
+# llega por la variable FUTBOLMARKET_GRAFANA_DASHBOARDS, que pone monitoring/grafana/start-grafana.ps1
+# con la ruta absoluta del repo: una ruta relativa se resolvería contra la instalación de Grafana.
+# El dashboard se edita en el repo, no desde la interfaz (allowUiUpdates: false).
+apiVersion: 1
+providers:
+  - name: futbol-market
+    type: file
+    folder: futbol-market
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 10
+    options:
+      path: $FUTBOLMARKET_GRAFANA_DASHBOARDS

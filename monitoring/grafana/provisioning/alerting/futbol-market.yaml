@@ -1,0 +1,6 @@
+# Provisioning de alertas de Grafana (research R15 de la 013): futbol-market no define alertas
+# (fuera de alcance de la spec).
+#
+# Grafana lee siempre esta carpeta al arrancar y deja un error en el log si no existe. Este archivo
+# mínimo y válido la mantiene en el repo (git no guarda carpetas vacías) sin configurar nada.
+apiVersion: 1

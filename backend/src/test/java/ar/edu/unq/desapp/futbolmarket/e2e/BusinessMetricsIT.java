@@ -91,7 +91,8 @@ class BusinessMetricsIT {
             RESULT, Set.of(SUCCESS, REJECTED, FAILURE, "blocked", "in_progress"),
             "trigger", Set.of("manual", "scheduled", "startup"),
             "source", Set.of("football_data", "whoscored"),
-            "type", Set.of("full", "single_league"));
+            "type", Set.of("full", "single_league"),
+            "counterparty", Set.of("initial_order", "user"));
 
     @DynamicPropertySource
     static void configuration(DynamicPropertyRegistry registry) {
