@@ -335,7 +335,8 @@ solos y que sus paneles muestran datos después de unas consultas y operaciones.
 
 - **SC-001**: En la medición documentada, el tiempo medio de una consulta repetida del ranking
   es al menos 5 veces menor que el de una consulta que va a la base, y el caché nuevo no es más
-  de un 10% más lento que el anterior.
+  lento que el anterior más allá del ruido de la medición: se reportan los dos valores y la
+  diferencia.
 - **SC-002**: Bajo una ráfaga de al menos 1.000 consultas repetidas sobre un conjunto de hojas
   que entra en el tope, al menos el 95% se responde desde el caché, y la métrica de aciertos y
   fallos lo muestra.
