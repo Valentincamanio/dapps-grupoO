@@ -38,3 +38,7 @@ backend/logs/
 # y el almacenamiento local de sus series
 monitoring/admin-api-key
 monitoring/data/
+
+# Grafana local: la credencial del administrador (se copia del .example) y su base, logs y plugins
+monitoring/grafana/admin-credentials
+monitoring/grafana/data/

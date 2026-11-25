@@ -55,9 +55,11 @@ Prometheus corren como binarios locales en Windows, sin Docker.
 **Tipo de proyecto**: web service (monorepo `backend/` + `frontend/`). El frontend no cambia.
 
 **Objetivos de rendimiento** (SC-001 y SC-002):
-- En la medición, el promedio de una consulta repetida del ranking es ≥ 5 veces menor que sin
-  caché, y el caché nuevo no es más lento que el anterior más allá del ruido de la medición. Se
-  reportan los dos valores y la diferencia.
+- En la medición, las consultas repetidas del ranking no van a la base y el tiempo medio del
+  servidor con el caché nuevo es menor que sin caché: se informan el factor y el ahorro absoluto,
+  sin un umbral fijo (el costo fijo de cada pedido no depende del caché; ver research R7). El
+  caché nuevo no es más lento que el anterior más allá del ruido de la medición: se reportan los
+  dos valores y la diferencia, con dos corridas de cada uno.
 - Con 1.000 consultas repetidas o más, al menos el 95% son aciertos.
 
 **Restricciones**:
@@ -82,7 +84,7 @@ Prometheus corren como binarios locales en Windows, sin Docker.
 | **I. Capas estrictas** | Las clases nuevas de producción van en paquetes transversales que ya existen. En `config/` van `QuoteCacheManager`, `GenerationGuardedCaffeineCache` y `QuoteCacheProperties`. En `observability/` va `TradeCounterparty`, y crecen `BusinessMetrics` y `BusinessMetricsAspect`. No se crean carpetas ni contextos. `config/` no depende de `service/`. El aspecto sigue con pointcuts de texto. Ninguna regla de ArchUnit de la 010 cambia. | ✅ |
 | **II. Modelo rico** | No se agrega lógica de negocio en servicios. Las operaciones las sigue decidiendo `PlayerBook`, y la métrica solo lee `Trade`. | ✅ |
 | **III. Validación en su nivel** | Los parámetros del ranking se siguen validando en el controller (`@Min`/`@Max`), antes de llegar al caché (FR-007). Las propiedades del caché se validan al enlazarse (FR-003). No hay status nuevos. | ✅ |
-| **IV. Tests (NO NEGOCIABLE)** | Hay unitarios de `config/` y `observability/`, IT de servicio (concurrencia) y e2e (`/actuator/prometheus` y el dashboard), todos con setup, execute y verify y con AssertJ. **Un test existente cambia con el "sí" explícito** del desarrollador que implementa (2026-11-24): solo la aserción de tipo de `CacheConfigTest` (ver Complexity Tracking). Ningún otro test existente se toca. | ✅ con excepción autorizada |
+| **IV. Tests (NO NEGOCIABLE)** | Hay unitarios de `config/` y `observability/`, IT de servicio (concurrencia) y e2e (`/actuator/prometheus` y el dashboard), todos con setup, execute y verify y con AssertJ. **Dos tests existentes cambian, cada uno con el "sí" explícito** del desarrollador que implementa: la aserción de tipo de `CacheConfigTest` (2026-11-24) y una entrada del vocabulario de etiquetas de `BusinessMetricsIT` (2026-11-25), ver Complexity Tracking. Ningún otro test existente se toca. | ✅ con dos excepciones autorizadas |
 | **V. Calidad medible** | Los valores van en propiedades, y los nombres y etiquetas en constantes. No hay `catch` genéricos: `recordSafely` captura `RuntimeException`, como en la 012. Se loguea con SLF4J, la inyección es por constructor y no hay credenciales. | ✅ |
 | **VI. Persistencia portable** | No hay cambios a la persistencia. | ✅ |
 | **VII. Idioma** | Los identificadores van en inglés (`TradeCounterparty`, `counterparty` e `initial_order`). Las descripciones de métricas, los Javadoc, el README y los mensajes de validación van en español. | ✅ |
@@ -250,4 +252,5 @@ carpetas nuevas del Principio I. Lo de Grafana vive junto al Prometheus de la 01
 | Desviación | Por qué hace falta | Alternativa más simple descartada |
 |---|---|---|
 | Se modifica un test existente: `CacheConfigTest.elCacheManagerEsElNuestroConLosDosCachesDeCotizaciones` cambia `isInstanceOf(ConcurrentMapCacheManager.class)` por `isInstanceOf(CaffeineCacheManager.class)`, y su import. Es una excepción a SC-008, con el "sí" explícito del desarrollador que implementa (2026-11-24). | El test fija el tipo de manager que esta feature reemplaza a propósito. El resto del test (los dos nombres y que no exista otro caché) sigue valiendo y no cambia. | Una subclase de `ConcurrentMapCacheManager` que arme cachés de Caffeine: el test pasaría sin cambios, pero contradice la decisión de usar `CaffeineCacheManager` y es más confuso. El equipo eligió autorizar el cambio. |
+| Se modifica otro test existente: `BusinessMetricsIT` suma `"counterparty", Set.of("initial_order", "user")` a su mapa `VOCABULARY`. Es la segunda excepción a SC-008, con el "sí" explícito del desarrollador que implementa (2026-11-25). | `ningunaSeriePropiaTieneEtiquetasFueraDelVocabulario` verifica que toda serie `futbolmarket.*` use solo etiquetas de un vocabulario cerrado, y las métricas de operaciones llevan `counterparty` (FR-020). La regla del test sigue valiendo: el vocabulario crece con los dos valores cerrados del enum `TradeCounterparty`. Research R8 no lo había detectado; lo mostró el build completo. | Cambiar el prefijo de las métricas nuevas para que el test no las vea: contradice FR-018 (la familia de nombres de la 012) y esconde las series nuevas del control de vocabulario. |
 | Dos dependencias nuevas (`spring-boot-starter-cache` y `caffeine`). | Tope, vencimiento y estadísticas del caché, y la autoconfiguración de sus métricas. Hoy falta `spring-context-support`. | Un caché propio sobre `ConcurrentHashMap`: reinventa Caffeine y necesita métricas a mano (research R1 y R2). |

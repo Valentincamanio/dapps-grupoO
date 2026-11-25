@@ -74,6 +74,18 @@ providers:
       path: $FUTBOLMARKET_GRAFANA_DASHBOARDS
 ```
 
+## 4.1 Carpetas de provisioning sin uso: `provisioning/plugins/` y `provisioning/alerting/`
+
+Grafana lee siempre las carpetas `plugins` y `alerting` de `GF_PATHS_PROVISIONING` y, si no
+existen, deja un error de provisioning en el log (verificado con Grafana 13.3.2 en la validación
+manual de T033). Git no guarda carpetas vacías, así que cada una lleva un archivo mínimo válido,
+`futbol-market.yaml`, que no configura nada (nunca un `.gitkeep`):
+
+| Archivo | Contenido |
+|---|---|
+| `provisioning/plugins/futbol-market.yaml` | `apiVersion: 1` y `apps: []` |
+| `provisioning/alerting/futbol-market.yaml` | `apiVersion: 1` (la spec deja las alertas fuera de alcance) |
+
 ## 5. Dashboard: `dashboards/futbol-market.json`
 
 Encabezado: `uid: "futbol-market"`, `title: "futbol-market"`, `schemaVersion: 39`,
@@ -81,18 +93,21 @@ Encabezado: `uid: "futbol-market"`, `title: "futbol-market"`, `schemaVersion: 39
 envoltorio de la API.
 
 Todo panel con consultas lleva `"datasource": {"type": "prometheus", "uid": "futbol-market-prometheus"}`.
-`$__range` y `$__rate_interval` son variables de Grafana. Con `increase` y `rate`, un reinicio del
-backend no produce saltos negativos (FR-027).
+`$__rate_interval` es una variable de Grafana. En las series temporales, `increase` y `rate`
+absorben un reinicio del backend y no producen saltos negativos (FR-027). Los tres *stats* de
+totales muestran a propósito el valor del contador, que es el total desde que arrancó el backend:
+su título lo dice, así que la vuelta a cero después de un reinicio es coherente con lo que se
+muestra (research R16).
 
 ### Fila "Negocio" (FR-024)
 
 | Panel | Tipo | PromQL |
 |---|---|---|
-| Operaciones ejecutadas (en el rango) | stat | `sum(increase(futbolmarket_market_trades_total[$__range]))` |
+| Operaciones ejecutadas (desde el arranque del backend) | stat, 0 decimales | `sum(futbolmarket_market_trades_total)` |
 | Operaciones por período | time series | `sum(increase(futbolmarket_market_trades_total[$__rate_interval]))` (total) y `sum by (counterparty) (increase(futbolmarket_market_trades_total[$__rate_interval]))` |
-| Tokens transaccionados (en el rango) | stat | `sum(increase(futbolmarket_market_tokens_traded_total[$__range]))` |
+| Tokens transaccionados (desde el arranque del backend) | stat, 0 decimales | `sum(futbolmarket_market_tokens_traded_total)` |
 | Tokens por período | time series | lo mismo con `futbolmarket_market_tokens_traded_total`: total y `by (counterparty)` |
-| Créditos movidos (en el rango) | stat, 2 decimales | `sum(increase(futbolmarket_market_credits_traded_total[$__range]))` |
+| Créditos movidos (desde el arranque del backend) | stat, 2 decimales | `sum(futbolmarket_market_credits_traded_total)` |
 | Créditos por período | time series | lo mismo con `futbolmarket_market_credits_traded_total`: total y `by (counterparty)` |
 | Órdenes pedidas por operación y resultado | time series | `sum by (operation, result) (increase(futbolmarket_market_orders_total[$__rate_interval]))` |
 | Órdenes abiertas | stat | `sum(futbolmarket_market_orders_open)` |

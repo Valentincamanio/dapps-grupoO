@@ -10,6 +10,8 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import ar.edu.unq.desapp.futbolmarket.modelo.auth.exception.InvalidCredentialsException;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.BookOutcome;
+import ar.edu.unq.desapp.futbolmarket.modelo.market.Trade;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.RecalculationOrigin;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.RecalculationReport;
 import ar.edu.unq.desapp.futbolmarket.modelo.quote.exception.RecalculationBlockedBySyncException;
@@ -37,7 +39,17 @@ import lombok.RequiredArgsConstructor;
  * El {@code throws Throwable} lo impone {@link ProceedingJoinPoint#proceed()}.</p>
  *
  * <p>Tiene la máxima precedencia para quedar <b>afuera</b> de la transacción del servicio: una falla
- * al commitear también se ve y la duración la incluye.</p>
+ * al commitear también se ve y la duración la incluye. Por eso, cuando {@code proceed()} vuelve bien,
+ * el commit ya ocurrió.</p>
+ *
+ * <p><b>Operaciones ejecutadas</b> (research R9 y R10 de la 013): los advices de {@code buy} y
+ * {@code sell} registran cada {@link Trade} del {@link BookOutcome} que devolvió el servicio, con su
+ * contraparte, recién cuando el pedido volvió bien: cuentan exactamente lo confirmado (FR-014). Un
+ * rechazo, una falla al grabar o un commit que falla llegan como excepción y no suman nada; una orden
+ * que queda pendiente no tiene operaciones, y se cuenta una sola vez cuando la cruza el pedido
+ * siguiente (FR-015). {@code cancel} nunca ejecuta operaciones (FR-016). {@code buy} y {@code sell}
+ * son la única ruta que ejecuta operaciones: una feature futura que cruce el libro desde otro
+ * proceso tiene que llamar a {@link BusinessMetrics#recordTrade}.</p>
  *
  * <p>Los pointcuts son texto, sin depender de las clases de {@code service/}. {@code runFull} es
  * package-private y se intercepta igual porque el proxy CGLIB se genera en el mismo paquete; por eso
@@ -77,12 +89,16 @@ public class BusinessMetricsAspect {
 
     @Around(BUY)
     public Object measureBuy(ProceedingJoinPoint joinPoint) throws Throwable {
-        return measureOrder(joinPoint, OrderOperation.BUY);
+        Object result = measureOrder(joinPoint, OrderOperation.BUY);
+        recordTrades(result);
+        return result;
     }
 
     @Around(SELL)
     public Object measureSell(ProceedingJoinPoint joinPoint) throws Throwable {
-        return measureOrder(joinPoint, OrderOperation.SELL);
+        Object result = measureOrder(joinPoint, OrderOperation.SELL);
+        recordTrades(result);
+        return result;
     }
 
     @Around(CANCEL)
@@ -188,6 +204,16 @@ public class BusinessMetricsAspect {
                 recordSync(source, type, SyncResult.FAILURE, start);
             }
             throw e;
+        }
+    }
+
+    /**
+     * Las operaciones de un pedido que volvió bien. Cualquier otro resultado no registra nada.
+     */
+    private void recordTrades(Object result) {
+        if (result instanceof BookOutcome outcome) {
+            recordSafely(BusinessMetrics.TRADES, () -> outcome.trades().forEach(trade ->
+                    metrics.recordTrade(trade.sellerType(), trade.quantity(), trade.total())));
         }
     }
 

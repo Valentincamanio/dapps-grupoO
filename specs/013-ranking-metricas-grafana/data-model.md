@@ -122,6 +122,8 @@ Contrato completo: [contracts/metrics.md](./contracts/metrics.md).
 | `monitoring/grafana/dashboards/futbol-market.json` | El dashboard | `uid: futbol-market`, `schemaVersion: 39` y cada panel con `datasource.uid` = el del data source |
 | `monitoring/grafana/start-grafana.ps1` | El lanzador | Parámetro `-GrafanaHome` (o `$env:GRAFANA_HOME`) |
 | `monitoring/grafana/admin-credentials.example` | El ejemplo sin contraseña | `admin_user=admin` y `admin_password=` |
+| `monitoring/grafana/provisioning/plugins/futbol-market.yaml` | Provisioning de plugins vacío | `apiVersion: 1` y `apps: []` |
+| `monitoring/grafana/provisioning/alerting/futbol-market.yaml` | Provisioning de alertas vacío | `apiVersion: 1` |
 
 Hay dos cosas locales que git ignora:
 - `monitoring/grafana/admin-credentials`: `clave=valor` con `admin_user` y `admin_password`. Se

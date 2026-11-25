@@ -60,6 +60,16 @@ dashboard de Grafana versionado que aparece armado al levantar Grafana.
   lo mismo, se vacía en los mismos momentos y tiene la misma garantía estricta. El dashboard
   muestra solo el del ranking (FR-030, Key Entities, SC-004, Assumptions).
 
+### Session 2026-11-25
+
+- Q: La medición dio un factor sin caché / caché nuevo de 2,41 en el servidor y 1,51 en el cliente,
+  por debajo de las 5 veces de la primera versión de SC-001. ¿Se busca otro umbral? → A: No. Cada
+  pedido tiene un costo fijo de unos 3,4 ms (seguridad, auditoría, métrica HTTP y JSON) que el
+  caché no toca, así que el factor depende del costo de la consulta a la base y no del caché. SC-001
+  pasa a pedir que las consultas repetidas no vayan a la base (SC-002) y que el tiempo medio del
+  servidor baje respecto de sin caché, informando el factor y el ahorro absoluto medidos, sin otro
+  umbral. La comparación con el caché anterior dentro del ruido se mantiene.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Ranking rápido bajo consultas frecuentes (Priority: P1)
@@ -333,10 +343,12 @@ solos y que sus paneles muestran datos después de unas consultas y operaciones.
 
 ### Measurable Outcomes
 
-- **SC-001**: En la medición documentada, el tiempo medio de una consulta repetida del ranking
-  es al menos 5 veces menor que el de una consulta que va a la base, y el caché nuevo no es más
-  lento que el anterior más allá del ruido de la medición: se reportan los dos valores y la
-  diferencia.
+- **SC-001**: En la medición documentada, las consultas repetidas del ranking no van a la base
+  (el índice de aciertos que fija SC-002) y el tiempo medio del servidor con el caché nuevo es
+  menor que sin caché: se informan el factor (sin caché / caché nuevo) y el ahorro absoluto
+  medidos, sin un umbral fijo. Además, el caché nuevo no es más lento que el anterior más allá del
+  ruido de la medición: se reportan los dos valores y la diferencia, con al menos dos corridas de
+  cada uno.
 - **SC-002**: Bajo una ráfaga de al menos 1.000 consultas repetidas sobre un conjunto de hojas
   que entra en el tope, al menos el 95% se responde desde el caché, y la métrica de aciertos y
   fallos lo muestra.

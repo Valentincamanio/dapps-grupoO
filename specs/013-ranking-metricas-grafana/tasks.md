@@ -49,6 +49,10 @@ dos.
   `<test>/e2e/AuthTestHelper`, `<test>/service/market/MarketDatabase`, `<test>/service/quote/QuoteDatabase`,
   `<test>/service/quote/MutableClock`) se **usan** sin agregarles métodos. Agregar métodos a los archivos de test que
   crea esta feature está permitido.
+  **Segunda excepción autorizada (2026-11-25)**: el build completo mostró que
+  `BusinessMetricsIT.ningunaSeriePropiaTieneEtiquetasFueraDelVocabulario` rechaza la etiqueta
+  `counterparty`. Con el "sí" explícito del desarrollador, su mapa `VOCABULARY` suma
+  `"counterparty", Set.of("initial_order", "user")`, y nada más (plan, Complexity Tracking; research R8).
 - **Dos dependencias nuevas, y solo esas** (research R2): `org.springframework.boot:spring-boot-starter-cache` y
   `com.github.ben-manes.caffeine:caffeine`, sin versión (las fija el BOM de Boot 4.1.1). `build.gradle` y
   `application.yaml` se **modifican** (se agregan líneas), no se reemplazan; `application-local.yml` y
@@ -74,9 +78,10 @@ dos.
 **Propósito**: dejar medida la variante **caché anterior** antes de tocar `CacheConfig` (FR-010; plan, "Orden de
 implementación", paso 1). **Ninguna tarea de la Fase 2 ni de la US1 puede empezar antes de cerrar T003.**
 
-- [ ] T001 Confirmar la línea de base: `cd backend; ./gradlew build` da BUILD SUCCESSFUL en la rama sin cambios de
+- [X] T001 Confirmar la línea de base: `cd backend; ./gradlew build` da BUILD SUCCESSFUL en la rama sin cambios de
   código, y anotar la cantidad de tests que corren (para comparar en T038). No se modifica ningún archivo.
-- [ ] T002 Crear el script de medición `monitoring/measure-ranking.ps1` (research R7; quickstart §1.1), compatible
+  **Línea de base**: BUILD SUCCESSFUL, 2368 tests (2 saltados, 0 fallas) en 215 clases.
+- [X] T002 Crear el script de medición `monitoring/measure-ranking.ps1` (research R7; quickstart §1.1), compatible
   con Windows PowerShell 5.1 y PowerShell 7, sin dependencias nuevas:
   - Parámetros: `-BaseUrl` (`http://localhost:8080`), `-Query` (`page=0&size=20`), `-Requests` (`1000`),
     `-Warmup` (`20`), `-Variant` (obligatorio, `ValidateSet('cache-anterior','sin-cache','cache-nuevo')`) y
@@ -93,7 +98,7 @@ implementación", paso 1). **Ninguna tarea de la Fase 2 ni de la US1 puede empez
     calcula Δhit, Δmiss y el índice de aciertos; si no existen, imprime "n/d".
   - Imprime una tabla final con `Variant`, fecha y las cifras, lista para copiar a `medicion-ranking.md`. Nunca
     imprime la clave de API. Comentarios y mensajes en español.
-- [ ] T003 Medir la variante **caché anterior** con el código actual (`ConcurrentMapCacheManager`, sin cambios en
+- [X] T003 Medir la variante **caché anterior** con el código actual (`ConcurrentMapCacheManager`, sin cambios en
   `CacheConfig`), como dice quickstart §1.2.A: levantar `cd backend; ./gradlew bootRun
   --args="--futbolmarket.quotes.recalculation.on-startup=false"`, esperar `GET /actuator/health` → `UP` y correr
   `powershell -ExecutionPolicy Bypass -File monitoring/measure-ranking.ps1 -Variant cache-anterior`. Crear
@@ -112,7 +117,7 @@ implementación", paso 1). **Ninguna tarea de la Fase 2 ni de la US1 puede empez
 **Propósito**: lo que bloquea a la US1. La US2 no depende de esta fase (puede arrancar en paralelo después de la
 Fase 1, o incluso antes si no se toca `build.gradle` al mismo tiempo).
 
-- [ ] T004 Agregar en `backend/build.gradle`, en el bloque `dependencies`, sin versión y con un comentario en
+- [X] T004 Agregar en `backend/build.gradle`, en el bloque `dependencies`, sin versión y con un comentario en
   español que remita a research R2: `implementation 'org.springframework.boot:spring-boot-starter-cache'` y
   `implementation 'com.github.ben-manes.caffeine:caffeine'`. Verificar con
   `./gradlew dependencies --configuration runtimeClasspath` que aparecen `spring-context-support`,
@@ -137,7 +142,7 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
 
 ### Configuración (`config/`)
 
-- [ ] T005 [P] [US1] Crear `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/QuoteCacheProperties.java`
+- [X] T005 [P] [US1] Crear `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/QuoteCacheProperties.java`
   (research R5; data-model §1.1): `record QuoteCacheProperties(@Valid @NotNull Spec ranking, @Valid @NotNull Spec
   current)` con `@ConfigurationProperties("futbolmarket.cache")` y `@Validated`, y un record anidado
   `Spec(@NotNull @Positive Long maximumSize, @NotNull Duration expireAfterWrite)` cuyo constructor compacto lanza
@@ -147,13 +152,16 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
   cachés, el mensaje de `@Positive`/`@NotNull` puede nombrar la propiedad relativa (`maximum-size`) y el binder de
   Boot agrega el prefijo completo; verificar en T007 que el mensaje final de arranque incluye
   `futbolmarket.cache.ranking.` o `futbolmarket.cache.current.` y ajustar si no. Javadoc en español.
-- [ ] T006 [US1] Agregar a `backend/src/main/resources/application.yaml` el bloque
+  **Ajuste (T007)**: el error de enlace de las anotaciones nombra el campo en camelCase
+  (`ranking.maximumSize`), así que toda la validación quedó en el constructor de
+  `QuoteCacheProperties`, con mensajes que nombran la propiedad completa (research R5).
+- [X] T006 [US1] Agregar a `backend/src/main/resources/application.yaml` el bloque
   `futbolmarket.cache.ranking.{maximum-size: 500, expire-after-write: 10m}` y
   `futbolmarket.cache.current.{maximum-size: 5000, expire-after-write: 10m}`, con un comentario en español que
   remita a la spec (Assumptions) y a research R5; y registrar `QuoteCacheProperties.class` en la lista de
   `@EnableConfigurationProperties` de `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/ApplicationConfig.java`.
   No tocar `application-local.yml` ni `application-test.yml`. Depende de T005.
-- [ ] T007 [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/QuoteCachePropertiesTest.java`
+- [X] T007 [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/QuoteCachePropertiesTest.java`
   con el estilo de `QuoteRecalculationPropertiesTest` (`ApplicationContextRunner` con
   `@EnableConfigurationProperties(QuoteCacheProperties.class)` y validación): los valores por defecto de
   `application.yaml` enlazan (500 / 10m y 5000 / 10m, leídos con `ConfigurationFiles` si ese apoyo existente lo
@@ -163,7 +171,7 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
 
 ### Caché con generación y manager
 
-- [ ] T008 [US1] Crear `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/GenerationGuardedCaffeineCache.java`
+- [X] T008 [US1] Crear `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/GenerationGuardedCaffeineCache.java`
   (research R3; data-model §1.3): `extends org.springframework.cache.caffeine.CaffeineCache`, con
   `AtomicLong generation`, `ThreadLocal<Long> lookupGeneration` y `ReentrantReadWriteLock lock`.
   - Constructor `(String name, com.github.benmanes.caffeine.cache.Cache<Object,Object> cache, boolean allowNullValues)`
@@ -184,7 +192,7 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
     (una anotación por hilo, el 404 que deja la anotación hasta la próxima búsqueda, `sync = true` no protegido,
     consultas simultáneas que pueden llegar las dos a la base). Que sea subclase y no decorador para que
     `CaffeineCacheMeterBinderProvider` lo reconozca (R3, "Por qué es una subclase").
-- [ ] T009 [US1] Crear `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/QuoteCacheManager.java`
+- [X] T009 [US1] Crear `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/QuoteCacheManager.java`
   (research R1, R4, R6): `extends org.springframework.cache.caffeine.CaffeineCacheManager`.
   - Constructor `(QuoteCacheProperties properties, com.github.benmanes.caffeine.cache.Ticker ticker,
     java.util.concurrent.Executor executor)` (`executor` puede ser `null` = el de Caffeine por defecto).
@@ -200,7 +208,7 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
   - Javadoc en español: por qué Caffeine (W-TinyLFU, tope, vencimiento, stats), valores propios por caché (FR-030)
     y que los cachés se registran al construirse porque `CacheMetricsRegistrarConfiguration` registra solo los que
     existen en ese momento (R4).
-- [ ] T010 [US1] Modificar `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/CacheConfig.java`
+- [X] T010 [US1] Modificar `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/config/CacheConfig.java`
   (plan, "Diseño por historia US1"; research R7): el `@Bean cacheManager(QuoteCacheProperties properties)` devuelve
   `new QuoteCacheManager(properties, Ticker.systemTicker(), null)` y lleva
   `@ConditionalOnProperty(name = "spring.cache.type", havingValue = "caffeine", matchIfMissing = true)`. El nombre
@@ -208,7 +216,7 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
   constantes `QUOTES_CURRENT` y `QUOTES_RANKING` y `@EnableCaching` no cambian. Actualizar el Javadoc de la clase
   (ya no es `ConcurrentMapCacheManager`; entradas con tope y vencimiento; `spring.cache.type=none` solo para la
   variante "sin caché" de la medición).
-- [ ] T011 [US1] Cambio autorizado de un test existente (research R18): en
+- [X] T011 [US1] Cambio autorizado de un test existente (research R18): en
   `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/CacheConfigTest.java`, reemplazar **solo**
   `isInstanceOf(ConcurrentMapCacheManager.class)` por `isInstanceOf(CaffeineCacheManager.class)` y el import
   `org.springframework.cache.concurrent.ConcurrentMapCacheManager` por
@@ -217,10 +225,10 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
 
 ### Tests unitarios del caché (`config/`)
 
-- [ ] T012 [P] [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/FakeTicker.java`
+- [X] T012 [P] [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/FakeTicker.java`
   (research R6): clase de test package-private que implementa `com.github.benmanes.caffeine.cache.Ticker` con un
   `AtomicLong` de nanos y un método `advance(Duration)`. Sin `guava-testlib`.
-- [ ] T013 [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/QuoteCacheManagerTest.java`
+- [X] T013 [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/QuoteCacheManagerTest.java`
   (unitario, sin Spring; `new QuoteCacheManager(props, fakeTicker, Runnable::run)`, y
   `((com.github.benmanes.caffeine.cache.Cache<?,?>) cache.getNativeCache()).cleanUp()` antes de verificar):
   - es un `CaffeineCacheManager`; `getCacheNames()` tiene exactamente `quotes-ranking` y `quotes-current`;
@@ -232,7 +240,7 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
   - **estadísticas**: `stats()` cuenta un `miss` y un `hit` después de `get` sin entrada, `put` y `get` (prueba de
     que `recordStats()` está prendido).
   Depende de T009 y T012.
-- [ ] T014 [P] [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/GenerationGuardedCaffeineCacheTest.java`
+- [X] T014 [P] [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/config/GenerationGuardedCaffeineCacheTest.java`
   (unitario, un solo hilo, la carrera de research R3 armada a mano):
   - `get(k)` sin entrada → `clear()` → `put(k, v)` → `get(k)` es `null` (el `put` se descartó);
   - lo mismo con `invalidate()` en lugar de `clear()`;
@@ -246,7 +254,7 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
 
 ### Tests de integración del caché
 
-- [ ] T015 [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/quote/QuoteCacheConcurrencyIT.java`
+- [X] T015 [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/service/quote/QuoteCacheConcurrencyIT.java`
   (research R6; SC-003; FR-005; `@SpringBootTest`, `@ActiveProfiles("test")`, datos con `QuoteDatabase` sin
   modificarla): un `@MockitoSpyBean` sobre `QuoteRepository` que, en la primera llamada a `findRanking` de la
   prueba, avisa con un `CountDownLatch` que entró y se frena en otro `CountDownLatch` hasta que el test lo libera,
@@ -262,7 +270,7 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
   Una cuarta prueba hace lo mismo con `getCurrent(playerId)` y `QuoteRepository` del método que use
   (FR-030). Timeouts en los `await` (por ejemplo 10 s) para que el test nunca cuelgue. Usar solo métodos públicos de
   los servicios existentes; si algún cambio no es invocable así, armarlo con los apoyos existentes sin modificarlos.
-- [ ] T016 [P] [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/CacheMetricsIT.java`
+- [X] T016 [P] [US1] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/CacheMetricsIT.java`
   (contracts/metrics.md §2; MockMvc, perfil test, credencial `ADMIN` con `ActuatorITSupport`/`AuthTestHelper` sin
   modificarlos). Lee `/actuator/prometheus` y filtra por `cache="quotes-ranking"` o `cache="quotes-current"`:
   - desde el arranque existen, para los dos cachés, `cache_gets_total` con `result="hit"` y `result="miss"`,
@@ -279,7 +287,7 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
   - sin credencial `/actuator/prometheus` da 401 y con `USER` 403 (sin cambios, FR-008).
   Si los datos de otras pruebas del mismo contexto llenan el caché, vaciarlo con `QuoteCacheInvalidator` al empezar
   cada prueba.
-- [ ] T017 [US1] Verificar la invalidación de punta a punta y el arranque inválido: agregar a
+- [X] T017 [US1] Verificar la invalidación de punta a punta y el arranque inválido: agregar a
   `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/CacheMetricsIT.java` una prueba que guarde una hoja,
   cambie la estrategia activa como `ADMIN` por HTTP (endpoints de la 007) y verifique que la siguiente consulta
   informa la estrategia nueva y suma un `miss` (US1, escenario 4); y agregar a
@@ -288,17 +296,23 @@ siguiente consulta trae datos nuevos (también con una consulta en vuelo); pedir
 
 ### Medición después del cambio
 
-- [ ] T018 [US1] Medir las variantes **sin caché** y **caché nuevo** con el código nuevo (quickstart §1.2.B y C;
+- [X] T018 [US1] Medir las variantes **sin caché** y **caché nuevo** con el código nuevo (quickstart §1.2.B y C;
   research R7), con la misma máquina, base, `-Query` y `-Requests` que T003:
   `./gradlew bootRun --args="--futbolmarket.quotes.recalculation.on-startup=false --spring.cache.type=none"` →
   `-Variant sin-cache`; `./gradlew bootRun --args="--futbolmarket.quotes.recalculation.on-startup=false"` →
   `-Variant cache-nuevo`. Antes de medir B, comprobar que con `spring.cache.type=none` el contexto levanta (Boot
   crea un `NoOpCacheManager`) y que `QuoteCacheInvalidator` no falla contra él; si fallara, documentar el ajuste
   mínimo en `CacheConfig` y en research. Completar las filas B y C de
-  `specs/013-ranking-metricas-grafana/medicion-ranking.md`, más: la razón B/C de promedios (SC-001: ≥ 5), los
+  `specs/013-ranking-metricas-grafana/medicion-ranking.md`, más: la razón B/C de promedios (SC-001: ≥ 5; ver el ajuste abajo), los
   promedios de A y C con su diferencia absoluta y relativa y una línea sobre el ruido (por ejemplo, repetir A o C
   dos veces y anotar la dispersión), y el índice de aciertos de C (SC-002: ≥ 95%, se espera 1 fallo). Si SC-001 o
   SC-002 no se cumplen, anotarlo y no cerrar la tarea hasta revisar la causa.
+  **Ajuste (2026-11-25)**: la razón B/C medida fue 2,41 en el servidor, por el costo fijo de cada pedido
+  (research R7). SC-001 se reescribió sin umbral: se informan el factor y el ahorro absoluto, y C se corre
+  una segunda vez para comparar con A con dos corridas de cada lado.
+  **Resultado**: C quedó con tres corridas (02:29, 03:41 y 03:42). Factor B / C 2,44 y ahorro de 4,887 ms en el
+  servidor; C contra A +0,49 ms, dentro del ruido; 100 % de aciertos. SC-001 y SC-002 se cumplen
+  (medicion-ranking.md).
 
 **Checkpoint**: US1 completa. Los dos cachés son Caffeine con tope, vencimiento y stats; la garantía estricta tiene
 su IT; las métricas salen en `/actuator/prometheus`; la medición está documentada.
@@ -320,12 +334,12 @@ distintos).
 
 ### Catálogo y aspecto (`observability/`)
 
-- [ ] T019 [P] [US2] Crear `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/observability/TradeCounterparty.java`
+- [X] T019 [P] [US2] Crear `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/observability/TradeCounterparty.java`
   (research R8; data-model §2.1): enum `INITIAL_ORDER("initial_order")`, `USER("user")` con `tag()` y
   `static TradeCounterparty from(OwnerType sellerType)` (`ADMIN` → `INITIAL_ORDER`, `USER` → `USER`; `null` →
   `IllegalArgumentException` con mensaje en español). Mismo estilo que `observability/OrderResult.java`. Javadoc en
   español.
-- [ ] T020 [US2] Modificar `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/observability/BusinessMetrics.java`
+- [X] T020 [US2] Modificar `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/observability/BusinessMetrics.java`
   (research R8, R11; contracts/metrics.md §1):
   - constantes `TRADES = "futbolmarket.market.trades"`, `TOKENS_TRADED = "futbolmarket.market.tokens.traded"`,
     `CREDITS_TRADED = "futbolmarket.market.credits.traded"` y la de la etiqueta `COUNTERPARTY = "counterparty"`;
@@ -338,7 +352,7 @@ distintos).
   No cambiar nombres, etiquetas ni descripciones de las métricas de la 012 (FR-022); no agregar los nombres nuevos
   al conjunto `NAMES` que usa `BusinessMetricsTest` si eso cambiara lo que ese test cuenta (verificarlo leyendo el
   test, sin modificarlo).
-- [ ] T021 [US2] Modificar `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/observability/BusinessMetricsAspect.java`
+- [X] T021 [US2] Modificar `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/observability/BusinessMetricsAspect.java`
   (research R9, R10): `measureBuy` y `measureSell` guardan el resultado de `measureOrder(...)`, lo pasan por un
   nuevo `private void recordTrades(Object result)` y devuelven **el mismo objeto**. `recordTrades` actúa solo si
   `result instanceof BookOutcome outcome` y, dentro de `recordSafely(BusinessMetrics.TRADES, ...)`, recorre
@@ -350,10 +364,10 @@ distintos).
 
 ### Tests unitarios de US2
 
-- [ ] T022 [P] [US2] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/observability/TradeCounterpartyTest.java`:
+- [X] T022 [P] [US2] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/observability/TradeCounterpartyTest.java`:
   `from(ADMIN)` es `INITIAL_ORDER`, `from(USER)` es `USER`, los `tag()` son `initial_order` y `user`, y `from(null)`
   lanza. Depende de T019.
-- [ ] T023 [P] [US2] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/observability/BusinessMetricsTradesTest.java`
+- [X] T023 [P] [US2] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/observability/BusinessMetricsTradesTest.java`
   (`SimpleMeterRegistry`, mismo estilo que `BusinessMetricsTest` sin modificarlo):
   - después de `bindTo` existen las 6 series (3 nombres × 2 `counterparty`) con valor 0 y las descripciones están en
     español (FR-017);
@@ -363,7 +377,7 @@ distintos).
   - ninguna serie nueva tiene otra etiqueta que `counterparty` (FR-020);
   - las series de la 012 siguen siendo las mismas (cantidad y nombres) (FR-022).
   Depende de T020.
-- [ ] T024 [US2] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/observability/BusinessMetricsAspectTradesTest.java`
+- [X] T024 [US2] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/observability/BusinessMetricsAspectTradesTest.java`
   (mismo esquema que `BusinessMetricsAspectTest`, sin modificarlo; `ProceedingJoinPoint` de Mockito y
   `BusinessMetrics` sobre `SimpleMeterRegistry`; `BookOutcome` y `Trade` armados con sus constructores públicos o
   con los apoyos de test existentes del mercado, sin modificarlos):
@@ -379,7 +393,7 @@ distintos).
 
 ### Test de integración de US2
 
-- [ ] T025 [US2] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/MarketTradeMetricsIT.java`
+- [X] T025 [US2] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/MarketTradeMetricsIT.java`
   (SC-005; contracts/metrics.md §1; MockMvc, perfil test, usuarios con `AuthTestHelper` y datos con
   `MarketDatabase`, sin modificarlos; lecturas de `/actuator/prometheus` como `ADMIN` y comparación por diferencia
   contra una lectura previa):
@@ -417,15 +431,15 @@ escribir antes, pero `GrafanaDashboardIT` (T032) solo pasa cuando existen esas m
 
 ### Archivos versionados de Grafana
 
-- [ ] T026 [P] [US3] Crear `monitoring/grafana/provisioning/datasources/prometheus.yaml` exactamente como
+- [X] T026 [P] [US3] Crear `monitoring/grafana/provisioning/datasources/prometheus.yaml` exactamente como
   contracts/grafana-dashboard.md §3 (`apiVersion: 1`; `name: Prometheus futbol-market`, `type: prometheus`,
   `uid: futbol-market-prometheus`, `access: proxy`, `url: http://localhost:9090`, `isDefault: true`,
   `editable: false`, `jsonData.timeInterval: 15s`), con comentarios en español. Sin credenciales.
-- [ ] T027 [P] [US3] Crear `monitoring/grafana/provisioning/dashboards/futbol-market.yaml` exactamente como
+- [X] T027 [P] [US3] Crear `monitoring/grafana/provisioning/dashboards/futbol-market.yaml` exactamente como
   contracts/grafana-dashboard.md §4 (provider `type: file`, `folder: futbol-market`, `disableDeletion: true`,
   `allowUiUpdates: false`, `updateIntervalSeconds: 10`, `options.path: $FUTBOLMARKET_GRAFANA_DASHBOARDS`), con
   comentarios en español.
-- [ ] T028 [P] [US3] Crear `monitoring/grafana/dashboards/futbol-market.json` (contracts/grafana-dashboard.md §5;
+- [X] T028 [P] [US3] Crear `monitoring/grafana/dashboards/futbol-market.json` (contracts/grafana-dashboard.md §5;
   research R16), en formato de exportación sin envoltorio de API: `uid: "futbol-market"`, `title: "futbol-market"`,
   `schemaVersion: 39`, `time: {from: "now-6h", to: "now"}`, `refresh: "30s"`, `editable: false`, ids de panel
   únicos y `gridPos` sin superposiciones. Tres filas (`type: "row"`) con sus paneles y la PromQL **literal** del
@@ -439,14 +453,17 @@ escribir antes, pero `GrafanaDashboardIT` (T032) solo pasa cuando existen esas m
   - **General**: pedidos por segundo; tasa de errores 4xx y 5xx (`percentunit`), excluyendo `/actuator.*`.
   Todo panel con `targets` lleva `"datasource": {"type": "prometheus", "uid": "futbol-market-prometheus"}`, y cada
   target también. Títulos y descripciones de paneles en español. Solo `increase`/`rate` sobre contadores (FR-027).
-- [ ] T029 [P] [US3] Crear `monitoring/grafana/admin-credentials.example` (research R14; contracts §2): una línea de
+  **Cambio (T033)**: los tres *stats* de totales de la fila Negocio muestran el contador
+  (`sum(futbolmarket_market_trades_total)` y los equivalentes), con el título "(desde el arranque
+  del backend)", 0 decimales en operaciones y tokens y 2 en créditos (research R16).
+- [X] T029 [P] [US3] Crear `monitoring/grafana/admin-credentials.example` (research R14; contracts §2): una línea de
   comentario en español que diga que se copia a `monitoring/grafana/admin-credentials` (ignorado por git) y se
   completa, más `admin_user=admin` y `admin_password=` vacío.
-- [ ] T030 [P] [US3] Agregar a `.gitignore` (raíz), junto a `monitoring/admin-api-key` y `monitoring/data/`, las
+- [X] T030 [P] [US3] Agregar a `.gitignore` (raíz), junto a `monitoring/admin-api-key` y `monitoring/data/`, las
   líneas `monitoring/grafana/data/` y `monitoring/grafana/admin-credentials`. Verificar con
   `git check-ignore -v monitoring/grafana/admin-credentials monitoring/grafana/data/x` y que
   `admin-credentials.example` **no** queda ignorado.
-- [ ] T031 [US3] Crear `monitoring/grafana/start-grafana.ps1` (research R12, R13, R14; contracts §1), compatible con
+- [X] T031 [US3] Crear `monitoring/grafana/start-grafana.ps1` (research R12, R13, R14; contracts §1), compatible con
   PowerShell 5.1 y 7:
   - `param([string]$GrafanaHome = $env:GRAFANA_HOME)`; si falta, o no existe `$GrafanaHome\bin\grafana.exe`,
     termina con un mensaje en español y código distinto de 0;
@@ -462,7 +479,7 @@ escribir antes, pero `GrafanaDashboardIT` (T032) solo pasa cuando existen esas m
 
 ### Test del dashboard
 
-- [ ] T032 [US3] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/GrafanaDashboardIT.java`
+- [X] T032 [US3] Crear `backend/src/test/java/ar/edu/unq/desapp/futbolmarket/e2e/GrafanaDashboardIT.java`
   (research R17; contracts/grafana-dashboard.md §6; MockMvc, perfil test, `ADMIN` con `ActuatorITSupport` sin
   modificarlo). Rutas relativas a `backend/` (el directorio de trabajo de los tests de Gradle):
   1. `../monitoring/grafana/dashboards/futbol-market.json` parsea con `tools.jackson.databind.json.JsonMapper`, y
@@ -477,7 +494,7 @@ escribir antes, pero `GrafanaDashboardIT` (T032) solo pasa cuando existen esas m
   4. `../monitoring/grafana/admin-credentials.example` deja `admin_password` vacío; el archivo local
      `admin-credentials` no se lee aunque exista (SC-007).
   Es un test de archivos: no necesita Grafana ni Prometheus. Depende de T016, T020 y T026 a T029.
-- [ ] T033 [US3] Validación manual de Grafana (quickstart §4, pasos 1 a 7): con Grafana OSS ≥ 11.0 descomprimido,
+- [X] T033 [US3] Validación manual de Grafana (quickstart §4, pasos 1 a 7): con Grafana OSS ≥ 11.0 descomprimido,
   Prometheus ≥ 2.55.0 con `monitoring/prometheus.yml` sin cambios y el backend en local, correr
   `start-grafana.ps1` y comprobar: data source "Prometheus futbol-market" no editable con *Test* OK; dashboard
   `futbol-market` en la carpeta `futbol-market` sin pasos manuales; log de `monitoring/grafana/data/log/` sin
@@ -486,6 +503,11 @@ escribir antes, pero `GrafanaDashboardIT` (T032) solo pasa cuando existen esas m
   negativos al reiniciar el backend; "No data" sin errores con Prometheus detenido. Anotar la versión de Grafana
   con la que se probó (para T035). Si algún PromQL del contrato no funciona en Grafana, corregirlo en
   `futbol-market.json` y en contracts/grafana-dashboard.md a la vez.
+  **Resultado (2026-11-25, Grafana 13.3.2 y Prometheus 3.16.0)**: data source y dashboard provisionados
+  sin pasos manuales y paneles con datos. El primer arranque dejó dos errores de provisioning, por las
+  carpetas `plugins` y `alerting`; cada una lleva ahora un `futbol-market.yaml` mínimo (research R15) y,
+  después de reiniciar, el log no tiene ningún `level=error`. Los tres *stats* de totales pasaron a
+  mostrar el contador desde el arranque del backend (research R16).
 
 **Checkpoint**: US3 completa. El dashboard aparece solo y muestra negocio, ranking y tráfico general.
 
@@ -495,12 +517,12 @@ escribir antes, pero `GrafanaDashboardIT` (T032) solo pasa cuando existen esas m
 
 **Propósito**: documentación, verificación de credenciales y cierre (definición de terminado).
 
-- [ ] T034 [P] Revisar el Javadoc y los comentarios de las clases nuevas y modificadas
+- [X] T034 [P] Revisar el Javadoc y los comentarios de las clases nuevas y modificadas
   (`config/QuoteCacheProperties`, `config/GenerationGuardedCaffeineCache`, `config/QuoteCacheManager`,
   `config/CacheConfig`, `observability/TradeCounterparty`, `observability/BusinessMetrics`,
   `observability/BusinessMetricsAspect`) en `backend/src/main/java/ar/edu/unq/desapp/futbolmarket/`: en español,
   sin referencias a personas ni máquinas, y con los enlaces a research que correspondan.
-- [ ] T035 Actualizar la sección "Métricas y monitoreo" de `README.md` (FR-010, FR-029; plan, "US3"), agregando sin
+- [X] T035 Actualizar la sección "Métricas y monitoreo" de `README.md` (FR-010, FR-029; plan, "US3"), agregando sin
   reemplazar lo de la 012:
   - **Caché del ranking**: tope, vencimiento y propiedades `futbolmarket.cache.*` con sus valores por defecto; que
     la invalidación no cambia; las series `cache_gets_total`, `cache_evictions_total`, `cache_size` y el PromQL del
@@ -514,18 +536,22 @@ escribir antes, pero `GrafanaDashboardIT` (T032) solo pasa cuando existen esas m
   - **Medición del ranking**: resumen de la tabla (promedio de A, B y C, razón B/C, diferencia A/C, índice de
     aciertos) y enlace a `specs/013-ranking-metricas-grafana/medicion-ranking.md`.
   Sin Docker. Sin credenciales. Sin nombres de personas ni de máquinas.
-- [ ] T036 [P] Completar `specs/013-ranking-metricas-grafana/medicion-ranking.md` con una conclusión corta que diga
+- [X] T036 [P] Completar `specs/013-ranking-metricas-grafana/medicion-ranking.md` con una conclusión corta que diga
   si se cumplen SC-001 y SC-002 con los números de T003 y T018, y el enlace de vuelta al README.
-- [ ] T037 Búsqueda de credenciales (SC-007; quickstart §4.8): correr
+- [X] T037 Búsqueda de credenciales (SC-007; quickstart §4.8): correr
   `git grep -nIiE "(password|api[-_]?key|token)\s*[:=]\s*\S" -- monitoring README.md specs/013-ranking-metricas-grafana`
   y verificar que solo aparecen nombres de archivos, nombres de variables o claves vacías. `git status` no muestra
   `monitoring/grafana/admin-credentials` ni `monitoring/grafana/data/`.
-- [ ] T038 Cierre (quickstart §5; definición de terminado): `cd backend; ./gradlew build` da BUILD SUCCESSFUL con la
+- [X] T038 Cierre (quickstart §5; definición de terminado): `cd backend; ./gradlew build` da BUILD SUCCESSFUL con la
   suite completa (incluida la de arquitectura de la 010 y todos los tests nuevos); la cantidad de tests es la de
   T001 más los nuevos; `git diff main -- backend/src/test` muestra como único cambio en tests existentes la
   aserción y el import de `CacheConfigTest` (T011); `./gradlew bootRun` levanta con el perfil local; con
   `--futbolmarket.cache.ranking.maximum-size=0` no arranca y el mensaje nombra la propiedad (quickstart §2.4);
   Swagger no cambió. Repasar los escenarios manuales de quickstart §2 y §3.
+  **Cierre (2026-11-25)**: BUILD SUCCESSFUL, 2435 tests (2 saltados, 0 fallas): los 2368 de T001 más 67
+  nuevos. Tests existentes modificados: `CacheConfigTest` (T011) y `BusinessMetricsIT` (vocabulario,
+  segunda excepción autorizada). `maximum-size=0` no arranca (`QuoteCachePropertiesTest`); no hay
+  endpoints nuevos.
 
 ---
 

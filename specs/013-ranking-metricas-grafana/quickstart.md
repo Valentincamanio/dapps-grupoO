@@ -96,8 +96,10 @@ http://localhost:9090/graph con
 - En `specs/013-ranking-metricas-grafana/medicion-ranking.md` van la fecha, la máquina, N, la
   consulta y una tabla con el promedio y el p95 (cliente y servidor) de cada variante, más el
   índice de aciertos de C. El README enlaza ese documento y copia el resumen.
-- **SC-001**: el promedio de C es ≤ 1/5 del de B, y C no es más lento que A más allá del ruido de
-  la medición. En `medicion-ranking.md` se anotan los dos promedios (A y C) y su diferencia.
+- **SC-001**: en C las consultas repetidas son aciertos (SC-002) y el promedio del servidor es
+  menor que en B. Se anotan el factor B / C y el ahorro absoluto B − C, sin un umbral fijo. A y C
+  se corren dos veces cada una, y C no es más lento que A más allá de la variación entre corridas:
+  en `medicion-ranking.md` se anotan los promedios de A y C y su diferencia.
 - **SC-002**: en C, con N = 1000 y una sola combinación de parámetros, el índice de aciertos es
   ≥ 95% (se espera 1 fallo y el resto aciertos).
 - La variante A no tiene métricas de caché: el `ConcurrentMapCacheManager` no las publica. Se anota

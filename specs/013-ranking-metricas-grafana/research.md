@@ -151,6 +151,8 @@ devolviendo el `com.github.benmanes.caffeine.cache.Cache` con las estadísticas.
   implementación** que 1.17.1 coincide, en la tarea del IT de métricas del caché):
   `cache.gets{result=hit|miss}`, `cache.puts`, `cache.evictions`, `cache.size` y
   `cache.eviction.weight`. Sin `recordStats()` se registra solo `cache.size`, con un `WARN`.
+  **Verificado en la implementación (T016)**: con Micrometer 1.17.1 salen las cinco, para los dos
+  cachés y con `cache_manager="cacheManager"` (`e2e/CacheMetricsIT`).
 
 **Cómo queda en Prometheus** (más `application="futbol-market"` en toda serie):
 
@@ -196,10 +198,16 @@ futbolmarket:
       expire-after-write: 10m
 ```
 
-Validación al arrancar (FR-003): `maximum-size` va con `@NotNull @Positive`. `expire-after-write`
-va con `@NotNull` y una comprobación en el constructor compacto: tiene que ser positivo. Un valor
-inválido corta el arranque con un mensaje en español que nombra la propiedad, con el mismo estilo
-de `QuoteRecalculationProperties`.
+Validación al arrancar (FR-003): el constructor compacto de `QuoteCacheProperties` comprueba que
+cada caché tenga su bloque, y que `maximum-size` y `expire-after-write` estén y sean mayores que
+cero. Un valor inválido corta el arranque con un mensaje en español que nombra la propiedad
+completa, con el mismo estilo de `QuoteRecalculationProperties`.
+
+**Verificado en la implementación (T007)**: la primera versión llevaba `@NotNull @Positive` en el
+registro anidado `Spec`. El error de enlace de esas anotaciones nombra el campo en camelCase
+(`ranking.maximumSize`), no la propiedad (`futbolmarket.cache.ranking.maximum-size`), y como
+`Spec` se comparte entre los dos cachés, su mensaje tampoco puede decir cuál es. Por eso toda la
+validación pasó al constructor del registro de afuera, que conoce el nombre de cada caché.
 
 **Por qué esos valores** (los fija Assumptions de la spec):
 - **Ranking, 500 entradas**: la clave es `(PlayerFilter, page, size)`. Los filtros que se usan son
@@ -280,8 +288,18 @@ Tres variantes con la misma cantidad de consultas (FR-010 y Assumptions):
 - **Resultados**: van en `specs/013-ranking-metricas-grafana/medicion-ranking.md`, con el
   procedimiento, la máquina, N, la consulta y una tabla por variante. Para comparar el caché nuevo
   con el anterior (SC-001) se reportan los dos valores y la diferencia, sin un umbral fijo: el
-  caché nuevo no puede ser más lento que el anterior más allá del ruido de la medición. El README
-  lleva un resumen y el enlace (FR-010). No hay test automático de tiempos.
+  caché nuevo no puede ser más lento que el anterior más allá del ruido de la medición, y por eso
+  A y C se corren dos veces cada una. Contra la variante sin caché se informan el factor B / C y el
+  ahorro absoluto B − C del tiempo medio del servidor, también sin umbral. El README lleva un
+  resumen y el enlace (FR-010). No hay test automático de tiempos.
+- **Por qué sin umbral contra "sin caché"** (cambio del 2026-11-25, después de medir): la primera
+  versión de SC-001 pedía que la consulta repetida fuera 5 veces más rápida que sin caché. La
+  medición dio 2,41 en el servidor y 1,51 en el cliente. En C todas las consultas medidas fueron
+  aciertos y el servidor igual tardó 3,44 ms por pedido: es el costo fijo de la cadena de
+  seguridad, la auditoría de web services, la métrica HTTP y la serialización a JSON, que el caché
+  no toca. El caché elimina la consulta a la base (4,8 ms con la base H2 local), así que el factor
+  depende de cuánto cueste esa consulta: con una base remota o con más datos sería mayor. Un umbral
+  fijo mediría la base y no el caché.
 
 **Alternativas**:
 - JMeter, k6 o `hey`: son dependencias nuevas. La spec pide "sin dependencias nuevas".
@@ -320,9 +338,12 @@ Tres variantes con la misma cantidad de consultas (FR-010 y Assumptions):
   las suyas).
 - `bindTo` da de alta las 6 combinaciones en cero (FR-017). El catálogo pasa de 30 a 36 series, y
   se actualiza el Javadoc.
-- **No rompe tests existentes**: `BusinessMetricsTest` cuenta solo los nombres de su conjunto
-  `NAMES`, y `ActuatorContentIT` filtra por prefijo (`futbolmarket_market_orders_total{`), que no
-  coincide con los nombres nuevos.
+- **Tests existentes**: `BusinessMetricsTest` cuenta solo los nombres de su conjunto `NAMES`, y
+  `ActuatorContentIT` filtra por prefijo (`futbolmarket_market_orders_total{`), que no coincide con
+  los nombres nuevos. **Corregido en la implementación**: `BusinessMetricsIT` sí se rompe, porque
+  verifica que toda serie `futbolmarket.*` use solo etiquetas de su vocabulario, que no tenía
+  `counterparty`. Se le agregó esa entrada con los dos valores cerrados, con el "sí" explícito del
+  desarrollador (2026-11-25; plan, Complexity Tracking).
 
 **Por qué**: es la misma familia de nombres de la 012 (FR-018). Una etiqueta de valores cerrados
 mantiene acotada la cardinalidad (FR-020). Los nombres del pedido del usuario se mantienen tal cual.
@@ -408,7 +429,7 @@ el IT compara con tolerancia de un centavo (`isCloseTo(..., within(0.005))`).
 es el de la 11.0, referencias a data sources por objeto `{type, uid}` y el subcomando
 `grafana server`. Las páginas oficiales de hoy muestran la 13 como versión actual. **A verificar en
 la implementación**: la versión con la que se probó queda escrita en el README, en la tarea del
-README.
+README. **Verificado (T033)**: se probó con Grafana OSS 13.3.2 y Prometheus 3.16.0.
 
 - El ejecutable es `<GRAFANA_HOME>\bin\grafana.exe server`. Las páginas de instalación más viejas
   todavía nombran `grafana-server.exe`, que está deprecado, y la de arranque usa `grafana server`.
@@ -508,24 +529,38 @@ Cases). **A verificar en la implementación**: que Grafana no se queje por las c
 provisioning que no usamos (`plugins`, `alerting`). Si fallara, se agrega un archivo mínimo válido,
 nunca un `.gitkeep`. Se verifica en la tarea del quickstart de Grafana.
 
+**Verificado en la implementación (T033, Grafana 13.3.2)**: sin esas carpetas, el log de Grafana
+muestra dos errores de provisioning, uno por `provisioning/plugins` y otro por
+`provisioning/alerting`. Cada carpeta lleva ahora un `futbol-market.yaml` mínimo y válido que no
+configura nada: `apiVersion: 1` y `apps: []` para los plugins, y `apiVersion: 1` para las
+alertas (contracts/grafana-dashboard.md §4.1).
+
 `monitoring/prometheus.yml` **no cambia**: recolecta el mismo endpoint, y las métricas nuevas salen
 solas.
 
 ### R16. Paneles y PromQL
 
-**Decisión**: tres filas. Se usa `increase`/`rate`, que absorben los reinicios de los contadores
-(FR-027, escenario 5). Se excluye `/actuator/**` del tráfico general, para que el scrape de
+**Decisión**: tres filas. Las series temporales usan `increase`/`rate`, que absorben los
+reinicios de los contadores (FR-027, escenario 5). Se excluye `/actuator/**` del tráfico general, para que el scrape de
 Prometheus no ensucie los pedidos. El detalle de cada expresión está en
 [contracts/grafana-dashboard.md](./contracts/grafana-dashboard.md).
 
-- **Negocio**: operaciones, tokens y créditos, cada uno con un *stat* del total en el rango y una
-  serie temporal por `counterparty` más el total (FR-024). Órdenes pedidas por `operation`/`result`
+- **Negocio**: operaciones, tokens y créditos, cada uno con un *stat* del total desde el arranque
+  del backend y una serie temporal por `counterparty` más el total (FR-024). Órdenes pedidas por `operation`/`result`
   y órdenes abiertas (`futbolmarket_market_orders_open`).
 - **Ranking**: el p95 de `http_server_requests_seconds_bucket{uri="/players/ranking"}` con
   `histogram_quantile` (el histograma ya está prendido desde la 012, FR-009) y el índice de
   aciertos de `quotes-ranking` (FR-025).
 - **General**: pedidos por segundo y tasa de 4xx y de 5xx, con la etiqueta `outcome` de Micrometer
   (`CLIENT_ERROR` y `SERVER_ERROR`) (FR-026).
+
+**Cambio después de la validación manual (T033)**: los tres *stats* de totales usaban
+`sum(increase(...[$__range]))`. `increase` extrapola a los bordes de la ventana, así que con pocas
+operaciones mostraba valores no enteros que cambiaban solos (por ejemplo, 4,13 operaciones). Ahora
+muestran el valor del contador, `sum(futbolmarket_market_trades_total)` y los equivalentes de
+tokens y créditos, con 0 decimales en operaciones y tokens y 2 en créditos. Es el total exacto
+desde que arrancó el backend, y el título lo dice: después de un reinicio vuelve a cero, que es
+coherente con lo que el panel promete (FR-027). Las series temporales por período no cambian.
 
 ### R17. Test del dashboard
 
